@@ -1,14 +1,15 @@
 #include <iostream>
-#include <vector>
+#include <array>
 
 #include <GLFW/glfw3.h>
 
+#include "gui.h"
 #include "vkabstraction.h"
 
 const static unsigned int WIDTH = 800;
 const static unsigned int HEIGHT = 600;
 
-const std::vector<const char*, 1> validationLayers = {
+const std::array<const char*, 1> validationLayers = {
     "VK_LAYER_KHRONOS_validation"
 };
 
@@ -20,10 +21,10 @@ const bool enableValidationLayers = true;
 
 bool check_validation_layer_support() {
     uint32_t layer_cnt;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
+    vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
 
     std::vector<VkLayerProperties> availableLayers(layer_cnt);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
+    vkEnumerateInstanceLayerProperties(&layer_cnt, availableLayers.data());
 
     for (const char* layerName : validationLayers) {
         bool layerFound = false;
@@ -43,17 +44,14 @@ bool check_validation_layer_support() {
     return true;
 }
 
-void init_window() {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
-
-    window = glfwCreateWindow(WIDHT, HEIGHT, "vkkk", nullptr, nullptr);
-}
-
 int main() {
-    init_window();
-    init_vulkan();
+    auto win = init_window(800, 600);
+
+    VkInstance instance;
+    VkDebugUtilsMessengerEXT debug_messenger;
+    const char** glfw_extensions;
+    uint32_t glfw_extension_cnt;
+    glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
+    init_vulkan(instance, "vkkk", "vkbackend", glfw_extensions, , &debug_messenger, nullptr);
     return 0;
 }

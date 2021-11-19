@@ -2,13 +2,15 @@ find_path(GLFW_INCLUDE_DIR GLFW/glfw3.h
     HINTS
         /usr
         /usr/local
+        ${GLFW_ROOT}
     PATH_SUFFIXES
         include)
 
-find_library(GLFW_LIB glfw
+find_library(GLFW_LIB glfw3
     HINTS
         /usr
         /usr/local
+        ${GLFW_ROOT}
     PATH_SUFFIXES
         lib)
 

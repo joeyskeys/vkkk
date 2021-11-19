@@ -1,3 +1,3 @@
 #pragma once
 
-void init_window(int width, int height);
+GLFWwindow* init_window(int width, int height);

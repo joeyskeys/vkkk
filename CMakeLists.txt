@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.10)
 
+cmake_policy(SET CMP0074 NEW)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 
 project(vkkk)
@@ -20,7 +22,7 @@ else()
     message(STATUS "Found GLFW: ${GLFW_LIBRARY}")
 endif()
 
-include_directories($Vulkan_INCLUDE_DIRS)
-include_directories($GLFW_INCLUDE_DIRS)
+include_directories(${Vulkan_INCLUDE_DIRS})
+include_directories(${GLFW_INCLUDE_DIRS})
 
-add_executable(vkkk main.cpp)
+add_executable(vkkk main.cpp vkabstraction.cpp gui.cpp)

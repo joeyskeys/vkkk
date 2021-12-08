@@ -26,3 +26,6 @@ include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
 
 add_executable(vkkk main.cpp vkabstraction.cpp gui.cpp)
+target_link_libraries(vkkk
+    ${GLFW_LIBRARIES}
+    ${Vulkan_LIBRARIES})

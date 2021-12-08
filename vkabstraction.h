@@ -18,7 +18,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     return VK_FALSE;
 }
 
-void init_vulkan(
+void create_instance(
     VkInstance& instance,
     const std::string& app_name,
     const std::string& engine_name,
@@ -26,5 +26,9 @@ void init_vulkan(
     std::function<std::vector<const char*>()> validation_layer_functor,
     VkDebugUtilsMessengerEXT* debug_messenger,
     PFN_vkDebugUtilsMessengerCallbackEXT debug_cbk=debug_callback);
+
+std::vector<VkPhysicalDevice> get_devices();
+
+bool validate_device(const VkPhysicalDevice& device, const VkQueueFlagBits& flags);
 
 }

@@ -53,6 +53,6 @@ int main() {
     uint32_t glfw_extension_cnt;
     glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
     auto extensions = std::vector<const char*>(glfw_extensions, glfw_extensions + glfw_extension_cnt);
-    vkkk::init_vulkan(instance, "vkkk", "vkbackend", extensions, vkkk::default_validation_layer_func, &debug_messenger);
+    vkkk::create_instance(instance, "vkkk", "vkbackend", extensions, vkkk::default_validation_layer_func, &debug_messenger);
     return 0;
 }

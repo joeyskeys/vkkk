@@ -33,7 +33,7 @@ std::vector<const char*> default_validation_layer_func() {
     return validation_layers;
 }
 
-void init_vulkan(
+void create_instance(
     VkInstance& instance,
     const std::string& app_name,
     const std::string& engine_name,
@@ -102,6 +102,24 @@ void init_vulkan(
         if (ret != VK_SUCCESS)
             throw std::runtime_error("failed to set up debug messenger!");
     }
+}
+
+std::vector<VkPhysicalDevice> get_devices(const VkInstance& instance) {
+    uint32_t device_cnt = 0;
+    vkEnumeratePhysicalDevices(instance, &device_cnt, nullptr);
+
+    auto devices = std::vector<VkPhysicalDevice>();
+    if (device_cnt > 0) {
+        devices.reserve(device_cnt);
+        vkEnumeratePhysicalDevices(instance, &device_cnt, devices.data());
+    }
+
+    return devices;
+}
+
+bool validate_device(const VkPhysicalDevice& device, const VkQueueFlagBits& flags) {
+    uint32_t queue_family_cnt = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_cnt, nullptr);
 }
 
 }

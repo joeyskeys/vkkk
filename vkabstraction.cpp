@@ -104,7 +104,7 @@ void create_instance(
     }
 }
 
-std::vector<VkPhysicalDevice> get_devices(const VkInstance& instance) {
+std::vector<VkPhysicalDevice> get_physical_devices(const VkInstance& instance) {
     uint32_t device_cnt = 0;
     vkEnumeratePhysicalDevices(instance, &device_cnt, nullptr);
 
@@ -120,6 +120,16 @@ std::vector<VkPhysicalDevice> get_devices(const VkInstance& instance) {
 bool validate_device(const VkPhysicalDevice& device, const VkQueueFlagBits& flags) {
     uint32_t queue_family_cnt = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_cnt, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queue_families(queue_family_cnt);
+    vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_cnt, queue_families.data());
+
+    for (const auto& queue_family : queue_families) {
+        if (queue_family.queueFlags & flags)
+            return true;
+    }
+
+    return false;
 }
 
 }

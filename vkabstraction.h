@@ -27,8 +27,10 @@ void create_instance(
     VkDebugUtilsMessengerEXT* debug_messenger,
     PFN_vkDebugUtilsMessengerCallbackEXT debug_cbk=debug_callback);
 
-std::vector<VkPhysicalDevice> get_devices();
+std::vector<VkPhysicalDevice> get_physical_devices(const VkInstance& instance);
 
 bool validate_device(const VkPhysicalDevice& device, const VkQueueFlagBits& flags);
+
+void create_logical_device();
 
 }

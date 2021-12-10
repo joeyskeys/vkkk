@@ -176,4 +176,8 @@ void create_logical_device(const VkPhysicalDevice& physical_device, const VkQueu
     //vkGetDeviceQueue(device, idx.value(), 0, );
 }
 
+bool VkWrappedInstance::init() {
+
+}
+
 }

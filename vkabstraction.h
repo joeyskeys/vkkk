@@ -39,16 +39,35 @@ void create_logical_device(const VkPhysicalDevice& physical_device, const VkQueu
 
 class VkWrappedInstance {
 public:
-    VkWrappedInstance(uint32_t w, uint32_t h);
+    VkWrappedInstance();
+    VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename);
     ~VkWrappedInstance();
 
     bool init();
 
 private:
+    // Private methods
+    std::vector<const char*> get_default_extensions();
+    static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT severity,
+        VkDebugUtilsMessageTypeFlagsEXT type,
+        const VkDebugUtilsMessengerCallbackDataEXT* cb_data,
+        void* user_data) {
+        std::cerr << "validation layer: " << cb_data->pMessage << std::endl;
+        return VK_FALSE;
+    }
+
+private:
     uint32_t width = 800;
     uint32_t height = 600;
+    std::string app_name = "vkkk";
+    std::string engine_name = "vulkan";
+    uint32_t app_version = VK_MAKE_VERSION(1, 0, 0);
+    uint32_t api_version = VK_API_VERSION_1_2;
+    bool enable_validation_layers = true;
 
     VkInstance instance;
+    VkDebugUtilsMessengerEXT debug_messenger;
 
     // Currently only use one physical card and one logical device
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;

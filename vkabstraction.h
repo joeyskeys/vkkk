@@ -43,11 +43,17 @@ public:
     VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename);
     ~VkWrappedInstance();
 
-    bool init();
+    inline std::vector<VkPhysicalDevice> get_physical_devices() {
+        return physical_devices;
+    }
+
+    bool validate_current_device(const VkQueueFlagBits& flags, QueueFamilyIndex* idx);
+    void create_logical_device(const VkQueueFlagBits& flags);
 
 private:
     // Private methods
     std::vector<const char*> get_default_extensions();
+
     static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT severity,
         VkDebugUtilsMessageTypeFlagsEXT type,
@@ -70,12 +76,14 @@ private:
     VkDebugUtilsMessengerEXT debug_messenger;
 
     // Currently only use one physical card and one logical device
+    std::vector<VkPhysicalDevice> physical_devices;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device;
 
     // Multiple queues, currently store in a map with names
     using QueueMap = std::unordered_map<std::string, VkQueue>;
     QueueMap queue_map;
+    VkQueue graphic_queue;
 };
 
 }

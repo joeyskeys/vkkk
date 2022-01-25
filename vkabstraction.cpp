@@ -226,6 +226,15 @@ VkWrappedInstance::VkWrappedInstance() {
                 throw std::runtime_error("failed to set up debug messenger..");
         }
     }
+
+    uint32_t device_cnt = 0;
+    vkEnumeratePhysicalDevices(instance, &device_cnt, nullptr);
+
+    if (device_cnt > 0) {
+        physical_devices.resize(device_cnt);
+        vkEnumeratePhysicalDevices(instance, &device_cnt, physical_devices.data());
+        physical_device = physical_devices[0];
+    }
 }
 
 VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename)
@@ -245,8 +254,63 @@ VkWrappedInstance::~VkWrappedInstance() {
     vkDestroyInstance(instance, nullptr);
 }
 
-bool VkWrappedInstance::init() {
+bool VkWrappedInstance::validate_current_device(const VkQueueFlagBits& flags, QueueFamilyIndex* idx) {
+    uint32_t queue_family_cnt = 0;
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_cnt, nullptr);
+
+    std::vector<VkQueueFamilyProperties> queue_families(queue_family_cnt);
+    vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_cnt, queue_families.data());
+
+    int i = 0;
+    for (const auto& queue_family : queue_families) {
+        if (queue_family.queueFlags & flags) {
+            if (idx)
+                *idx = i;
+            return true;
+        }
+    }
+
     return false;
+}
+
+void VkWrappedInstance::create_logical_device(const VkQueueFlagBits& flags) {
+    QueueFamilyIndex idx;
+    if (!validate_device(physical_device, flags, &idx))
+        throw std::runtime_error("Queue specified not available");
+
+    // Queue create info
+    VkDeviceQueueCreateInfo queue_create_info{};
+    queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_info.queueFamilyIndex = idx.value();
+    queue_create_info.queueCount = 1;
+    float queue_priority = 1.f;
+    queue_create_info.pQueuePriorities = &queue_priority;
+
+    // Device feature
+    VkPhysicalDeviceFeatures device_features{};
+
+    // Device create info
+    VkDeviceCreateInfo device_create_info{};
+    device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    device_create_info.pQueueCreateInfos = &queue_create_info;
+    device_create_info.queueCreateInfoCount = 1;
+    device_create_info.pEnabledFeatures = &device_features;
+
+    // Modern impls will have this info from instance, ignore for now..
+    // device_create_info.enabledExtensionCount = 0;
+    // if (enable_validation_layers) {
+    //  device_create_info.enabledLayerCount = validationLayers.size();
+    //  device_create_info.ppEnabledLayerNames = validationLayers.data();
+    // }
+    // else
+    //  device_create_info.enabledLayerCount = 0;
+
+    // Create logical device
+    if (vkCreateDevice(physical_device, &device_create_info, nullptr, &device) != VK_SUCCESS)
+        throw std::runtime_error("failed to create logical device!");
+
+    // Retrieve queue
+    vkGetDeviceQueue(device, idx.value(), 0, &graphic_queue);
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_extensions() {

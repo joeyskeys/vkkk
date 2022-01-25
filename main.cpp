@@ -56,5 +56,6 @@ int main() {
     //vkkk::create_instance(instance, "vkkk", "vkbackend", extensions, vkkk::default_validation_layer_func, &debug_messenger);
 
     vkkk::VkWrappedInstance ins;
+    ins.create_logical_device(VK_QUEUE_GRAPHICS_BIT);
     return 0;
 }

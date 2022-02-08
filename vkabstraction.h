@@ -5,37 +5,19 @@
 #include <unordered_map>
 
 #include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
 
 namespace vkkk
 {
 
-using QueueFamilyIndex = std::optional<uint32_t>;
+struct QueueFamilyIndex {
+    std::optional<uint32_t> graphic_family;
+    std::optional<uint32_t> present_family;
 
-std::vector<const char*> default_validation_layer_func();
-
-static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
-    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
-    VkDebugUtilsMessageTypeFlagsEXT message_type,
-    const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
-    void* p_user_data) {
-    std::cerr << "validation layer: " << p_callback_data->pMessage << std::endl;
-    return VK_FALSE;
-}
-
-void create_instance(
-    VkInstance& instance,
-    const std::string& app_name,
-    const std::string& engine_name,
-    std::vector<const char*> extensions,
-    std::function<std::vector<const char*>()> validation_layer_functor,
-    VkDebugUtilsMessengerEXT* debug_messenger,
-    PFN_vkDebugUtilsMessengerCallbackEXT debug_cbk=debug_callback);
-
-std::vector<VkPhysicalDevice> get_physical_devices(const VkInstance& instance);
-
-bool validate_device(const VkPhysicalDevice& device, const VkQueueFlagBits& flags, QueueFamilyIndex* idx);
-
-void create_logical_device(const VkPhysicalDevice& physical_device, const VkQueueFlagBits& flags, VkDevice& device);
+    inline bool is_valid() {
+        return graphic_family.has_value() && present_family.has_value();
+    }
+};
 
 class VkWrappedInstance {
 public:
@@ -43,12 +25,18 @@ public:
     VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename);
     ~VkWrappedInstance();
 
+    inline void setup_window(GLFWwindow* win) {
+        window = win;
+    }
+    
+    void create_surface();
+
     inline std::vector<VkPhysicalDevice> get_physical_devices() {
         return physical_devices;
     }
 
-    bool validate_current_device(const VkQueueFlagBits& flags, QueueFamilyIndex* idx);
-    void create_logical_device(const VkQueueFlagBits& flags);
+    bool validate_current_device(QueueFamilyIndex* idx);
+    void create_logical_device();
 
 private:
     // Private methods
@@ -84,6 +72,13 @@ private:
     using QueueMap = std::unordered_map<std::string, VkQueue>;
     QueueMap queue_map;
     VkQueue graphic_queue;
+    VkQueue present_queue;
+
+    // Surface
+    VkSurfaceKHR surface;
+
+    // Window, bound to glfw for now
+    GLFWwindow* window;
 };
 
 }

@@ -45,6 +45,7 @@ bool check_validation_layer_support() {
 }
 
 int main() {
+    /*
     auto win = init_window(800, 600);
 
     VkInstance instance;
@@ -54,8 +55,10 @@ int main() {
     glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
     auto extensions = std::vector<const char*>(glfw_extensions, glfw_extensions + glfw_extension_cnt);
     //vkkk::create_instance(instance, "vkkk", "vkbackend", extensions, vkkk::default_validation_layer_func, &debug_messenger);
+    */
 
     vkkk::VkWrappedInstance ins;
-    ins.create_logical_device(VK_QUEUE_GRAPHICS_BIT);
+    ins.create_surface();
+    ins.create_logical_device();
     return 0;
 }

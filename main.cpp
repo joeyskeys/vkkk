@@ -60,5 +60,6 @@ int main() {
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
+    ins.create_swapchain();
     return 0;
 }

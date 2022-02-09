@@ -1,5 +1,7 @@
+#include <array>
 #include <functional>
 #include <iostream>
+#include <span>
 #include <vector>
 #include <optional>
 #include <unordered_map>
@@ -17,6 +19,12 @@ struct QueueFamilyIndex {
     inline bool is_valid() {
         return graphic_family.has_value() && present_family.has_value();
     }
+};
+
+struct SwapChainSupportDetails {
+    VkSurfaceCapabilitiesKHR capabilities;
+    std::vector<VkSurfaceFormatKHR> formats;
+    std::vector<VkPresentModeKHR> present_modes;
 };
 
 class VkWrappedInstance {
@@ -37,10 +45,14 @@ public:
 
     bool validate_current_device(QueueFamilyIndex* idx);
     void create_logical_device();
+    void create_swapchain();
 
 private:
     // Private methods
-    std::vector<const char*> get_default_extensions();
+    std::vector<const char*> get_default_instance_extensions();
+    inline std::array<const char*, 1> get_default_device_extensions() {
+        return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -50,6 +62,13 @@ private:
         std::cerr << "validation layer: " << cb_data->pMessage << std::endl;
         return VK_FALSE;
     }
+
+    bool check_device_extension_support(const std::span<const char*> extensions) const;
+
+    VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats) const;
+    VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes) const;
+    VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+
 
 private:
     uint32_t width = 800;
@@ -68,17 +87,26 @@ private:
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device;
 
-    // Multiple queues, currently store in a map with names
-    using QueueMap = std::unordered_map<std::string, VkQueue>;
-    QueueMap queue_map;
-    VkQueue graphic_queue;
-    VkQueue present_queue;
-
     // Surface
     VkSurfaceKHR surface;
 
+    // Multiple queues, currently store in a map with names
+    using QueueIndexVec = std::vector<uint32_t>;
+    QueueIndexVec queue_idx_vec;
+    VkQueue graphic_queue;
+    VkQueue present_queue;
+    bool    queue_created = false;
+
+    // SwapChain related
+    VkSwapchainKHR          swapchain;
+    std::vector<VkImage>    swapchain_images;
+    SwapChainSupportDetails swapchain_details;
+    VkSurfaceFormatKHR      swapchain_surface_format;
+    VkExtent2D              swapchain_extent;
+    bool                    swapchain_created = false;
+
     // Window, bound to glfw for now
-    GLFWwindow* window;
+    GLFWwindow*     window;
 };
 
 }

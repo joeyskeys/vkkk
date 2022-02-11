@@ -1,11 +1,15 @@
 #include <algorithm>
 #include <cassert>
+#include <filesystem>
+#include <fstream>
 #include <format>
 #include <iterator>
 #include <set>
 #include <stdexcept>
 
 #include "vkabstraction.h"
+
+namespace fs = std::filesystem;
 
 namespace vkkk
 {
@@ -86,6 +90,11 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    if (imageviews_created) {
+        for (auto imageview : swapchain_imageviews)
+            vkDestroyImageView(device, imageview, nullptr);
+    }
+
     if (swapchain_created)
         vkDestroySwapchainKHR(device, swapchain, nullptr);
 
@@ -268,6 +277,57 @@ void VkWrappedInstance::create_swapchain() {
     vkGetSwapchainImagesKHR(device, swapchain, &image_cnt, swapchain_images.data());
 
     swapchain_created = true;
+}
+
+void VkWrappedInstance::create_imageviews() {
+    swapchain_imageviews.resize(swapchain_images.size());
+
+    for (int i = 0; i < swapchain_images.size(); ++i) {
+        VkImageViewCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        create_info.image = swapchain_images[i];
+        create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        create_info.format = swapchain_surface_format.format;
+        create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+        
+        create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        create_info.subresourceRange.baseMipLevel = 0;
+        create_info.subresourceRange.levelCount = 1;
+        create_info.subresourceRange.baseArrayLayer = 0;
+        create_info.subresourceRange.layerCount = 1;
+
+        if (vkCreateImageView(device, &create_info, nullptr, &swapchain_imageviews[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to create image views!");
+
+        imageviews_created = true;
+    }
+}
+
+static std::vector<char> load_file(const fs::path& filepath) {
+    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+
+    if (!file.good()) {
+        throw std::runtime_error(std::format("failed to open file : {}..", filepath));
+    }
+
+    size_t file_size = fs::file_size(filepath);
+    std::vector<char> buffer(file_size);
+    file.seekg(0);
+    file.read(buffer.data(), file_size);
+    file.close();
+
+    return buffer;
+}
+
+VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
+    
+}
+
+void VkWrappedInstance::create_graphics_pipeline() {
+
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {

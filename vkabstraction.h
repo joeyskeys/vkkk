@@ -46,6 +46,9 @@ public:
     bool validate_current_device(QueueFamilyIndex* idx);
     void create_logical_device();
     void create_swapchain();
+    void create_imageviews();
+    VkShaderModule create_shader_module(std::vector<char>);
+    void create_graphics_pipeline();
 
 private:
     // Private methods
@@ -98,12 +101,15 @@ private:
     bool    queue_created = false;
 
     // SwapChain related
-    VkSwapchainKHR          swapchain;
-    std::vector<VkImage>    swapchain_images;
-    SwapChainSupportDetails swapchain_details;
-    VkSurfaceFormatKHR      swapchain_surface_format;
-    VkExtent2D              swapchain_extent;
-    bool                    swapchain_created = false;
+    VkSwapchainKHR              swapchain;
+    std::vector<VkImage>        swapchain_images;
+    SwapChainSupportDetails     swapchain_details;
+    VkSurfaceFormatKHR          swapchain_surface_format;
+    VkExtent2D                  swapchain_extent;
+    bool                        swapchain_created = false;
+
+    std::vector<VkImageView>    swapchain_imageviews;
+    bool                        imageviews_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

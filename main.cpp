@@ -61,5 +61,6 @@ int main() {
     ins.create_surface();
     ins.create_logical_device();
     ins.create_swapchain();
+    ins.create_imageviews();
     return 0;
 }

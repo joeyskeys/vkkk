@@ -2,7 +2,6 @@
 #include <cassert>
 #include <filesystem>
 #include <fstream>
-#include <format>
 #include <iterator>
 #include <set>
 #include <stdexcept>
@@ -310,7 +309,8 @@ static std::vector<char> load_file(const fs::path& filepath) {
     std::ifstream file(filepath, std::ios::ate | std::ios::binary);
 
     if (!file.good()) {
-        throw std::runtime_error(std::format("failed to open file : {}..", filepath));
+        //throw std::runtime_error(std::format("failed to open file : {}..", filepath));
+        throw std::runtime_error("failed to open file..");
     }
 
     size_t file_size = fs::file_size(filepath);
@@ -348,11 +348,11 @@ void VkWrappedInstance::create_graphics_pipeline() {
     vert_stage_create_info.module = vert_shader_module;
     vert_stage_create_info.pName = "main";
 
-    VkPipelineShaderStageCreateInfo vert_stage_create_info{};
-    vert_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vert_stage_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    vert_stage_create_info.module = frag_shader_module;
-    vert_stage_create_info.pName = "main";
+    VkPipelineShaderStageCreateInfo frag_stage_create_info{};
+    frag_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    frag_stage_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    frag_stage_create_info.module = frag_shader_module;
+    frag_stage_create_info.pName = "main";
 
     vkDestroyShaderModule(device, vert_shader_module, nullptr);
     vkDestroyShaderModule(device, frag_shader_module, nullptr);

@@ -323,11 +323,39 @@ static std::vector<char> load_file(const fs::path& filepath) {
 }
 
 VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
-    
+    VkShaderModuleCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+    create_info.codeSize = buf.size();
+    create_info.pCode = reinterpret_cast<const uint32_t*>(buf.data());
+
+    VkShaderModule shader_module;
+    if (vkCreateShaderModule(device, &create_info, nullptr, &shader_module) != VK_SUCCESS)
+        throw std::runtime_error("failed to create shader module!");
+
+    return shader_module;
 }
 
 void VkWrappedInstance::create_graphics_pipeline() {
+    auto vert_code = load_file("../resource/shaders/default.vert");
+    auto frag_code = load_file("../resource/shaders/default.frag");
 
+    auto vert_shader_module = create_shader_module(vert_code);
+    auto frag_shader_module = create_shader_module(frag_code);
+
+    VkPipelineShaderStageCreateInfo vert_stage_create_info{};
+    vert_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vert_stage_create_info.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vert_stage_create_info.module = vert_shader_module;
+    vert_stage_create_info.pName = "main";
+
+    VkPipelineShaderStageCreateInfo vert_stage_create_info{};
+    vert_stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vert_stage_create_info.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    vert_stage_create_info.module = frag_shader_module;
+    vert_stage_create_info.pName = "main";
+
+    vkDestroyShaderModule(device, vert_shader_module, nullptr);
+    vkDestroyShaderModule(device, frag_shader_module, nullptr);
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {

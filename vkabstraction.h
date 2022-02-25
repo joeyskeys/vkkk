@@ -111,6 +111,9 @@ private:
     std::vector<VkImageView>    swapchain_imageviews;
     bool                        imageviews_created = false;
 
+    // Pipeline
+    VkPipelineLayout            pipeline_layout;
+
     // Window, bound to glfw for now
     GLFWwindow*     window;
 };

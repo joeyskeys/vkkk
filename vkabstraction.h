@@ -47,6 +47,7 @@ public:
     void create_logical_device();
     void create_swapchain();
     void create_imageviews();
+    void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
     void create_graphics_pipeline();
 
@@ -113,6 +114,11 @@ private:
 
     // Pipeline
     VkPipelineLayout            pipeline_layout;
+    bool                        pipeline_created = false;
+
+    // Render pass
+    VkRenderPass                render_pass;
+    bool                        render_pass_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

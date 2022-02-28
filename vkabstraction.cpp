@@ -89,6 +89,12 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    if (pipeline_created)
+        vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+
+    if (render_pass_created)
+        vkDestroyRenderPass(device, render_pass, nullptr);
+
     if (imageviews_created) {
         for (auto imageview : swapchain_imageviews)
             vkDestroyImageView(device, imageview, nullptr);
@@ -322,6 +328,39 @@ static std::vector<char> load_file(const fs::path& filepath) {
     return buffer;
 }
 
+void VkWrappedInstance::create_renderpass() {
+    VkAttachmentDescription attachment{};
+    attachment.format = swapchain_surface_format.format;
+    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference attachment_ref{};
+    attachment_ref.attachment = 0;
+    attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    VkSubpassDescription subpass{};
+    subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    subpass.colorAttachmentCount = 1;
+    subpass.pColorAttachments = &attachment_ref;
+
+    VkRenderPassCreateInfo pass_info{};
+    pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
+    pass_info.attachmentCount = 1;
+    pass_info.pAttachments = &attachment;
+    pass_info.subpassCount = 1;
+    pass_info.pSubpasses = &subpass;
+
+    if (vkCreateRenderPass(device, &pass_info, nullptr, &render_pass) != VK_SUCCESS)
+        throw std::runtime_error("failed to create render pass!");
+
+    render_pass_created = true;
+}
+
 VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -426,6 +465,8 @@ void VkWrappedInstance::create_graphics_pipeline() {
 
     vkDestroyShaderModule(device, vert_shader_module, nullptr);
     vkDestroyShaderModule(device, frag_shader_module, nullptr);
+
+    pipeline_created = true;
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {

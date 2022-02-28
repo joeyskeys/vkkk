@@ -62,5 +62,7 @@ int main() {
     ins.create_logical_device();
     ins.create_swapchain();
     ins.create_imageviews();
+    ins.create_renderpass();
+    ins.create_graphics_pipeline();
     return 0;
 }

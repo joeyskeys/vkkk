@@ -112,11 +112,10 @@ private:
     std::vector<VkImageView>    swapchain_imageviews;
     bool                        imageviews_created = false;
 
-    // Pipeline
+    // Pipeline related
     VkPipelineLayout            pipeline_layout;
+    VkPipeline                  pipeline;
     bool                        pipeline_created = false;
-
-    // Render pass
     VkRenderPass                render_pass;
     bool                        render_pass_created = false;
 

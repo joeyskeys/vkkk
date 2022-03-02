@@ -89,6 +89,9 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    if (commandpool_created)
+        vkDestroyCommandPool(device, command_pool, nullptr);
+
     if (framebuffer_created)
         for (auto framebuffer : swapchain_framebuffers)
             vkDestroyFramebuffer(device, framebuffer, nullptr);
@@ -184,15 +187,14 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
 }
 
 void VkWrappedInstance::create_logical_device() {
-    QueueFamilyIndex idx;
-    if (!validate_current_device(&idx))
+    if (!validate_current_device(&queue_family_idx))
         throw std::runtime_error("Queue specified not available");
 
     // Queue create info
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     std::set<uint32_t> queue_families = {
-        idx.graphic_family.value(),
-        idx.present_family.value()
+        queue_family_idx.graphic_family.value(),
+        queue_family_idx.present_family.value()
     };
     
     float queue_priority = 1.f;
@@ -234,8 +236,8 @@ void VkWrappedInstance::create_logical_device() {
         throw std::runtime_error("failed to create logical device!");
 
     // Retrieve queue
-    vkGetDeviceQueue(device, idx.graphic_family.value(), 0, &graphic_queue);
-    vkGetDeviceQueue(device, idx.present_family.value(), 0, &present_queue);
+    vkGetDeviceQueue(device, queue_family_idx.graphic_family.value(), 0, &graphic_queue);
+    vkGetDeviceQueue(device, queue_family_idx.present_family.value(), 0, &present_queue);
 
     queue_created = true;
 }
@@ -510,6 +512,64 @@ void VkWrappedInstance::create_framebuffers() {
 
         if (vkCreateFramebuffer(device, &framebuffer_info, nullptr, &swapchain_framebuffers[i]) != VK_SUCCESS)
             throw std::runtime_error("failed to create framebuffer!");
+    }
+
+    framebuffer_created = true;
+}
+
+void VkWrappedInstance::create_command_pool() {
+    VkCommandPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.queueFamilyIndex = queue_family_idx.graphic_family.value();
+
+    if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) != VK_SUCCESS)
+        throw std::runtime_error("failed to create command pool!");
+
+    commandpool_created = true;
+}
+
+void VkWrappedInstance::create_commandbuffers() {
+    if (!commandpool_created)
+        throw std::runtime_error("command pool not created!");
+
+    commandbuffers.resize(swapchain_framebuffers.size());
+
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = static_cast<uint32_t>(commandbuffers.size());
+
+    if (vkAllocateCommandBuffers(device, &alloc_info, commandbuffers.data()) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate command buffers!");
+
+    for (int i = 0; i < commandbuffers.size(); ++i) {
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        
+        if (vkBeginCommandBuffer(commandbuffers[i], &begin_info) != VK_SUCCESS)
+            throw std::runtime_error("failed to begin recording command buffer!");
+
+        VkRenderPassBeginInfo renderpass_info{};
+        renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderpass_info.renderPass = render_pass;
+        renderpass_info.framebuffer = swapchain_framebuffers[i];
+        renderpass_info.renderArea.offset = { 0, 0 };
+        renderpass_info.renderArea.extent = swapchain_extent;
+
+        VkClearValue clear_color = { {{0.f, 0.f, 0.f, 1.f}} };
+        renderpass_info.clearValueCount = 1;
+        renderpass_info.pClearValues = &clear_color;
+
+        vkCmdBeginRenderPass(commandbuffers[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+            vkCmdDraw(commandbuffers[i], 3, 1, 0, 0);
+        vkCmdEndRenderPass(commandbuffers[i]);
+
+        if (vkEndCommandBuffer(commandbuffers[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to record command buffer!");
+
+        commandbuffer_created = true;
     }
 }
 

@@ -51,6 +51,8 @@ public:
     VkShaderModule create_shader_module(std::vector<char>&);
     void create_graphics_pipeline();
     void create_framebuffers();
+    void create_command_pool();
+    void create_commandbuffers();
 
 private:
     // Private methods
@@ -87,6 +89,8 @@ private:
     VkInstance instance;
     VkDebugUtilsMessengerEXT debug_messenger;
 
+    QueueFamilyIndex queue_family_idx;
+
     // Currently only use one physical card and one logical device
     std::vector<VkPhysicalDevice> physical_devices;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
@@ -103,26 +107,31 @@ private:
     bool    queue_created = false;
 
     // SwapChain related
-    VkSwapchainKHR              swapchain;
-    std::vector<VkImage>        swapchain_images;
-    SwapChainSupportDetails     swapchain_details;
-    VkSurfaceFormatKHR          swapchain_surface_format;
-    VkExtent2D                  swapchain_extent;
-    bool                        swapchain_created = false;
+    VkSwapchainKHR                  swapchain;
+    std::vector<VkImage>            swapchain_images;
+    SwapChainSupportDetails         swapchain_details;
+    VkSurfaceFormatKHR              swapchain_surface_format;
+    VkExtent2D                      swapchain_extent;
+    bool                            swapchain_created = false;
 
-    std::vector<VkImageView>    swapchain_imageviews;
-    bool                        imageviews_created = false;
+    std::vector<VkImageView>        swapchain_imageviews;
+    bool                            imageviews_created = false;
 
     // Pipeline related
-    VkPipelineLayout            pipeline_layout;
-    VkPipeline                  pipeline;
-    bool                        pipeline_created = false;
-    VkRenderPass                render_pass;
-    bool                        render_pass_created = false;
+    VkPipelineLayout                pipeline_layout;
+    VkPipeline                      pipeline;
+    bool                            pipeline_created = false;
+    VkRenderPass                    render_pass;
+    bool                            render_pass_created = false;
 
     // Buffers
-    std::vector<VkFramebuffer>  swapchain_framebuffers;
-    bool                        framebuffer_created = false;
+    std::vector<VkFramebuffer>      swapchain_framebuffers;
+    bool                            framebuffer_created = false;
+
+    VkCommandPool                   command_pool;
+    bool                            commandpool_created = false;
+    std::vector<VkCommandBuffer>    commandbuffers;
+    bool                            commandbuffer_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

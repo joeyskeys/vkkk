@@ -89,6 +89,10 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    if (framebuffer_created)
+        for (auto framebuffer : swapchain_framebuffers)
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+
     if (pipeline_created)
         vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
 
@@ -485,6 +489,28 @@ void VkWrappedInstance::create_graphics_pipeline() {
     vkDestroyShaderModule(device, frag_shader_module, nullptr);
 
     pipeline_created = true;
+}
+
+void VkWrappedInstance::create_framebuffers() {
+    swapchain_framebuffers.resize(swapchain_imageviews.size());
+
+    for (int i = 0; i < swapchain_imageviews.size(); ++i) {
+        VkImageView attachments[] = {
+            swapchain_imageviews[i]
+        };
+
+        VkFramebufferCreateInfo framebuffer_info{};
+        framebuffer_info.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass = render_pass;
+        framebuffer_info.attachmentCount = 1;
+        framebuffer_info.pAttachments = attachments;
+        framebuffer_info.width = swapchain_extent.width;
+        framebuffer_info.height = swapchain_extent.height;
+        framebuffer_info.layers = 1;
+
+        if (vkCreateFramebuffer(device, &framebuffer_info, nullptr, &swapchain_framebuffers[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to create framebuffer!");
+    }
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {

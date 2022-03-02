@@ -50,6 +50,7 @@ public:
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
     void create_graphics_pipeline();
+    void create_framebuffers();
 
 private:
     // Private methods
@@ -118,6 +119,10 @@ private:
     bool                        pipeline_created = false;
     VkRenderPass                render_pass;
     bool                        render_pass_created = false;
+
+    // Buffers
+    std::vector<VkFramebuffer>  swapchain_framebuffers;
+    bool                        framebuffer_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

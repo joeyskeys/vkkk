@@ -64,5 +64,6 @@ int main() {
     ins.create_imageviews();
     ins.create_renderpass();
     ins.create_graphics_pipeline();
+    ins.create_framebuffers();
     return 0;
 }

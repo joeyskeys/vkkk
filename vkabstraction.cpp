@@ -13,6 +13,8 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
+inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 VkWrappedInstance::VkWrappedInstance()
     : window(nullptr)
 {
@@ -89,6 +91,14 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    if (syncobj_created) {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+            vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
+            vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
+            vkDestroyFence(device, in_flight_fences[i], nullptr);
+        }
+    }
+
     if (commandpool_created)
         vkDestroyCommandPool(device, command_pool, nullptr);
 
@@ -571,6 +581,84 @@ void VkWrappedInstance::create_commandbuffers() {
 
         commandbuffer_created = true;
     }
+}
+
+void VkWrappedInstance::create_sync_objects() {
+    image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    render_finished_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);
+    images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
+
+    VkSemaphoreCreateInfo semaphor_info{};
+    semaphor_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+
+    VkFenceCreateInfo fence_info{};
+    fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+        if (vkCreateSemaphore(device, &semaphor_info, nullptr, &image_available_semaphores[i]) != VK_SUCCESS ||
+            vkCreateSemaphore(device, &semaphor_info, nullptr, &render_finished_semaphores[i]) != VK_SUCCESS ||
+            vkCreateFence(device, &fence_info, nullptr, &in_flight_fences[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to create synchronization objects for a frame");
+    }
+}
+
+void VkWrappedInstance::draw_frame() {
+    vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
+
+    uint32_t image_idx;
+    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_available_semaphores[current_frame],
+        VK_NULL_HANDLE, &image_idx);
+
+    if (images_in_flight[image_idx] != VK_NULL_HANDLE)
+        vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
+    images_in_flight[image_idx] = in_flight_fences[current_frame];
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore wait_semaphores[] = { image_available_semaphores[current_frame] };
+    VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = wait_semaphores;
+    submit_info.pWaitDstStageMask = wait_stages;
+
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &commandbuffers[image_idx];
+
+    VkSemaphore signal_semaphores[] = { render_finished_semaphores[current_frame] };
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = signal_semaphores;
+
+    vkResetFences(device, 1, &in_flight_fences[current_frame]);
+
+    if (vkQueueSubmit(graphic_queue, 1, &submit_info, in_flight_fences[current_frame]) != VK_SUCCESS)
+        throw std::runtime_error("failed to submit draw command buffer!");
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = signal_semaphores;
+
+    VkSwapchainKHR swapchains_for_present[] = { swapchain };
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swapchains_for_present;
+
+    present_info.pImageIndices = &image_idx;
+
+    vkQueuePresentKHR(present_queue, &present_info);
+    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
+void VkWrappedInstance::mainloop() {
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        draw_frame();
+    }
+
+    vkDeviceWaitIdle(device);
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {

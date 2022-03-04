@@ -53,6 +53,9 @@ public:
     void create_framebuffers();
     void create_command_pool();
     void create_commandbuffers();
+    void create_sync_objects();
+    void draw_frame();
+    void mainloop();
 
 private:
     // Private methods
@@ -132,6 +135,16 @@ private:
     bool                            commandpool_created = false;
     std::vector<VkCommandBuffer>    commandbuffers;
     bool                            commandbuffer_created = false;
+
+    // Semaphore and fences
+    std::vector<VkSemaphore>        image_available_semaphores;
+    std::vector<VkSemaphore>        render_finished_semaphores;
+    std::vector<VkFence>            in_flight_fences;
+    std::vector<VkFence>            images_in_flight;
+    bool                            syncobj_created = false;
+
+    // Frame related
+    size_t                          current_frame = 0;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

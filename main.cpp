@@ -67,5 +67,9 @@ int main() {
     ins.create_framebuffers();
     ins.create_command_pool();
     ins.create_commandbuffers();
+    ins.create_sync_objects();
+
+    ins.mainloop();
+
     return 0;
 }

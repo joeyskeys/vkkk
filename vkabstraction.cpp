@@ -391,8 +391,8 @@ VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
 }
 
 void VkWrappedInstance::create_graphics_pipeline() {
-    auto vert_code = load_file("../resource/shaders/default.vert");
-    auto frag_code = load_file("../resource/shaders/default.frag");
+    auto vert_code = load_file("../resource/shaders/default_vert.spv");
+    auto frag_code = load_file("../resource/shaders/default_frag.spv");
 
     auto vert_shader_module = create_shader_module(vert_code);
     auto frag_shader_module = create_shader_module(frag_code);

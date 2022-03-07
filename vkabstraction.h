@@ -46,6 +46,8 @@ public:
     bool validate_current_device(QueueFamilyIndex* idx);
     void create_logical_device();
     void create_swapchain();
+    void cleanup_swapchain();
+    void recreate_swapchain();
     void create_imageviews();
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
@@ -71,6 +73,11 @@ private:
         void* user_data) {
         std::cerr << "validation layer: " << cb_data->pMessage << std::endl;
         return VK_FALSE;
+    }
+
+    static void default_resize_callback(GLFWwindow* window, int w, int h) {
+        auto app = reinterpret_cast<VkWrappedInstance*>(glfwGetWindowUserPointer(window));
+        app->framebuffer_resized = true;
     }
 
     bool check_device_extension_support(const std::span<const char*> extensions) const;
@@ -130,6 +137,7 @@ private:
     // Buffers
     std::vector<VkFramebuffer>      swapchain_framebuffers;
     bool                            framebuffer_created = false;
+    bool                            framebuffer_resized = false;
 
     VkCommandPool                   command_pool;
     bool                            commandpool_created = false;

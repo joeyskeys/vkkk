@@ -23,6 +23,8 @@ VkWrappedInstance::VkWrappedInstance()
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
     window = glfwCreateWindow(width, height, app_name.c_str(), nullptr, nullptr);
+    glfwSetWindowUserPointer(window, this);
+    glfwSetFramebufferSizeCallback(window, default_resize_callback);
 
     // Init vulkan
     VkApplicationInfo app_info{};
@@ -91,6 +93,8 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 {}
 
 VkWrappedInstance::~VkWrappedInstance() {
+    cleanup_swapchain();
+
     if (syncobj_created) {
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
             vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
@@ -100,25 +104,8 @@ VkWrappedInstance::~VkWrappedInstance() {
     }
 
     if (commandpool_created)
-        vkDestroyCommandPool(device, command_pool, nullptr);
-
-    if (framebuffer_created)
-        for (auto framebuffer : swapchain_framebuffers)
-            vkDestroyFramebuffer(device, framebuffer, nullptr);
-
-    if (pipeline_created)
-        vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
-
-    if (render_pass_created)
-        vkDestroyRenderPass(device, render_pass, nullptr);
-
-    if (imageviews_created) {
-        for (auto imageview : swapchain_imageviews)
-            vkDestroyImageView(device, imageview, nullptr);
-    }
-
-    if (swapchain_created)
-        vkDestroySwapchainKHR(device, swapchain, nullptr);
+        vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(commandbuffers.size()),
+            commandbuffers.data());
 
     vkDestroyDevice(device, nullptr);
 
@@ -298,6 +285,53 @@ void VkWrappedInstance::create_swapchain() {
     vkGetSwapchainImagesKHR(device, swapchain, &image_cnt, swapchain_images.data());
 
     swapchain_created = true;
+}
+
+void VkWrappedInstance::cleanup_swapchain() {
+    if (framebuffer_created)
+        for (auto framebuffer : swapchain_framebuffers)
+            vkDestroyFramebuffer(device, framebuffer, nullptr);
+
+    if (commandpool_created)
+        vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(commandbuffers.size()),
+            commandbuffers.data());
+
+    if (pipeline_created) {
+        vkDestroyPipeline(device, pipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+    }
+
+    if (render_pass_created)
+        vkDestroyRenderPass(device, render_pass, nullptr);
+
+    if (imageviews_created)
+        for (auto imageview : swapchain_imageviews)
+            vkDestroyImageView(device, imageview, nullptr);
+
+    if (swapchain_created)
+        vkDestroySwapchainKHR(device, swapchain, nullptr);
+}
+
+void VkWrappedInstance::recreate_swapchain() {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+
+    vkDeviceWaitIdle(device);
+
+    cleanup_swapchain();
+
+    create_swapchain();
+    create_imageviews();
+    create_renderpass();
+    create_graphics_pipeline();
+    create_framebuffers();
+    create_commandbuffers();
+
+    images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
 }
 
 void VkWrappedInstance::create_imageviews() {
@@ -608,8 +642,15 @@ void VkWrappedInstance::draw_frame() {
     vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
 
     uint32_t image_idx;
-    vkAcquireNextImageKHR(device, swapchain, UINT64_MAX, image_available_semaphores[current_frame],
-        VK_NULL_HANDLE, &image_idx);
+    auto result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+        image_available_semaphores[current_frame], VK_NULL_HANDLE, &image_idx);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreate_swapchain();
+        return;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        throw std::runtime_error("failed to acquire swap chain image!");
 
     if (images_in_flight[image_idx] != VK_NULL_HANDLE)
         vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
@@ -648,7 +689,15 @@ void VkWrappedInstance::draw_frame() {
 
     present_info.pImageIndices = &image_idx;
 
-    vkQueuePresentKHR(present_queue, &present_info);
+    result = vkQueuePresentKHR(present_queue, &present_info);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebuffer_resized) {
+        framebuffer_resized = false;
+        recreate_swapchain();
+    }
+    else if (result != VK_SUCCESS)
+        throw std::runtime_error("failed to present swap chain image!");
+
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 

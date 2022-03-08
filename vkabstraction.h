@@ -8,6 +8,7 @@
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
 
 namespace vkkk
 {
@@ -25,6 +26,11 @@ struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> present_modes;
+};
+
+struct Vertex {
+    glm::vec2 pos;
+    glm::vec3 color;
 };
 
 class VkWrappedInstance {

@@ -447,8 +447,14 @@ void VkWrappedInstance::create_graphics_pipeline() {
     
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
     vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    vert_input_info.vertexBindingDescriptionCount = 0;
-    vert_input_info.vertexAttributeDescriptionCount = 0;
+
+    auto binding_des = Vertex::get_binding_description();
+    auto attribute_des = Vertex::get_attr_descriptions();
+
+    vert_input_info.vertexBindingDescriptionCount = 1;
+    vert_input_info.vertexAttributeDescriptionCount = attribute_des.size();
+    vert_input_info.pVertexBindingDescriptions = &binding_des;
+    vert_input_info.pVertexAttributeDescriptions = attribute_des.data();
 
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};
     input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

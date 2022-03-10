@@ -22,6 +22,14 @@ else()
     message(STATUS "Found GLFW: ${GLFW_LIBRARY}")
 endif()
 
+find_package(GLM)
+
+if (NOT GLM_FOUND)
+    message(FATAL_ERROR "Could not find GLM library!")
+else()
+    message(STATUS "Found GLM: ${GLM_INCLUDE_DIRS}")
+endif()
+
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
 

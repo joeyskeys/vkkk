@@ -31,6 +31,31 @@ struct SwapChainSupportDetails {
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
+
+    static VkVertexInputBindingDescription get_binding_description() {
+        VkVertexInputBindingDescription des{};
+        des.binding = 0;
+        des.stride = sizeof(Vertex);
+        des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        return des;
+    }
+
+    static auto get_attr_descriptions() {
+        std::array<VkVertexInputAttributeDescription, 2> des{};
+
+        des[0].binding = 0;
+        des[0].location = 0;
+        des[0].format = VK_FORMAT_R32G32_SFLOAT;
+        des[0].offset = offsetof(Vertex, pos);
+
+        des[1].binding = 0;
+        des[1].location = 1;
+        des[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        des[1].offset = offsetof(Vertex, color);
+
+        return des;
+    }
 };
 
 class VkWrappedInstance {

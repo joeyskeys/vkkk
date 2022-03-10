@@ -45,18 +45,6 @@ bool check_validation_layer_support() {
 }
 
 int main() {
-    /*
-    auto win = init_window(800, 600);
-
-    VkInstance instance;
-    VkDebugUtilsMessengerEXT debug_messenger;
-    const char** glfw_extensions;
-    uint32_t glfw_extension_cnt;
-    glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
-    auto extensions = std::vector<const char*>(glfw_extensions, glfw_extensions + glfw_extension_cnt);
-    //vkkk::create_instance(instance, "vkkk", "vkbackend", extensions, vkkk::default_validation_layer_func, &debug_messenger);
-    */
-
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
@@ -66,6 +54,14 @@ int main() {
     ins.create_graphics_pipeline();
     ins.create_framebuffers();
     ins.create_command_pool();
+    
+    const std::array<vkkk::Vertex, 3> verts{
+        glm::vec2{0.f, -0.5f}, glm::vec3{1.f, 0.f, 1.f},
+        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 1.f, 0.f},
+        glm::vec2{-0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f}
+    };
+    ins.create_vertex_buffer(verts.data(), verts.size());
+
     ins.create_commandbuffers();
     ins.create_sync_objects();
 

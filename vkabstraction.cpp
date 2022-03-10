@@ -95,6 +95,11 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 VkWrappedInstance::~VkWrappedInstance() {
     cleanup_swapchain();
 
+    if (vertbuffer_created) {
+        vkDestroyBuffer(device, vert_buffer, nullptr);
+        vkFreeMemory(device, vert_buffer_memo, nullptr);
+    }
+
     if (syncobj_created) {
         for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
             vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
@@ -425,8 +430,8 @@ VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
 }
 
 void VkWrappedInstance::create_graphics_pipeline() {
-    auto vert_code = load_file("../resource/shaders/default_vert.spv");
-    auto frag_code = load_file("../resource/shaders/default_frag.spv");
+    auto vert_code = load_file("../resource/shaders/vbuf_default_vert.spv");
+    auto frag_code = load_file("../resource/shaders/vbuf_default_frag.spv");
 
     auto vert_shader_module = create_shader_module(vert_code);
     auto frag_shader_module = create_shader_module(frag_code);
@@ -578,6 +583,52 @@ void VkWrappedInstance::create_command_pool() {
     commandpool_created = true;
 }
 
+uint32_t VkWrappedInstance::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const {
+    VkPhysicalDeviceMemoryProperties mem_props;
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
+
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i) {
+        if ((type_filter & (1 << i)) &&
+            (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+        }
+    }
+
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t vcnt) {
+    VkBufferCreateInfo buf_info{};
+    buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buf_info.size = sizeof(Vertex) * vcnt;
+    buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device, &buf_info, nullptr, &vert_buffer) != VK_SUCCESS)
+        throw std::runtime_error("failed to create vertex buffer!");
+
+    VkMemoryRequirements mem_req;
+    vkGetBufferMemoryRequirements(device, vert_buffer, &mem_req);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_req.size;
+    alloc_info.memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+
+    if (vkAllocateMemory(device, &alloc_info, nullptr, &vert_buffer_memo) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate vertex buffer memory!");
+
+    vkBindBufferMemory(device, vert_buffer, vert_buffer_memo, 0);
+
+    void* data;
+    vkMapMemory(device, vert_buffer_memo, 0, buf_info.size, 0, &data);
+        memcpy(data, source_data, buf_info.size);
+    vkUnmapMemory(device, vert_buffer_memo);
+
+    vertbuffer_created = true;
+}
+
 void VkWrappedInstance::create_commandbuffers() {
     if (!commandpool_created)
         throw std::runtime_error("command pool not created!");
@@ -613,6 +664,11 @@ void VkWrappedInstance::create_commandbuffers() {
 
         vkCmdBeginRenderPass(commandbuffers[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
             vkCmdBindPipeline(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+            VkBuffer vert_buffers[] = {vert_buffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandbuffers[i], 0, 1, vert_buffers, offsets);
+
             vkCmdDraw(commandbuffers[i], 3, 1, 0, 0);
         vkCmdEndRenderPass(commandbuffers[i]);
 

@@ -85,6 +85,7 @@ public:
     void create_graphics_pipeline();
     void create_framebuffers();
     void create_command_pool();
+    void create_vertex_buffer(const Vertex* source_data, size_t vcnt);
     void create_commandbuffers();
     void create_sync_objects();
     void draw_frame();
@@ -116,7 +117,7 @@ private:
     VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats) const;
     VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes) const;
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) const;
-
+    uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags props) const;
 
 private:
     uint32_t width = 800;
@@ -184,6 +185,11 @@ private:
 
     // Frame related
     size_t                          current_frame = 0;
+
+    // Vertex Buffer
+    VkBuffer                        vert_buffer;
+    VkDeviceMemory                  vert_buffer_memo;
+    bool                            vertbuffer_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

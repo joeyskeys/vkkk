@@ -597,34 +597,80 @@ uint32_t VkWrappedInstance::find_memory_type(uint32_t type_filter, VkMemoryPrope
     throw std::runtime_error("failed to find suitable memory type!");
 }
 
-void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t vcnt) {
+void VkWrappedInstance::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+    VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo) {
     VkBufferCreateInfo buf_info{};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buf_info.size = sizeof(Vertex) * vcnt;
-    buf_info.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    buf_info.size = size;
+    buf_info.usage = usage;
     buf_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateBuffer(device, &buf_info, nullptr, &vert_buffer) != VK_SUCCESS)
-        throw std::runtime_error("failed to create vertex buffer!");
+    if (vkCreateBuffer(device, &buf_info, nullptr, &buf) != VK_SUCCESS)
+        throw std::runtime_error("failed to create buffer!");
 
-    VkMemoryRequirements mem_req;
-    vkGetBufferMemoryRequirements(device, vert_buffer, &mem_req);
+    VkMemoryRequirements memo_req;
+    vkGetBufferMemoryRequirements(device, buf, &memo_req);
 
     VkMemoryAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize = mem_req.size;
-    alloc_info.memoryTypeIndex = find_memory_type(mem_req.memoryTypeBits,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    alloc_info.allocationSize = memo_req.size;
+    alloc_info.memoryTypeIndex = find_memory_type(memo_req.memoryTypeBits, props);
 
-    if (vkAllocateMemory(device, &alloc_info, nullptr, &vert_buffer_memo) != VK_SUCCESS)
-        throw std::runtime_error("failed to allocate vertex buffer memory!");
+    if (vkAllocateMemory(device, &alloc_info, nullptr, &buf_memo) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate buffer memory!");
 
-    vkBindBufferMemory(device, vert_buffer, vert_buffer_memo, 0);
+    vkBindBufferMemory(device, buf, buf_memo, 0);
+}
+
+void VkWrappedInstance::copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size) {
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandPool = command_pool;
+    alloc_info.commandBufferCount = 1;
+
+    VkCommandBuffer cmd_buf;
+    vkAllocateCommandBuffers(device, &alloc_info, &cmd_buf);
+
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(cmd_buf, &begin_info);
+        VkBufferCopy copy_region{};
+        copy_region.size = size;
+        vkCmdCopyBuffer(cmd_buf, src_buf, dst_buf, 1, &copy_region);
+    vkEndCommandBuffer(cmd_buf);
+
+    VkSubmitInfo sub_info{};
+    sub_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    sub_info.commandBufferCount = 1;
+    sub_info.pCommandBuffers = &cmd_buf;
+
+    vkQueueSubmit(graphic_queue, 1, &sub_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphic_queue);
+
+    vkFreeCommandBuffers(device, command_pool, 1, &cmd_buf);
+}
+
+void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t vcnt) {
+    VkDeviceSize buf_size = sizeof(Vertex) * vcnt;
+    VkBuffer staging_buf;
+    VkDeviceMemory staging_buf_memo;
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buf, staging_buf_memo);
 
     void* data;
-    vkMapMemory(device, vert_buffer_memo, 0, buf_info.size, 0, &data);
-        memcpy(data, source_data, buf_info.size);
-    vkUnmapMemory(device, vert_buffer_memo);
+    vkMapMemory(device, staging_buf_memo, 0, buf_size, 0, &data);
+        memcpy(data, source_data, buf_size);
+    vkUnmapMemory(device, staging_buf_memo);
+
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vert_buffer, vert_buffer_memo);
+
+    copy_buffer(staging_buf, vert_buffer, buf_size);
+    vkDestroyBuffer(device, staging_buf, nullptr);
+    vkFreeMemory(device, staging_buf_memo, nullptr);
 
     vertbuffer_created = true;
 }

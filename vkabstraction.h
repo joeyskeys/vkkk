@@ -85,6 +85,9 @@ public:
     void create_graphics_pipeline();
     void create_framebuffers();
     void create_command_pool();
+    void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo);
+    void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const Vertex* source_data, size_t vcnt);
     void create_commandbuffers();
     void create_sync_objects();

@@ -89,6 +89,7 @@ public:
         VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo);
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const Vertex* source_data, size_t vcnt);
+    void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_commandbuffers();
     void create_sync_objects();
     void draw_frame();
@@ -128,7 +129,7 @@ private:
     std::string app_name = "vkkk";
     std::string engine_name = "vulkan";
     uint32_t app_version = VK_MAKE_VERSION(1, 0, 0);
-    uint32_t api_version = VK_API_VERSION_1_2;
+    uint32_t api_version = VK_API_VERSION_1_1;
     bool enable_validation_layers = true;
 
     VkInstance instance;
@@ -193,6 +194,9 @@ private:
     VkBuffer                        vert_buffer;
     VkDeviceMemory                  vert_buffer_memo;
     bool                            vertbuffer_created = false;
+    VkBuffer                        index_buffer;
+    VkDeviceMemory                  index_buffer_memo;
+    bool                            indexbuffer_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

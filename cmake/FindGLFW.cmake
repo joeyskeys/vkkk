@@ -6,7 +6,13 @@ find_path(GLFW_INCLUDE_DIR GLFW/glfw3.h
     PATH_SUFFIXES
         include)
 
-find_library(GLFW_LIB glfw3
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    set(LIB_NAME glfw)
+else()
+    set(LIB_NAME glfw3)
+endif()
+
+find_library(GLFW_LIB ${LIB_NAME}
     HINTS
         /usr
         /usr/local

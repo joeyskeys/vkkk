@@ -55,12 +55,18 @@ int main() {
     ins.create_framebuffers();
     ins.create_command_pool();
     
-    const std::array<vkkk::Vertex, 3> verts{
-        glm::vec2{0.f, -0.5f}, glm::vec3{1.f, 0.f, 1.f},
-        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 1.f, 0.f},
-        glm::vec2{-0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f}
+    const std::array<vkkk::Vertex, 4> verts{
+        glm::vec2{-0.5f, -0.5f}, glm::vec3{1.f, 0.f, 0.f},
+        glm::vec2{0.5f, -0.5f}, glm::vec3{0.f, 1.f, 0.f},
+        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f},
+        glm::vec2{-0.5f, 0.5f}, glm::vec3{1.f, 1.f, 1.f}
     };
     ins.create_vertex_buffer(verts.data(), verts.size());
+
+    const std::array<uint32_t, 6> indices{
+        0, 1, 2, 2, 3, 0
+    };
+    ins.create_index_buffer(indices.data(), indices.size());
 
     ins.create_commandbuffers();
     ins.create_sync_objects();

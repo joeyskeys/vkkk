@@ -1,4 +1,5 @@
 #include <array>
+#include <chrono>
 #include <functional>
 #include <iostream>
 #include <span>
@@ -8,7 +9,10 @@
 
 #include <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
+
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
 namespace vkkk
 {
@@ -58,6 +62,12 @@ struct Vertex {
     }
 };
 
+struct MVPBuffer {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
+};
+
 class VkWrappedInstance {
 public:
     VkWrappedInstance();
@@ -82,6 +92,7 @@ public:
     void create_imageviews();
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
+    void create_descriptorset_layout();
     void create_graphics_pipeline();
     void create_framebuffers();
     void create_command_pool();
@@ -90,6 +101,8 @@ public:
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const Vertex* source_data, size_t vcnt);
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
+    void create_uniform_buffer();
+    void update_uniform_buffer(uint32_t idx);
     void create_commandbuffers();
     void create_sync_objects();
     void draw_frame();
@@ -169,6 +182,8 @@ private:
     bool                            pipeline_created = false;
     VkRenderPass                    render_pass;
     bool                            render_pass_created = false;
+    VkDescriptorSetLayout           descriptor_layout;
+    bool                            descriptor_layout_created = false;
 
     // Buffers
     std::vector<VkFramebuffer>      swapchain_framebuffers;
@@ -197,6 +212,9 @@ private:
     VkBuffer                        index_buffer;
     VkDeviceMemory                  index_buffer_memo;
     bool                            indexbuffer_created = false;
+    std::vector<VkBuffer>           uniform_buffers;
+    std::vector<VkDeviceMemory>     uniform_buffer_memos;
+    bool                            uniform_buffer_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*     window;

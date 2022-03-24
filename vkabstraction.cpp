@@ -95,6 +95,9 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 VkWrappedInstance::~VkWrappedInstance() {
     cleanup_swapchain();
 
+    if (descriptor_layout_created)
+        vkDestroyDescriptorSetLayout(device, descriptor_layout, nullptr);
+
     if (indexbuffer_created) {
         vkDestroyBuffer(device, index_buffer, nullptr);
         vkFreeMemory(device, index_buffer_memo, nullptr);
@@ -320,6 +323,13 @@ void VkWrappedInstance::cleanup_swapchain() {
 
     if (swapchain_created)
         vkDestroySwapchainKHR(device, swapchain, nullptr);
+
+    if (uniform_buffer_created) {
+        for (int i = 0; i < swapchain_images.size(); ++i) {
+            vkDestroyBuffer(device, uniform_buffers[i], nullptr);
+            vkFreeMemory(device, uniform_buffer_memos[i], nullptr);
+        }
+    }
 }
 
 void VkWrappedInstance::recreate_swapchain() {
@@ -339,6 +349,7 @@ void VkWrappedInstance::recreate_swapchain() {
     create_renderpass();
     create_graphics_pipeline();
     create_framebuffers();
+    create_uniform_buffer();
     create_commandbuffers();
 
     images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
@@ -434,6 +445,25 @@ VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
     return shader_module;
 }
 
+void VkWrappedInstance::create_descriptorset_layout() {
+    VkDescriptorSetLayoutBinding layout_binding{};
+    layout_binding.binding = 0;
+    layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    layout_binding.descriptorCount = 1;
+    layout_binding.pImmutableSamples = nullptr;
+    layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layout_info{};
+    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layout_info.bindingCount = 1;
+    layout_info.pBindings = &layout_binding;
+
+    if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &descriptor_layout) != VK_SUCCESS)
+        throw std::runtime_error("failed to create descriptor set layout");
+
+    descriptor_layout_created = true;
+}
+
 void VkWrappedInstance::create_graphics_pipeline() {
     auto vert_code = load_file("../resource/shaders/vbuf_default_vert.spv");
     auto frag_code = load_file("../resource/shaders/vbuf_default_frag.spv");
@@ -523,7 +553,8 @@ void VkWrappedInstance::create_graphics_pipeline() {
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = 0;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &descriptor_layout;
     pipeline_layout_info.pushConstantRangeCount = 0;
 
     if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS)
@@ -703,6 +734,37 @@ void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, size_t i
     indexbuffer_created = true;
 }
 
+void VkWrappedInstance::create_uniform_buffer() {
+    VkDeviceSize buf_size = sizeof(MVPBuffer);
+
+    uniform_buffers.resize(MAX_FRAMES_IN_FLIGHT);
+    uniform_buffer_memos.resize(MAX_FRAMES_IN_FLIGHT);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+        create_buffer(buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniform_buffers[i], uniform_buffer_memos[i]);
+
+    uniform_buffer_created = true;
+}
+
+void VkWrappedInstance::update_uniform_buffer(uint32_t idx) {
+    static auto start_time = std::chrono::high_resolution_clock::now();
+    auto current_time = std::chrono::high_resolution_clock::now();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+
+    MVPBuffer ubo{};
+    ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radiance(90.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.proj = glm::perspective(glm::radians(45.f), swapchain_extent.width /
+        static_cast<float>(swapchain_extent.height), 0.1f, 10.f);
+    ubo.proj[1][1] *= -1;
+
+    void* data;
+    vkMapMemory(device, uniform_buffer_memos[current_frame], 0, sizeof(ubo), 0, &data);
+    memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device, uniform_buffer_memos[current_frame]);
+}
+
 void VkWrappedInstance::create_commandbuffers() {
     if (!commandpool_created)
         throw std::runtime_error("command pool not created!");
@@ -794,6 +856,8 @@ void VkWrappedInstance::draw_frame() {
     if (images_in_flight[image_idx] != VK_NULL_HANDLE)
         vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
     images_in_flight[image_idx] = in_flight_fences[current_frame];
+
+    update_uniform_buffer(image_idx);
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

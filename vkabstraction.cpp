@@ -330,6 +330,9 @@ void VkWrappedInstance::cleanup_swapchain() {
             vkFreeMemory(device, uniform_buffer_memos[i], nullptr);
         }
     }
+
+    if (descriptor_pool_created)
+        vkDestroyDescriptorPool(device, descriptor_pool, nullptr);
 }
 
 void VkWrappedInstance::recreate_swapchain() {
@@ -350,6 +353,8 @@ void VkWrappedInstance::recreate_swapchain() {
     create_graphics_pipeline();
     create_framebuffers();
     create_uniform_buffer();
+    create_descriptor_pool();
+    create_descriptor_set();
     create_commandbuffers();
 
     images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
@@ -445,12 +450,12 @@ VkShaderModule VkWrappedInstance::create_shader_module(std::vector<char>& buf) {
     return shader_module;
 }
 
-void VkWrappedInstance::create_descriptorset_layout() {
+void VkWrappedInstance::create_descriptor_set_layout() {
     VkDescriptorSetLayoutBinding layout_binding{};
     layout_binding.binding = 0;
     layout_binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     layout_binding.descriptorCount = 1;
-    layout_binding.pImmutableSamples = nullptr;
+    layout_binding.pImmutableSamplers = nullptr;
     layout_binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
     VkDescriptorSetLayoutCreateInfo layout_info{};
@@ -465,8 +470,8 @@ void VkWrappedInstance::create_descriptorset_layout() {
 }
 
 void VkWrappedInstance::create_graphics_pipeline() {
-    auto vert_code = load_file("../resource/shaders/vbuf_default_vert.spv");
-    auto frag_code = load_file("../resource/shaders/vbuf_default_frag.spv");
+    auto vert_code = load_file("../resource/shaders/mvp_default_vert.spv");
+    auto frag_code = load_file("../resource/shaders/mvp_default_frag.spv");
 
     auto vert_shader_module = create_shader_module(vert_code);
     auto frag_shader_module = create_shader_module(frag_code);
@@ -527,7 +532,7 @@ void VkWrappedInstance::create_graphics_pipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -737,10 +742,10 @@ void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, size_t i
 void VkWrappedInstance::create_uniform_buffer() {
     VkDeviceSize buf_size = sizeof(MVPBuffer);
 
-    uniform_buffers.resize(MAX_FRAMES_IN_FLIGHT);
-    uniform_buffer_memos.resize(MAX_FRAMES_IN_FLIGHT);
+    uniform_buffers.resize(swapchain_images.size());
+    uniform_buffer_memos.resize(swapchain_images.size());
 
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
+    for (int i = 0; i < swapchain_images.size(); ++i)
         create_buffer(buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, uniform_buffers[i], uniform_buffer_memos[i]);
 
@@ -750,19 +755,65 @@ void VkWrappedInstance::create_uniform_buffer() {
 void VkWrappedInstance::update_uniform_buffer(uint32_t idx) {
     static auto start_time = std::chrono::high_resolution_clock::now();
     auto current_time = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(currentTime - startTime).count();
+    float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
 
     MVPBuffer ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radiance(90.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.proj = glm::perspective(glm::radians(45.f), swapchain_extent.width /
         static_cast<float>(swapchain_extent.height), 0.1f, 10.f);
     ubo.proj[1][1] *= -1;
 
     void* data;
-    vkMapMemory(device, uniform_buffer_memos[current_frame], 0, sizeof(ubo), 0, &data);
-    memcpy(data, &ubo, sizeof(ubo));
-    vkUnmapMemory(device, uniform_buffer_memos[current_frame]);
+    vkMapMemory(device, uniform_buffer_memos[idx], 0, sizeof(ubo), 0, &data);
+        memcpy(data, &ubo, sizeof(ubo));
+    vkUnmapMemory(device, uniform_buffer_memos[idx]);
+}
+
+void VkWrappedInstance::create_descriptor_pool() {
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    pool_size.descriptorCount = static_cast<uint32_t>(swapchain_images.size());
+
+    VkDescriptorPoolCreateInfo pool_info{};
+    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.poolSizeCount = 1;
+    pool_info.pPoolSizes = &pool_size;
+    pool_info.maxSets = static_cast<uint32_t>(swapchain_images.size());
+
+    if (vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptor_pool) != VK_SUCCESS)
+        throw std::runtime_error("failed to create descriptor pool");
+}
+
+void VkWrappedInstance::create_descriptor_set() {
+    std::vector<VkDescriptorSetLayout> layouts(swapchain_images.size(), descriptor_layout);
+    VkDescriptorSetAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool = descriptor_pool;
+    alloc_info.descriptorSetCount = static_cast<uint32_t>(swapchain_images.size());
+    alloc_info.pSetLayouts = layouts.data();
+
+    descriptor_sets.resize(swapchain_images.size());
+    if (vkAllocateDescriptorSets(device, &alloc_info, descriptor_sets.data()) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate descriptor sets");
+
+    for (int i = 0; i < swapchain_images.size(); ++i) {
+        VkDescriptorBufferInfo buf_info{};
+        buf_info.buffer = uniform_buffers[i];
+        buf_info.offset = 0;
+        buf_info.range = sizeof(MVPBuffer);
+
+        VkWriteDescriptorSet descriptor_write{};
+        descriptor_write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_write.dstSet = descriptor_sets[i];
+        descriptor_write.dstBinding = 0;
+        descriptor_write.dstArrayElement = 0;
+        descriptor_write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_write.descriptorCount = 1;
+        descriptor_write.pBufferInfo = &buf_info;
+
+        vkUpdateDescriptorSets(device, 1, &descriptor_write, 0, nullptr);
+    }
 }
 
 void VkWrappedInstance::create_commandbuffers() {
@@ -805,6 +856,8 @@ void VkWrappedInstance::create_commandbuffers() {
             VkDeviceSize offsets[] = {0};
             vkCmdBindVertexBuffers(commandbuffers[i], 0, 1, vert_buffers, offsets);
 
+            vkCmdBindDescriptorSets(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
+                0, 1, &descriptor_sets[i], 0, nullptr);
             vkCmdBindIndexBuffer(commandbuffers[i], index_buffer, 0, VK_INDEX_TYPE_UINT32);
 
             //vkCmdDraw(commandbuffers[i], 3, 1, 0, 0);

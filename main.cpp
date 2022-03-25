@@ -51,6 +51,7 @@ int main() {
     ins.create_swapchain();
     ins.create_imageviews();
     ins.create_renderpass();
+    ins.create_descriptor_set_layout();
     ins.create_graphics_pipeline();
     ins.create_framebuffers();
     ins.create_command_pool();
@@ -67,6 +68,10 @@ int main() {
         0, 1, 2, 2, 3, 0
     };
     ins.create_index_buffer(indices.data(), indices.size());
+
+    ins.create_uniform_buffer();
+    ins.create_descriptor_pool();
+    ins.create_descriptor_set();
 
     ins.create_commandbuffers();
     ins.create_sync_objects();

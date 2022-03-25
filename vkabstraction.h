@@ -92,7 +92,7 @@ public:
     void create_imageviews();
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
-    void create_descriptorset_layout();
+    void create_descriptor_set_layout();
     void create_graphics_pipeline();
     void create_framebuffers();
     void create_command_pool();
@@ -103,6 +103,8 @@ public:
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);
+    void create_descriptor_pool();
+    void create_descriptor_set();
     void create_commandbuffers();
     void create_sync_objects();
     void draw_frame();
@@ -184,6 +186,9 @@ private:
     bool                            render_pass_created = false;
     VkDescriptorSetLayout           descriptor_layout;
     bool                            descriptor_layout_created = false;
+    VkDescriptorPool                descriptor_pool;
+    bool                            descriptor_pool_created = true;
+    std::vector<VkDescriptorSet>    descriptor_sets;
 
     // Buffers
     std::vector<VkFramebuffer>      swapchain_framebuffers;

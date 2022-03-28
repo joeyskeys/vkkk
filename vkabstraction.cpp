@@ -6,6 +6,8 @@
 #include <set>
 #include <stdexcept>
 
+#include <OpenImageIO/imagebuf.h>
+
 #include "vkabstraction.h"
 
 namespace fs = std::filesystem;
@@ -133,6 +135,66 @@ VkWrappedInstance::~VkWrappedInstance() {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
+    const VkFormatformat, VkImageTiling tiling, VkImageUsageFlags usage,
+    VkMeomoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo)
+{
+    VkImageCreateInfo image_info{};
+    image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    image_info.imageType = VK_IMAGE_TYPE_2D;
+    image_info.extent.width = w;
+    image_info.extent.height = h;
+    image_info.extent.depth = 1;
+    image_info.mipLevels = 1;
+    image_info.arrayLayers = 1;
+    image_info.format = format;
+    image_info. tiling = tiling;
+    image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    image_info.usage = usage;
+    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateImage(device, &image_info, nullptr, &image) != VK_SUCCESS)
+        throw std::runtime_error("failed to create image");
+
+    VkMemoryRequirements mem_reqs;
+    vkGetImageMemoryRequirements(device, image, &mem_reqs);
+
+    VkMemoryAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    alloc_info.allocationSize = mem_reqs.size;
+    alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, properties);
+
+    if (vkAllocateMemory(device, &alloc_info, nullptr, &image_memo) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate image memory");
+
+    vkBindImageMemory(device, image, image_memo, 0);
+}
+
+void VkWrappedInstance::transition_image_layout(Vkimage image, VkFormat format,
+    VkImageLayout old_layout, VkImageLayout new_layout)
+{
+
+}
+
+void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
+    uint32_t h)
+{
+    
+}
+
+bool VkWrappedInstance::load_texture(const fs::path& path) {
+    OIIO::ImageBuf oiio_buf(path.c_str());
+    oiio_buf.read();
+
+    int w = oiio_buf.xend() - oiio_buf.xbegin();
+    int h = oiio_buf.yend() - oiio_buf.ybegin();
+    std::vector<Pixel> pixels;
+    pixels.resize(w * h);
+    oiio_buf.get_pixels(OIIO::ROI::all(), OIIO::TypeDesc::UINT8, pixels.data());
+    texture_bufs.emplace_back(std::move(oiio_buf));
 }
 
 void VkWrappedInstance::create_surface() {

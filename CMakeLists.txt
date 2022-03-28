@@ -30,10 +30,20 @@ else()
     message(STATUS "Found GLM: ${GLM_INCLUDE_DIRS}")
 endif()
 
+find_package(OIIO)
+
+if (NOT OIIO_FOUND)
+    message(FATAL_ERROR "Could not find oiio library!")
+else()
+    message(STATUS "Found oiio: ${OIIO_INCLUDE_DIRS}")
+endif()
+
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
+include_directories(${OIIO_INCLUDE_DIRS})
 
 add_executable(vkkk main.cpp vkabstraction.cpp gui.cpp)
 target_link_libraries(vkkk
     ${GLFW_LIBRARIES}
-    ${Vulkan_LIBRARIES})
+    ${Vulkan_LIBRARIES}
+    ${OIIO_LIBRARIES})

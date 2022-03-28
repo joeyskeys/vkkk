@@ -1,5 +1,6 @@
 #include <array>
 #include <chrono>
+#include <filesystem>
 #include <functional>
 #include <iostream>
 #include <span>
@@ -13,6 +14,8 @@
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+
+namespace fs = std::filesystem;
 
 namespace vkkk
 {
@@ -30,6 +33,13 @@ struct SwapChainSupportDetails {
     VkSurfaceCapabilitiesKHR capabilities;
     std::vector<VkSurfaceFormatKHR> formats;
     std::vector<VkPresentModeKHR> present_modes;
+};
+
+struct Pixel {
+    char r;
+    char g;
+    char b;
+    char a;
 };
 
 struct Vertex {
@@ -77,6 +87,16 @@ public:
     inline void setup_window(GLFWwindow* win) {
         window = win;
     }
+
+    void create_vk_image(const uint32_t w, const uint32_t h, const VkFormat format,
+        VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+        VkImage& image, VkDeviceMemory& image_memo);
+    void transition_image_layout(Vkimage image, VkFormat format,
+        VkImageLayout old_layout, VkImageLayout new_layout);
+    void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
+        uint32_t h);
+    void create_texture_image(const uint32_t idx);
+    bool load_texture(const fs::path& path);
     
     void create_surface();
 
@@ -157,6 +177,11 @@ private:
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
     VkDevice device;
 
+    // Textures
+    std::vector<std::vector<Pixel>  texture_bufs;
+    std::vector<VkImage>            vk_images;
+    std::vector<VkDeviceMemory>     vk_image_memos;
+
     // Surface
     VkSurfaceKHR surface;
 
@@ -222,7 +247,7 @@ private:
     bool                            uniform_buffer_created = false;
 
     // Window, bound to glfw for now
-    GLFWwindow*     window;
+    GLFWwindow*                     window;
 };
 
 }

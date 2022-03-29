@@ -88,6 +88,9 @@ public:
         window = win;
     }
 
+    VkCommandBuffer begin_single_time_commands();
+    void end_single_time_commands(VkCommandBuffer cmd_buf);
+
     void create_vk_image(const uint32_t w, const uint32_t h, const VkFormat format,
         VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
         VkImage& image, VkDeviceMemory& image_memo);
@@ -95,7 +98,6 @@ public:
         VkImageLayout old_layout, VkImageLayout new_layout);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
         uint32_t h);
-    void create_texture_image(const uint32_t idx);
     bool load_texture(const fs::path& path);
     
     void create_surface();

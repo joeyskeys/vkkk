@@ -97,6 +97,12 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 VkWrappedInstance::~VkWrappedInstance() {
     cleanup_swapchain();
 
+    for (auto& vk_image : vk_images)
+        vkDestroy(device, vk_image, nullptr);
+
+    for (auto& vk_image_memo : vk_image_memos)
+        vkFreeMemory(device, vk_image_memo, nullptr);
+
     if (descriptor_layout_created)
         vkDestroyDescriptorSetLayout(device, descriptor_layout, nullptr);
 
@@ -135,6 +141,37 @@ VkWrappedInstance::~VkWrappedInstance() {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+VkCommandBuffer VkWrappedInstance::begin_single_time_commands() {
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandPool = command_pool;
+    alloc_info.commandBufferCount = 1;
+
+    VkCommandBuffer command_buf;
+    vkAllocateCommandBuffers(device, &alloc_info, &command_buf);
+
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    vkBeginCommandBuffer(command_buf, &begin_info);
+    return command_buf;
+}
+
+void VkWrappedInstance::end_single_time_commands(VkCommandBuffer cmd_buf) {
+    vkEndCommandBuffer(cmd_buf);
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &cmd_buf;
+
+    vkQueueSubmit(graphic_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphic_queue);
+    vkFreeCommandBuffers(device, command_pool, 1, &cmd_buf);
 }
 
 void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
@@ -176,13 +213,71 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
 void VkWrappedInstance::transition_image_layout(Vkimage image, VkFormat format,
     VkImageLayout old_layout, VkImageLayout new_layout)
 {
+    VkCommandBuffer cmd_buf = begin_single_time_commands();
 
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = image;
+    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags src_stage;
+    VkPipelineStageFlags dst_stage;
+
+    if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED && new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.srcAccessMask = 0;
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        src_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dst_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        src_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        dst_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+    else {
+        throw std::invalid_argument("unsupported layout transition!");
+    }
+
+    vkCmdPipelineBarrier(
+        cmd_buf,
+        src_stage, dst_stage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &barrier
+    );
+
+    end_single_time_commands(cmd_buf);
 }
 
 void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
     uint32_t h)
 {
-    
+    VkCommandBuffer cmd_buf = begin_single_time_commands();
+
+    VkBufferImageCopy region{};
+    region.bufferOffset = 0;
+    region.bufferRowLength = 0;
+    region.bufferImageHeight = 0;
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {w, h, 1};
+
+    vkCmdCopyBufferToImage(cmd_buf, buf, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+    end_single_time_commands(cmd_buf);
 }
 
 bool VkWrappedInstance::load_texture(const fs::path& path) {
@@ -194,7 +289,35 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
     std::vector<Pixel> pixels;
     pixels.resize(w * h);
     oiio_buf.get_pixels(OIIO::ROI::all(), OIIO::TypeDesc::UINT8, pixels.data());
-    texture_bufs.emplace_back(std::move(oiio_buf));
+    //texture_bufs.emplace_back(std::move(oiio_buf));
+
+    VkBuffer staging_buf;
+    VkDeviceMemory staging_buf_memo;
+    size_t image_size = w * h * sizeof(Pixel);
+    create_buffer(image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        staging_buf, staging_buf_memo);
+
+    void* data;
+    vkMapMemory(device, staging_buf_memo, 0, image_size, 0, &data);
+        memcpy(data, pixels, static_cast<size_t>(image_size));
+    vkUnmapMemory(device, staging_buf_memo);
+
+    VkImage img;
+    VkDeviceMemory img_memo;
+    create_vk_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img, img_memo);
+
+    transition_image_layout(img, VK_FLOAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        copy_buffer_to_image(staging_buf, img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+    transition_image_layout(img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    vkDestroyBuffer(device, staging_buf, nullptr);
+    vkFreeMemory(device, staging_buf_memo, nullptr);
+
+    vk_images.emplace_back(img);
+    vk_image_memos.emplace_back(img_memo);
 }
 
 void VkWrappedInstance::create_surface() {

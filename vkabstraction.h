@@ -98,6 +98,8 @@ public:
         VkImageLayout old_layout, VkImageLayout new_layout);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
         uint32_t h);
+    void create_texture_imageviews();
+    void create_texture_sampler();
     bool load_texture(const fs::path& path);
     
     void create_surface();
@@ -111,6 +113,7 @@ public:
     void create_swapchain();
     void cleanup_swapchain();
     void recreate_swapchain();
+    VkImageView create_imageview(VkImage image, VkFormat format);
     void create_imageviews();
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
@@ -183,6 +186,9 @@ private:
     std::vector<std::vector<Pixel>  texture_bufs;
     std::vector<VkImage>            vk_images;
     std::vector<VkDeviceMemory>     vk_image_memos;
+    std::vector<VkImageView>        texture_views;
+    VkSampler                       texture_sampler;
+    bool                            sampler_created;
 
     // Surface
     VkSurfaceKHR surface;

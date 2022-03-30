@@ -97,6 +97,12 @@ VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& 
 VkWrappedInstance::~VkWrappedInstance() {
     cleanup_swapchain();
 
+    if (sampler_created)
+        vkDestroySampler(device, texture_sampler, nullptr);
+
+    for (auto& tex_view : texture_views)
+        vkDestroyImageView(device, tex_view, nullptr);
+
     for (auto& vk_image : vk_images)
         vkDestroy(device, vk_image, nullptr);
 
@@ -280,6 +286,42 @@ void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32
     end_single_time_commands(cmd_buf);
 }
 
+void VkWrappedInstance::create_texture_imageviews() {
+    texture_views.resize(vk_images.size());
+
+    for (int i = 0; i < texture_views.size(); ++i)
+        texture_views[i] = create_imageview(vk_images[i], VK_FORMAT_R8G8B8A8_SRGB);
+    
+    texture_views_created = true;
+}
+
+void create_texture_sampler() {
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.anisotropyEnable = VK_TRUE;
+
+    VkPhysicalDeviceProperties props{};
+    vkGetPhysicalDeviceProperties(physical_device, &props);
+    sampler_info.maxAnisotropy = props.limits.maxSamplerAnisotropy;
+    
+    sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.mpLodBias = 0.f;
+    sampler_info.minLod = 0.f;
+    sampler_info.maxLod = 0.f;
+
+    if (vkCreateSampler(device, &sampler_info, nullptr, &texture_sampler) != VK_SUCCESS)
+        throw std::runtime_error("failed to create texture sampler");
+}
+
 bool VkWrappedInstance::load_texture(const fs::path& path) {
     OIIO::ImageBuf oiio_buf(path.c_str());
     oiio_buf.read();
@@ -362,6 +404,11 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
     std::vector<VkQueueFamilyProperties> queue_families(queue_family_cnt);
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_cnt, queue_families.data());
 
+    VkPhysicalDeviceFeatures supported_features;
+    vkGetPhysicalDeviceFeatures(device, &supported_features);
+    if (!supported_features.samplerAnisotropy)
+        return false;
+
     int i = 0;
     VkBool32 present_support = false;
     for (const auto& queue_family : queue_families) {
@@ -405,6 +452,7 @@ void VkWrappedInstance::create_logical_device() {
 
     // Device feature
     VkPhysicalDeviceFeatures device_features{};
+    device_features.samplerAnisotropy = VK_TRUE;
 
     // Device create info
     VkDeviceCreateInfo device_create_info{};
@@ -545,31 +593,38 @@ void VkWrappedInstance::recreate_swapchain() {
     images_in_flight.resize(swapchain_images.size(), VK_NULL_HANDLE);
 }
 
+VkImageView VkWrappedInstance::create_imageview(VkImage image, VkFormat format) {
+    VkImageViewCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    create_info.image = swapchain_images[i];
+    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create_info.format = format;
+
+    //create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    
+    create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    create_info.subresourceRange.baseMipLevel = 0;
+    create_info.subresourceRange.levelCount = 1;
+    create_info.subresourceRange.baseArrayLayer = 0;
+    create_info.subresourceRange.layerCount = 1;
+
+    VkImageView image_view;
+    if (vkCreateImageView(device, &create_info, nullptr, &image_view) != VK_SUCCESS)
+        throw std::runtime_error("failed to create texture image view");
+
+    return image_view;
+}
+
 void VkWrappedInstance::create_imageviews() {
     swapchain_imageviews.resize(swapchain_images.size());
 
-    for (int i = 0; i < swapchain_images.size(); ++i) {
-        VkImageViewCreateInfo create_info{};
-        create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-        create_info.image = swapchain_images[i];
-        create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        create_info.format = swapchain_surface_format.format;
-        create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-        create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-        
-        create_info.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-        create_info.subresourceRange.baseMipLevel = 0;
-        create_info.subresourceRange.levelCount = 1;
-        create_info.subresourceRange.baseArrayLayer = 0;
-        create_info.subresourceRange.layerCount = 1;
+    for (int i = 0; i < swapchain_images.size(); ++i)
+        create_imageview(swapchain_images[i], swapchain_surface_format.format);
 
-        if (vkCreateImageView(device, &create_info, nullptr, &swapchain_imageviews[i]) != VK_SUCCESS)
-            throw std::runtime_error("failed to create image views!");
-
-        imageviews_created = true;
-    }
+    imageviews_created = true;
 }
 
 static std::vector<char> load_file(const fs::path& filepath) {

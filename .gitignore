@@ -34,6 +34,9 @@
 *.out
 *.app
 
+# Mac filesystem
+*.DS_store
+
 # Build directory
 build/
 

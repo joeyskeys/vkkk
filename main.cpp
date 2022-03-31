@@ -55,12 +55,16 @@ int main() {
     ins.create_graphics_pipeline();
     ins.create_framebuffers();
     ins.create_command_pool();
+
+    ins.load_texture("../resource/textures/default.png");
+    ins.create_texture_imageviews();
+    ins.create_texture_sampler();
     
     const std::array<vkkk::Vertex, 4> verts{
-        glm::vec2{-0.5f, -0.5f}, glm::vec3{1.f, 0.f, 0.f},
-        glm::vec2{0.5f, -0.5f}, glm::vec3{0.f, 1.f, 0.f},
-        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f},
-        glm::vec2{-0.5f, 0.5f}, glm::vec3{1.f, 1.f, 1.f}
+        glm::vec2{-0.5f, -0.5f}, glm::vec3{1.f, 0.f, 0.f}, glm::vec2{1.f, 0.f},
+        glm::vec2{0.5f, -0.5f}, glm::vec3{0.f, 1.f, 0.f}, glm::vec2{0.f, 0.f},
+        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f}, glm::vec2{0.f, 1.f},
+        glm::vec2{-0.5f, 0.5f}, glm::vec3{1.f, 1.f, 1.f}, glm::vec2{1.f, 1.f}
     };
     ins.create_vertex_buffer(verts.data(), verts.size());
 

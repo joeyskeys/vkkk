@@ -45,6 +45,7 @@ struct Pixel {
 struct Vertex {
     glm::vec2 pos;
     glm::vec3 color;
+    glm::vec2 uv;
 
     static VkVertexInputBindingDescription get_binding_description() {
         VkVertexInputBindingDescription des{};
@@ -67,6 +68,11 @@ struct Vertex {
         des[1].location = 1;
         des[1].format = VK_FORMAT_R32G32B32_SFLOAT;
         des[1].offset = offsetof(Vertex, color);
+
+        des[2].binding = 0;
+        des[2].location = 2;
+        des[2].format = VK_FORMAT_R32G32_SFLOAT;
+        des[2].offset = offsetof(Vertex, uv);
 
         return des;
     }

@@ -104,7 +104,7 @@ VkWrappedInstance::~VkWrappedInstance() {
         vkDestroyImageView(device, tex_view, nullptr);
 
     for (auto& vk_image : vk_images)
-        vkDestroy(device, vk_image, nullptr);
+        vkDestroyImage(device, vk_image, nullptr);
 
     for (auto& vk_image_memo : vk_image_memos)
         vkFreeMemory(device, vk_image_memo, nullptr);
@@ -181,8 +181,8 @@ void VkWrappedInstance::end_single_time_commands(VkCommandBuffer cmd_buf) {
 }
 
 void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
-    const VkFormatformat, VkImageTiling tiling, VkImageUsageFlags usage,
-    VkMeomoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo)
+    const VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+    VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo)
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -216,7 +216,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     vkBindImageMemory(device, image, image_memo, 0);
 }
 
-void VkWrappedInstance::transition_image_layout(Vkimage image, VkFormat format,
+void VkWrappedInstance::transition_image_layout(VkImage image, VkFormat format,
     VkImageLayout old_layout, VkImageLayout new_layout)
 {
     VkCommandBuffer cmd_buf = begin_single_time_commands();
@@ -291,11 +291,9 @@ void VkWrappedInstance::create_texture_imageviews() {
 
     for (int i = 0; i < texture_views.size(); ++i)
         texture_views[i] = create_imageview(vk_images[i], VK_FORMAT_R8G8B8A8_SRGB);
-    
-    texture_views_created = true;
 }
 
-void create_texture_sampler() {
+void VkWrappedInstance::create_texture_sampler() {
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler_info.magFilter = VK_FILTER_LINEAR;
@@ -314,7 +312,7 @@ void create_texture_sampler() {
     sampler_info.compareEnable = VK_FALSE;
     sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
     sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    sampler_info.mpLodBias = 0.f;
+    sampler_info.mipLodBias = 0.f;
     sampler_info.minLod = 0.f;
     sampler_info.maxLod = 0.f;
 
@@ -330,7 +328,7 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
     int h = oiio_buf.yend() - oiio_buf.ybegin();
     std::vector<Pixel> pixels;
     pixels.resize(w * h);
-    oiio_buf.get_pixels(OIIO::ROI::all(), OIIO::TypeDesc::UINT8, pixels.data());
+    oiio_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
     //texture_bufs.emplace_back(std::move(oiio_buf));
 
     VkBuffer staging_buf;
@@ -342,7 +340,7 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
 
     void* data;
     vkMapMemory(device, staging_buf_memo, 0, image_size, 0, &data);
-        memcpy(data, pixels, static_cast<size_t>(image_size));
+        memcpy(data, pixels.data(), static_cast<size_t>(image_size));
     vkUnmapMemory(device, staging_buf_memo);
 
     VkImage img;
@@ -351,7 +349,7 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img, img_memo);
 
-    transition_image_layout(img, VK_FLOAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    transition_image_layout(img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copy_buffer_to_image(staging_buf, img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
     transition_image_layout(img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
@@ -405,7 +403,7 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_cnt, queue_families.data());
 
     VkPhysicalDeviceFeatures supported_features;
-    vkGetPhysicalDeviceFeatures(device, &supported_features);
+    vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
     if (!supported_features.samplerAnisotropy)
         return false;
 
@@ -596,7 +594,7 @@ void VkWrappedInstance::recreate_swapchain() {
 VkImageView VkWrappedInstance::create_imageview(VkImage image, VkFormat format) {
     VkImageViewCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    create_info.image = swapchain_images[i];
+    create_info.image = image;
     create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
     create_info.format = format;
 
@@ -1075,7 +1073,7 @@ void VkWrappedInstance::create_descriptor_set() {
         descriptor_writes[1].dstArrayElement = 0;
         descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptor_writes[1].descriptorCount = 1;
-        descriptor_writes[1].pBufferInfo = &img_info;
+        descriptor_writes[1].pImageInfo = &img_info;
 
         vkUpdateDescriptorSets(device, descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
     }

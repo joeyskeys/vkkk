@@ -100,7 +100,7 @@ public:
     void create_vk_image(const uint32_t w, const uint32_t h, const VkFormat format,
         VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
         VkImage& image, VkDeviceMemory& image_memo);
-    void transition_image_layout(Vkimage image, VkFormat format,
+    void transition_image_layout(VkImage image, VkFormat format,
         VkImageLayout old_layout, VkImageLayout new_layout);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
         uint32_t h);
@@ -189,7 +189,7 @@ private:
     VkDevice device;
 
     // Textures
-    std::vector<std::vector<Pixel>  texture_bufs;
+    std::vector<std::vector<Pixel>> texture_bufs;
     std::vector<VkImage>            vk_images;
     std::vector<VkDeviceMemory>     vk_image_memos;
     std::vector<VkImageView>        texture_views;

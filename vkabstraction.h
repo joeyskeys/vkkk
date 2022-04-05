@@ -57,7 +57,7 @@ struct Vertex {
     }
 
     static auto get_attr_descriptions() {
-        std::array<VkVertexInputAttributeDescription, 2> des{};
+        std::array<VkVertexInputAttributeDescription, 3> des{};
 
         des[0].binding = 0;
         des[0].location = 0;
@@ -193,6 +193,10 @@ private:
     std::vector<VkImage>            vk_images;
     std::vector<VkDeviceMemory>     vk_image_memos;
     std::vector<VkImageView>        texture_views;
+    VkImage                         tex_img;
+    VkImageLayout                   tex_layout;
+    VkDeviceMemory                  tex_img_memo;
+    VkImageView                     tex_view;
     VkSampler                       texture_sampler;
     bool                            sampler_created;
 

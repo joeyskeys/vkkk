@@ -287,10 +287,14 @@ void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32
 }
 
 void VkWrappedInstance::create_texture_imageviews() {
+    /*
     texture_views.resize(vk_images.size());
 
     for (int i = 0; i < texture_views.size(); ++i)
         texture_views[i] = create_imageview(vk_images[i], VK_FORMAT_R8G8B8A8_SRGB);
+    */
+
+    tex_view = create_imageview(tex_img, VK_FORMAT_R8G8B8A8_SRGB);
 }
 
 void VkWrappedInstance::create_texture_sampler() {
@@ -343,21 +347,21 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
         memcpy(data, pixels.data(), static_cast<size_t>(image_size));
     vkUnmapMemory(device, staging_buf_memo);
 
-    VkImage img;
-    VkDeviceMemory img_memo;
+    //VkImage img;
+    //VkDeviceMemory img_memo;
     create_vk_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, img, img_memo);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
 
-    transition_image_layout(img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copy_buffer_to_image(staging_buf, img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-    transition_image_layout(img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        copy_buffer_to_image(staging_buf, tex_img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(device, staging_buf, nullptr);
     vkFreeMemory(device, staging_buf_memo, nullptr);
 
-    vk_images.emplace_back(img);
-    vk_image_memos.emplace_back(img_memo);
+    //vk_images.emplace_back(img);
+    //vk_image_memos.emplace_back(img_memo);
 }
 
 void VkWrappedInstance::create_surface() {
@@ -716,8 +720,8 @@ void VkWrappedInstance::create_descriptor_set_layout() {
 }
 
 void VkWrappedInstance::create_graphics_pipeline() {
-    auto vert_code = load_file("../resource/shaders/mvp_default_vert.spv");
-    auto frag_code = load_file("../resource/shaders/mvp_default_frag.spv");
+    auto vert_code = load_file("../resource/shaders/tex_default_vert.spv");
+    auto frag_code = load_file("../resource/shaders/tex_default_frag.spv");
 
     auto vert_shader_module = create_shader_module(vert_code);
     auto frag_shader_module = create_shader_module(frag_code);
@@ -737,7 +741,7 @@ void VkWrappedInstance::create_graphics_pipeline() {
     VkPipelineShaderStageCreateInfo shader_stages[] = { vert_stage_create_info, frag_stage_create_info };
     
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
-    vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vert_input_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
 
     auto binding_des = Vertex::get_binding_description();
     auto attribute_des = Vertex::get_attr_descriptions();
@@ -806,7 +810,7 @@ void VkWrappedInstance::create_graphics_pipeline() {
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount = 1;
     pipeline_layout_info.pSetLayouts = &descriptor_layout;
-    pipeline_layout_info.pushConstantRangeCount = 0;
+    //pipeline_layout_info.pushConstantRangeCount = 0;
 
     if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS)
         throw std::runtime_error("failed to create pipeline layout!");
@@ -1053,8 +1057,9 @@ void VkWrappedInstance::create_descriptor_set() {
 
         VkDescriptorImageInfo img_info{};
         img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        assert(texture_views.size() > 0);
-        img_info.imageView = texture_views[0];
+        //assert(texture_views.size() > 0);
+        //img_info.imageView = texture_views[0];
+        img_info.imageView = tex_view;
         img_info.sampler = texture_sampler;
 
         std::array<VkWriteDescriptorSet, 2> descriptor_writes{};

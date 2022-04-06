@@ -8,6 +8,9 @@
 
 #include <OpenImageIO/imagebuf.h>
 
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb_image.h>
+
 #include "vkabstraction.h"
 
 namespace fs = std::filesystem;
@@ -193,7 +196,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     image_info.mipLevels = 1;
     image_info.arrayLayers = 1;
     image_info.format = format;
-    image_info. tiling = tiling;
+    image_info.tiling = tiling;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage = usage;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -202,7 +205,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     if (vkCreateImage(device, &image_info, nullptr, &image) != VK_SUCCESS)
         throw std::runtime_error("failed to create image");
 
-    VkMemoryRequirements mem_reqs;
+    VkMemoryRequirements mem_reqs{};
     vkGetImageMemoryRequirements(device, image, &mem_reqs);
 
     VkMemoryAllocateInfo alloc_info{};
@@ -325,19 +328,37 @@ void VkWrappedInstance::create_texture_sampler() {
 }
 
 bool VkWrappedInstance::load_texture(const fs::path& path) {
-    OIIO::ImageBuf oiio_buf(path.c_str());
+    fs::path abs_path = path;
+    if (path.is_relative())
+        abs_path = fs::absolute(path);
+    if (!fs::exists(abs_path))
+        throw std::runtime_error(fmt::format("texture does not exists .. {}", path.c_str()));
+
+    OIIO::ImageBuf oiio_buf(abs_path.c_str());
+    if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0))
+        throw std::runtime_error(fmt::format("texture init spec failed : {}", abs_path.c_str()));
+
     oiio_buf.read();
 
-    int w = oiio_buf.xend() - oiio_buf.xbegin();
-    int h = oiio_buf.yend() - oiio_buf.ybegin();
+    auto spec = oiio_buf.spec();
+    int w = spec.width;
+    int h = spec.height;
+    VkDeviceSize image_size = w * h * sizeof(Pixel);
+
     std::vector<Pixel> pixels;
     pixels.resize(w * h);
     oiio_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
     //texture_bufs.emplace_back(std::move(oiio_buf));
 
+    //int w, h, c;
+    //stbi_uc* pixels = stbi_load(path.c_str(), &w, &h, &c, STBI_rgb_alpha);
+    //VkDeviceSize image_size = w * h * 4;
+    //if (!pixels)
+        //throw std::runtime_error("failed to load texture image");
+
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_memo;
-    size_t image_size = w * h * sizeof(Pixel);
+    //size_t image_size = w * h * sizeof(Pixel);
     create_buffer(image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         staging_buf, staging_buf_memo);
@@ -345,7 +366,10 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
     void* data;
     vkMapMemory(device, staging_buf_memo, 0, image_size, 0, &data);
         memcpy(data, pixels.data(), static_cast<size_t>(image_size));
+        //memcpy(data, pixels, static_cast<size_t>(image_size));
     vkUnmapMemory(device, staging_buf_memo);
+
+    //stbi_image_free(pixels);
 
     //VkImage img;
     //VkDeviceMemory img_memo;
@@ -624,7 +648,7 @@ void VkWrappedInstance::create_imageviews() {
     swapchain_imageviews.resize(swapchain_images.size());
 
     for (int i = 0; i < swapchain_images.size(); ++i)
-        create_imageview(swapchain_images[i], swapchain_surface_format.format);
+        swapchain_imageviews[i] = create_imageview(swapchain_images[i], swapchain_surface_format.format);
 
     imageviews_created = true;
 }
@@ -1008,7 +1032,8 @@ void VkWrappedInstance::update_uniform_buffer(uint32_t idx) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
 
     MVPBuffer ubo{};
-    ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
+    //ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
+    ubo.model = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.proj = glm::perspective(glm::radians(45.f), swapchain_extent.width /
         static_cast<float>(swapchain_extent.height), 0.1f, 10.f);

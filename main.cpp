@@ -56,7 +56,7 @@ int main() {
     ins.create_framebuffers();
     ins.create_command_pool();
 
-    ins.load_texture("../resource/textures/default.png");
+    ins.load_texture("/Users/joey/Desktop/workspace/self/vkkk/resource/textures/texture.jpeg");
     ins.create_texture_imageviews();
     ins.create_texture_sampler();
     

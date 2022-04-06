@@ -41,7 +41,7 @@ endif()
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
 include_directories(${OIIO_INCLUDE_DIRS})
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty)
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 
 add_executable(vkkk main.cpp vkabstraction.cpp gui.cpp)
 target_link_libraries(vkkk

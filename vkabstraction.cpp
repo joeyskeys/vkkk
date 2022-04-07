@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include <OpenImageIO/imagebuf.h>
+#include <OpenImageIO/imagebufalgo.h>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -340,14 +341,20 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
 
     oiio_buf.read();
 
-    auto spec = oiio_buf.spec();
+    int ch_ords[] = {0, 1, 2, -1};
+    float ch_vals[] = {0, 0, 0, 1.f};
+    std::string ch_names[] = {"", "", "", "A"};
+    OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(oiio_buf, 4, ch_ords, ch_vals, ch_names);
+
+    auto spec = with_alpha_buf.spec();
     int w = spec.width;
     int h = spec.height;
+    std::cout << "tex w : " << w << ", h : " << h << std::endl;
     VkDeviceSize image_size = w * h * sizeof(Pixel);
 
     std::vector<Pixel> pixels;
     pixels.resize(w * h);
-    oiio_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
+    with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
     //texture_bufs.emplace_back(std::move(oiio_buf));
 
     //int w, h, c;

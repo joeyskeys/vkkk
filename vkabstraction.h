@@ -12,6 +12,7 @@
 #include <GLFW/glfw3.h>
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -43,7 +44,7 @@ struct Pixel {
 };
 
 struct Vertex {
-    glm::vec2 pos;
+    glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 uv;
 
@@ -61,7 +62,7 @@ struct Vertex {
 
         des[0].binding = 0;
         des[0].location = 0;
-        des[0].format = VK_FORMAT_R32G32_SFLOAT;
+        des[0].format = VK_FORMAT_R32G32B32_SFLOAT;
         des[0].offset = offsetof(Vertex, pos);
 
         des[1].binding = 0;
@@ -119,7 +120,7 @@ public:
     void create_swapchain();
     void cleanup_swapchain();
     void recreate_swapchain();
-    VkImageView create_imageview(VkImage image, VkFormat format);
+    VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
@@ -134,6 +135,7 @@ public:
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);
+    void create_depth_resource();
     void create_descriptor_pool();
     void create_descriptor_set();
     void create_commandbuffers();
@@ -168,6 +170,20 @@ private:
     VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes) const;
     VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) const;
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags props) const;
+
+    VkFormat find_supported_format(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+    inline VkFormat find_depth_format() {
+        return find_supported_format(
+            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
+    }
+
+    inline bool has_stencil_comp(VkFormat format) {
+        return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+    }
 
 private:
     uint32_t width = 800;
@@ -263,6 +279,12 @@ private:
     std::vector<VkBuffer>           uniform_buffers;
     std::vector<VkDeviceMemory>     uniform_buffer_memos;
     bool                            uniform_buffer_created = false;
+
+    // Depth Buffer
+    VkImage                         depth_img;
+    VkDeviceMemory                  depth_img_memo;
+    VkImageView                     depth_img_view;
+    bool                            depth_created;
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;

@@ -53,6 +53,7 @@ int main() {
     ins.create_renderpass();
     ins.create_descriptor_set_layout();
     ins.create_graphics_pipeline();
+    ins.create_depth_resource();
     ins.create_framebuffers();
     ins.create_command_pool();
 
@@ -60,16 +61,22 @@ int main() {
     ins.create_texture_imageviews();
     ins.create_texture_sampler();
     
-    const std::array<vkkk::Vertex, 4> verts{
-        glm::vec2{-0.5f, -0.5f}, glm::vec3{1.f, 0.f, 0.f}, glm::vec2{1.f, 0.f},
-        glm::vec2{0.5f, -0.5f}, glm::vec3{0.f, 1.f, 0.f}, glm::vec2{0.f, 0.f},
-        glm::vec2{0.5f, 0.5f}, glm::vec3{0.f, 0.f, 1.f}, glm::vec2{0.f, 1.f},
-        glm::vec2{-0.5f, 0.5f}, glm::vec3{1.f, 1.f, 1.f}, glm::vec2{1.f, 1.f}
+    const std::array<vkkk::Vertex, 8> verts{
+        glm::vec3{-0.5f, -0.5f, 0.f}, glm::vec3{1.f, 0.f, 0.f}, glm::vec2{1.f, 0.f},
+        glm::vec3{0.5f, -0.5f, 0.f}, glm::vec3{0.f, 1.f, 0.f}, glm::vec2{0.f, 0.f},
+        glm::vec3{0.5f, 0.5f, 0.f}, glm::vec3{0.f, 0.f, 1.f}, glm::vec2{0.f, 1.f},
+        glm::vec3{-0.5f, 0.5f, 0.f}, glm::vec3{1.f, 1.f, 1.f}, glm::vec2{1.f, 1.f},
+
+        glm::vec3{-0.5f, -0.5f, -0.5f}, glm::vec3{1.f, 0.f, 0.f}, glm::vec2{1.f, 0.f},
+        glm::vec3{0.5f, -0.5f, -0.5f}, glm::vec3{0.f, 1.f, 0.f}, glm::vec2{0.f, 0.f},
+        glm::vec3{0.5f, 0.5f, -0.5f}, glm::vec3{0.f, 0.f, 1.f}, glm::vec2{0.f, 1.f},
+        glm::vec3{-0.5f, 0.5f, -0.5f}, glm::vec3{1.f, 1.f, 1.f}, glm::vec2{1.f, 1.f}
     };
     ins.create_vertex_buffer(verts.data(), verts.size());
 
-    const std::array<uint32_t, 6> indices{
-        0, 1, 2, 2, 3, 0
+    const std::array<uint32_t, 12> indices{
+        0, 1, 2, 2, 3, 0,
+        4, 5, 6, 6, 7, 4
     };
     ins.create_index_buffer(indices.data(), indices.size());
 

@@ -3,8 +3,9 @@
 
 #include <GLFW/glfw3.h>
 
-#include "gui.h"
-#include "vkabstraction.h"
+#include "gui/gui.h"
+#include "vk_ins/vkabstraction.h"
+#include "asset_mgr/mesh.h"
 
 const static unsigned int WIDTH = 800;
 const static unsigned int HEIGHT = 600;
@@ -86,6 +87,10 @@ int main() {
 
     ins.create_commandbuffers();
     ins.create_sync_objects();
+
+    vkkk::Vertex2 v{};
+    v.arr[0] = 1.f;
+    v.y = 2.f;
 
     ins.mainloop();
 

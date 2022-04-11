@@ -5,8 +5,6 @@
 namespace vkkk
 {
 
-
-
 class MeshMgr : public Singleton<MeshMgr> {
 public:
 

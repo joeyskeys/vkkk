@@ -43,7 +43,7 @@ struct Pixel {
     char a;
 };
 
-struct Vertex {
+struct VertexTmp {
     glm::vec3 pos;
     glm::vec3 color;
     glm::vec2 uv;
@@ -51,7 +51,7 @@ struct Vertex {
     static VkVertexInputBindingDescription get_binding_description() {
         VkVertexInputBindingDescription des{};
         des.binding = 0;
-        des.stride = sizeof(Vertex);
+        des.stride = sizeof(VertexTmp);
         des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         return des;
@@ -63,17 +63,17 @@ struct Vertex {
         des[0].binding = 0;
         des[0].location = 0;
         des[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[0].offset = offsetof(Vertex, pos);
+        des[0].offset = offsetof(VertexTmp, pos);
 
         des[1].binding = 0;
         des[1].location = 1;
         des[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[1].offset = offsetof(Vertex, color);
+        des[1].offset = offsetof(VertexTmp, color);
 
         des[2].binding = 0;
         des[2].location = 2;
         des[2].format = VK_FORMAT_R32G32_SFLOAT;
-        des[2].offset = offsetof(Vertex, uv);
+        des[2].offset = offsetof(VertexTmp, uv);
 
         return des;
     }
@@ -131,7 +131,7 @@ public:
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo);
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
-    void create_vertex_buffer(const Vertex* source_data, size_t vcnt);
+    void create_vertex_buffer(const VertexTmp* source_data, size_t vcnt);
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);

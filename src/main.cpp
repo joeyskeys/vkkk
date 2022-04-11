@@ -62,7 +62,7 @@ int main() {
     ins.create_texture_imageviews();
     ins.create_texture_sampler();
     
-    const std::array<vkkk::Vertex, 8> verts{
+    const std::array<vkkk::VertexTmp, 8> verts{
         glm::vec3{-0.5f, -0.5f, 0.f}, glm::vec3{1.f, 0.f, 0.f}, glm::vec2{1.f, 0.f},
         glm::vec3{0.5f, -0.5f, 0.f}, glm::vec3{0.f, 1.f, 0.f}, glm::vec2{0.f, 0.f},
         glm::vec3{0.5f, 0.5f, 0.f}, glm::vec3{0.f, 0.f, 1.f}, glm::vec2{0.f, 1.f},

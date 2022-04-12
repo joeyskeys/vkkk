@@ -111,7 +111,7 @@ public:
     };
 };
 
-class VertexColorUV {
+class VertexUVColor {
 public:
     static VkVertexInputBindingDescription get_binding_description(uint32 binding) {
         VkVertexInputBindingDescription des{};
@@ -131,14 +131,14 @@ public:
         des[0].offset = 0;
 
         des[1].binding = binding;
-        des[1].location = loc_color;
-        des[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[1].offset = offsetof(VertexColorUV, color);
+        des[1].location = loc_uv;
+        des[1].format = VK_FORMAT_R32G32_SFLOAT;
+        des[1].offset = offsetof(VertexColorUV, uv);
 
         des[2].binding = binding;
-        des[2].location = loc_uv;
-        des[2].format = VK_FORMAT_R32G32_SFLOAT;
-        des[2].offset = offsetof(VertexColorUV, uv);
+        des[2].location = loc_color;
+        des[2].format = VK_FORMAT_R32G32B32_SFLOAT;
+        des[2].offset = offsetof(VertexColorUV, color);
 
         return des;
     }
@@ -150,16 +150,16 @@ public:
             float x;
             float y;
             float z;
+            float u;
+            float v;
             float r;
             float g;
             float b;
-            float u;
-            float v;
         };
         struct {
             glm::vec3 pos;
-            glm::vec3 color;
             glm::vec2 uv;
+            glm::vec3 color;
         };
     };
 };

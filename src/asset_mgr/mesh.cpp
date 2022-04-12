@@ -27,6 +27,32 @@ void Mesh::load(aiMesh *mesh) {
         vbuf[i * comp_size + 2] = mesh->mVertices[i].z;
     }
 
+    if (comp_flag & UV_BIT) {
+        // Assimp support multiple uv sets, but we only check for
+        // the first set
+        if (!mesh->HasTextureCoords(0))
+            throw std::runtime_error("Mesh doesn't have UVs");
+
+        for (uint i = 0; i < vcnt; ++i) {
+            auto uv = mesh->mTextureCoords[0][i]
+            vbuf[i * comp_size + 3] = uv.x;
+            vbuf[i * comp_size + 4] = uv.y;
+        }
+    }
+
+    if (comp_flag & COLOR_BIT) {
+        // Also supports multiple channels of vertex colors
+        if (!mesh->HasTextureColors(0))
+            throw std::runtime_error("Mesh doesn't have Vertex Colors");
+
+        for (uint i = 0; i < vcnt; ++i) {
+            auto vcolor = mesh->mColors[0][i];
+            vbuf[i * comp_size + 5] = vcolor.r;
+            vbuf[i * comp_size + 6] = vcolor.g;
+            vbuf[i * comp_size + 7] = vcolor.b;
+        }
+    }
+
     for (int i = 0; i < icnt; ++i) {
         ibuf[i * 3    ] = mesh->mFaces[i].mIndices[0];
         ibuf[i * 3 + 1] = mesh->mFaces[i].mIndices[1];

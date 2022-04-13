@@ -176,11 +176,11 @@ public:
     void load(aiMesh *mesh);
 
 private:
-    uint32_t    comp_flag = 0;
-    uint32_t    vertex_buffer_size;
-    bool        indexed = true;
-    float       *vbuf = nullptr;
-    uint32_t    *ibuf = nullptr;
+    uint32_t                    comp_flag = 0;
+    uint32_t                    vertex_buffer_size;
+    bool                        indexed = true;
+    std::unique_ptr<float[]>    vbuf = nullptr;
+    std::unique_ptr<uint32_t[]> ibuf = nullptr;
 };
 
 }

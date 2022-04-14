@@ -8,9 +8,9 @@ Mesh::Mesh(uint32_t flag, bool indexed)
 {}
 
 void Mesh::load(aiMesh *mesh) {
-    uint32_t vcnt = mesh->mNumVertices;
-    uint32_t icnt = mesh->mNumFaces;
-    uint32_t comp_size = 3 + 3 * (comp_flag & COLOR_BIT) + 2 * (comp_flag & UV_BIT >> 1);
+    vcnt = mesh->mNumVertices;
+    icnt = mesh->mNumFaces;
+    comp_size = 3 + 3 * (comp_flag & COLOR_BIT) + 2 * (comp_flag & UV_BIT >> 1);
 
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);

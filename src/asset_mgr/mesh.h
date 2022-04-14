@@ -177,9 +177,11 @@ public:
 
 private:
     uint32_t                    comp_flag = 0;
-    uint32_t                    vertex_buffer_size;
     bool                        indexed = true;
+    uint32_t                    comp_size;
+    uint32_t                    vcnt;
     std::unique_ptr<float[]>    vbuf = nullptr;
+    uint32_t                    icnt;
     std::unique_ptr<uint32_t[]> ibuf = nullptr;
 };
 

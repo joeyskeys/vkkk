@@ -1020,8 +1020,8 @@ void VkWrappedInstance::copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDevice
     vkFreeCommandBuffers(device, command_pool, 1, &cmd_buf);
 }
 
-void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t vcnt) {
-    VkDeviceSize buf_size = sizeof(Vertex) * vcnt;
+void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t buf_size) {
+    //VkDeviceSize buf_size = sizeof(Vertex) * vcnt;
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_memo;
     create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |

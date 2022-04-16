@@ -2,6 +2,9 @@
 
 #include <memory>
 
+namespace vkkk
+{
+
 Mesh::Mesh(uint32_t flag, bool indexed)
     : comp_flag(flag)
     , indexed(indexed)
@@ -52,4 +55,6 @@ void Mesh::load(aiMesh *mesh) {
         ibuf[i * 3 + 1] = mesh->mFaces[i].mIndices[1];
         ibuf[i * 3 + 2] = mesh->mFaces[i].mIndices[2];
     }
+}
+
 }

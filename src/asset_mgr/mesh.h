@@ -2,11 +2,14 @@
 
 #include <cstdint>
 #include <concepts>
+#include <functional>
 #include <type_traits>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+#include <frozen/string.h>
+#include <frozen/unordered_map.h>
 #include <vulkan/vulkan.h>
 
 namespace vkkk
@@ -33,7 +36,7 @@ public:
     }
 
     static auto get_attr_descriptions(uint32_t binding, uint32_t loc) {
-        std::array<VkVertexInputAttributeDescription, 1> des{};
+        std::vector<VkVertexInputAttributeDescription> des(1);
 
         des[0].binding = binding;
         des[0].location = loc;
@@ -79,7 +82,7 @@ public:
     }
 
     static auto get_attr_descriptions(uint32_t binding, uint32_t loc_pos, uint32_t loc_uv) {
-        std::array<VkVertexInputAttributeDescription, 2> des{};
+        std::vector<VkVertexInputAttributeDescription> des(2);
 
         des[0].binding = binding;
         des[0].location = loc_pos;
@@ -113,17 +116,17 @@ public:
 
 class VertexUVColor {
 public:
-    static VkVertexInputBindingDescription get_binding_description(uint32 binding) {
+    static VkVertexInputBindingDescription get_binding_description(uint32_t binding) {
         VkVertexInputBindingDescription des{};
         des.binding = binding;
-        des.stride = sizeof(VertexColorUV);
+        des.stride = sizeof(VertexUVColor);
         des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        return res;
+        return des;
     }
 
-    static auto get_attr_descriptions(uint32_t binding, uint32_t loc_pos, uint32_t loc_color, uint32_t loc_uv) {
-        std::array<VkVertexInputAttributeDescription, 3> des{};
+    static auto get_attr_descriptions(uint32_t binding, uint32_t loc_pos, uint32_t loc_uv, uint32_t loc_color) {
+        std::vector<VkVertexInputAttributeDescription> des(3);
 
         des[0].binding = binding;
         des[0].location = loc_pos;
@@ -133,12 +136,12 @@ public:
         des[1].binding = binding;
         des[1].location = loc_uv;
         des[1].format = VK_FORMAT_R32G32_SFLOAT;
-        des[1].offset = offsetof(VertexColorUV, uv);
+        des[1].offset = offsetof(VertexUVColor, uv);
 
         des[2].binding = binding;
         des[2].location = loc_color;
         des[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[2].offset = offsetof(VertexColorUV, color);
+        des[2].offset = offsetof(VertexUVColor, color);
 
         return des;
     }
@@ -165,8 +168,8 @@ public:
 };
 
 // POS BIT is a "must have"
-constexpr static int COLOR_BIT = 1;
-constexpr static int UV_BIT = 1 << 1;
+constexpr static int UV_BIT = 1;
+constexpr static int COLOR_BIT = 1 << 1;
 
 class Mesh {
 public:

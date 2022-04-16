@@ -16,6 +16,9 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "asset_mgr/mesh.h"
+#include "vk_ins/shader_mgr.h"
+
 namespace fs = std::filesystem;
 
 namespace vkkk
@@ -125,7 +128,14 @@ public:
     void create_renderpass();
     VkShaderModule create_shader_module(std::vector<char>&);
     void create_descriptor_set_layout();
+
     void create_graphics_pipeline();
+    void create_graphics_pipeline(
+        const ShaderModules&,
+        const uint32_t,
+        const VkPrimitiveTopology,
+        const VkPolygonMode);
+
     void create_framebuffers();
     void create_command_pool();
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,

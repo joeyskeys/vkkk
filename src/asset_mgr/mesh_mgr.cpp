@@ -1,5 +1,8 @@
 
-#include "mesh_mgr.h"
+#include "asset_mgr/mesh_mgr.h"
+
+namespace
+{
 
 static void process_node(aiNode* node, const aiScene* scene) {
     for (int i = 0; i < node->mNumMeshes; ++i) {
@@ -26,4 +29,6 @@ void MeshMgr::load_file(const fs::path& path) {
         return;
 
     process_node(scene->mRootNode, scene);
+}
+
 }

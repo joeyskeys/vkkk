@@ -9,7 +9,7 @@ ShaderModules::~ShaderModules() {
         vkDestroyShaderModule(device, shader_module, nullptr);
 }
 
-bool ShaderModules::add_module(fs::path path, VkDevice &device, VkShaderStageFlagBits t) {
+bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     fs::path abs_path = path;
     if (path.is_relative())
         abs_path = fs::absolute(path);
@@ -32,7 +32,7 @@ bool ShaderModules::add_module(fs::path path, VkDevice &device, VkShaderStageFla
     shader_types.push_back(t);
 }
 
-auto ShaderModules::get_create_info_array() const {
+std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_array() const {
     std::vector<VkPipelineShaderStageCreateInfo> stage_create_infos;
     for (int i = 0; i < shader_modules.size(); ++i) {
         VkPipelineShaderStageCreateInfo stage_create_info{};

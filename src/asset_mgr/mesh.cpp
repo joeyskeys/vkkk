@@ -10,6 +10,28 @@ Mesh::Mesh(uint32_t flag, bool indexed)
     , indexed(indexed)
 {}
 
+Mesh::Mesh(const Mesh& b) {
+    comp_flag = b.comp_flag;
+    indexed = b.indexed;
+    comp_size = b.comp_size;
+    vcnt = b.vcnt;
+    vbuf = std::make_unique<float[]>(vcnt * comp_size);
+    memcpy(vbuf.get(), b.vbuf.get(), vcnt * comp_size * sizeof(float));
+    icnt = icnt;
+    ibuf = std::make_unique<uint32_t[]>(icnt * 3);
+    memcpy(ibuf.get(), b.ibuf.get(), icnt * 3 * sizeof(uint32_t));
+}
+
+Mesh::Mesh(Mesh&& b) {
+    comp_flag = b.comp_flag;
+    indexed = b.indexed;
+    comp_size = b.comp_size;
+    vcnt = b.vcnt;
+    vbuf = std::move(b.vbuf);
+    icnt = icnt;
+    ibuf = std::move(b.ibuf);
+}
+
 void Mesh::load(aiMesh *mesh) {
     vcnt = mesh->mNumVertices;
     icnt = mesh->mNumFaces;
@@ -31,7 +53,7 @@ void Mesh::load(aiMesh *mesh) {
             throw std::runtime_error("Mesh doesn't have UVs");
 
         for (uint i = 0; i < vcnt; ++i) {
-            auto uv = mesh->mTextureCoords[0][i]
+            auto uv = mesh->mTextureCoords[0][i];
             vbuf[i * comp_size + 3] = uv.x;
             vbuf[i * comp_size + 4] = uv.y;
         }
@@ -39,7 +61,7 @@ void Mesh::load(aiMesh *mesh) {
 
     if (comp_flag & COLOR_BIT) {
         // Also supports multiple channels of vertex colors
-        if (!mesh->HasTextureColors(0))
+        if (!mesh->HasVertexColors(0))
             throw std::runtime_error("Mesh doesn't have Vertex Colors");
 
         for (uint i = 0; i < vcnt; ++i) {

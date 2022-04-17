@@ -118,6 +118,10 @@ public:
         return physical_devices;
     }
 
+    inline VkDevice get_device() {
+        return device;
+    }
+
     bool validate_current_device(QueueFamilyIndex* idx);
     void create_logical_device();
     void create_swapchain();
@@ -139,9 +143,10 @@ public:
     void create_framebuffers();
     void create_command_pool();
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo);
+        VkMemoryPropertyFlags props, VkBuffer &buf, VkDeviceMemory& buf_memo);
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
-    void create_vertex_buffer(const VertexTmp* source_data, size_t vcnt);
+    void create_vertex_buffer(const VertexTmp *source_data, size_t vcnt);
+    void create_vertex_buffer(const float *source_data, size_t comp_size, size_t vcnt);
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);

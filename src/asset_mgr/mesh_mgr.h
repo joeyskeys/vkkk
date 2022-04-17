@@ -12,8 +12,10 @@ namespace vkkk
 
 class MeshMgr : public Singleton<MeshMgr> {
 public:
-    MeshMgr() = delete;
-    void load_file(const fs::path& path);
+    void load_file(const fs::path &path, uint32_t flag);
+
+private:
+    void process_node(aiNode *node, const aiScene *scene, uint32_t flag);
 
 public:
     std::vector<Mesh>   meshes;

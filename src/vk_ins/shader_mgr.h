@@ -15,8 +15,8 @@ public:
     ShaderModules(const VkDevice d) : device(d) {}
     virtual ~ShaderModules();
 
-    bool add_module(fs::path path, VkDevice &device, VkShaderStageFlagBits t);
-    auto get_create_info_array() const;
+    bool add_module(fs::path path, VkShaderStageFlagBits t);
+    std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
     
 private:
     VkDevice                            device;

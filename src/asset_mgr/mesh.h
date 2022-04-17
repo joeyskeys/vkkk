@@ -1,16 +1,20 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <concepts>
 #include <functional>
 #include <type_traits>
+#include <vector>
 
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
-#include <frozen/string.h>
-#include <frozen/unordered_map.h>
 #include <vulkan/vulkan.h>
+
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/glm.hpp>
 
 namespace vkkk
 {
@@ -26,13 +30,13 @@ concept ThridComponent = D == 3;
 
 class Vertex {
 public:
-    static VkVertexInputBindingDescription get_binding_description(uint32 binding) {
+    static VkVertexInputBindingDescription get_binding_description(uint32_t binding) {
         VkVertexInputBindingDescription des{};
         des.binding = binding;
         des.stride = sizeof(Vertex);
         des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        return res;
+        return des;
     }
 
     static auto get_attr_descriptions(uint32_t binding, uint32_t loc) {
@@ -78,7 +82,7 @@ public:
         des.stride = sizeof(VertexUV);
         des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-        return res;
+        return des;
     }
 
     static auto get_attr_descriptions(uint32_t binding, uint32_t loc_pos, uint32_t loc_uv) {
@@ -171,14 +175,19 @@ public:
 constexpr static int UV_BIT = 1;
 constexpr static int COLOR_BIT = 1 << 1;
 
+constexpr static int ONLY_VERTEX = 0;
+constexpr static int WITH_UV = UV_BIT;
+constexpr static int WITH_UV_COLOR = UV_BIT | COLOR_BIT;
+
 class Mesh {
 public:
-    Mesh(uint32_t flag, bool indexed=true);
-    virtual ~Mesh();
+    Mesh(uint32_t flag=ONLY_VERTEX, bool indexed=true);
+    Mesh(const Mesh&);
+    Mesh(Mesh&&);
 
     void load(aiMesh *mesh);
 
-private:
+public:
     uint32_t                    comp_flag = 0;
     bool                        indexed = true;
     uint32_t                    comp_size;

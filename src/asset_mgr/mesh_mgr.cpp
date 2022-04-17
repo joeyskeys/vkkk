@@ -1,24 +1,25 @@
+#include <iostream>
 
 #include "asset_mgr/mesh_mgr.h"
 
-namespace
+namespace vkkk
 {
 
-static void process_node(aiNode* node, const aiScene* scene) {
+void MeshMgr::process_node(aiNode *node, const aiScene *scene, uint32_t flag) {
     for (int i = 0; i < node->mNumMeshes; ++i) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        Mesh m{};
+        Mesh m{flag};
         m.load(mesh);
         meshes.emplace_back(std::move(m));
     }
 
     for (int i = 0; i < node->mNumChildren; ++i)
-        process_node(node->mChildren[i], scene);
+        process_node(node->mChildren[i], scene, flag);
 }
 
-void MeshMgr::load_file(const fs::path& path) {
+void MeshMgr::load_file(const fs::path& path, uint32_t flag) {
     if (!fs::exists(fs::absolute(path))) {
-        std::cout << "file : " << path << "does not exist" << std::endl;
+        std::cerr << "file : " << path << "does not exist" << std::endl;
         return;
     }
 
@@ -28,7 +29,7 @@ void MeshMgr::load_file(const fs::path& path) {
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         return;
 
-    process_node(scene->mRootNode, scene);
+    process_node(scene->mRootNode, scene, flag);
 }
 
 }

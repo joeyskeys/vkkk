@@ -927,7 +927,7 @@ void VkWrappedInstance::create_graphics_pipeline(
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
 
     VkVertexInputBindingDescription binding_des{};
-    std::vector<VkVertexInputAttributeDescription> attr_des();
+    std::vector<VkVertexInputAttributeDescription> attr_des;
     
     if (vert_flag & UV_BIT) {
         if (vert_flag & COLOR_BIT) {
@@ -945,9 +945,9 @@ void VkWrappedInstance::create_graphics_pipeline(
     }
 
     vert_input_info.vertexBindingDescriptionCount = 1;
-    vert_input_info.vertexAttributeDescriptionCount = attribute_des.size();
+    vert_input_info.vertexAttributeDescriptionCount = attr_des.size();
     vert_input_info.pVertexBindingDescriptions = &binding_des;
-    vert_input_info.pVertexAttributeDescriptions = attribute_des.data();
+    vert_input_info.pVertexAttributeDescriptions = attr_des.data();
 
     // Input assembly, a.k.a drawing type
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};
@@ -978,7 +978,7 @@ void VkWrappedInstance::create_graphics_pipeline(
 
     // Rasterizer info
     VkPipelineRasterizationStateCreateInfo rasterizer_info{};
-    rasterizer_info.sType = VK_STRUCUTRE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer_info.depthClampEnable = VK_FALSE;
     rasterizer_info.rasterizerDiscardEnable = VK_FALSE;
     rasterizer_info.polygonMode = mode;
@@ -1022,15 +1022,15 @@ void VkWrappedInstance::create_graphics_pipeline(
 
     // Pipeline layout info
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
-    pipeline_layout.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout.setLayoutCount = 1;
-    pipeline_layout.pSetLayouts = &descriptor_layout;
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount = 1;
+    pipeline_layout_info.pSetLayouts = &descriptor_layout;
 
     if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS)
         throw std::runtime_error("failed to create pipeline layout!");
 
     // The final pipeline info
-    VkGraphicsPipelineCreateInfo pipeline_info{}
+    VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipeline_info.stageCount = 2;
     pipeline_info.pStages = shader_stages.data();
@@ -1041,7 +1041,7 @@ void VkWrappedInstance::create_graphics_pipeline(
     pipeline_info.pMultisampleState = &multisampling;
     pipeline_info.pDepthStencilState = &depth_stencil;
     pipeline_info.pColorBlendState = &blend_state;
-    pipeline_info.layout = &pipeline_layout;
+    pipeline_info.layout = pipeline_layout;
     pipeline_info.renderPass = render_pass;
     pipeline_info.subpass = 0;
     pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
@@ -1049,7 +1049,7 @@ void VkWrappedInstance::create_graphics_pipeline(
     if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline) != VK_SUCCESS)
         throw std::runtime_error("failed to create graphics pipeline !");
 
-    pipeline_created;
+    pipeline_created = true;
 }
 
 void VkWrappedInstance::create_framebuffers() {
@@ -1158,8 +1158,30 @@ void VkWrappedInstance::copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDevice
     vkFreeCommandBuffers(device, command_pool, 1, &cmd_buf);
 }
 
-void VkWrappedInstance::create_vertex_buffer(const Vertex* source_data, size_t buf_size) {
-    //VkDeviceSize buf_size = sizeof(Vertex) * vcnt;
+void VkWrappedInstance::create_vertex_buffer(const VertexTmp *source_data, size_t vcnt) {
+    VkDeviceSize buf_size = sizeof(VertexTmp) * vcnt;
+    VkBuffer staging_buf;
+    VkDeviceMemory staging_buf_memo;
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buf, staging_buf_memo);
+
+    void* data;
+    vkMapMemory(device, staging_buf_memo, 0, buf_size, 0, &data);
+        memcpy(data, source_data, buf_size);
+    vkUnmapMemory(device, staging_buf_memo);
+
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vert_buffer, vert_buffer_memo);
+
+    copy_buffer(staging_buf, vert_buffer, buf_size);
+    vkDestroyBuffer(device, staging_buf, nullptr);
+    vkFreeMemory(device, staging_buf_memo, nullptr);
+
+    vertbuffer_created = true;
+}
+
+void VkWrappedInstance::create_vertex_buffer(const float *source_data, size_t comp_size, size_t vcnt) {
+    VkDeviceSize buf_size = comp_size * vcnt * sizeof(float);
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_memo;
     create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |

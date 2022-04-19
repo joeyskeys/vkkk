@@ -38,9 +38,16 @@ else()
     message(STATUS "Found oiio: ${OIIO_INCLUDE_DIRS}")
 endif()
 
+find_package(ASSIMP)
+
+if (NOT ASSIMP_FOUND)
+    message(FATAL_ERROR "Could not find assimp library!")
+endif()
+
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
 include_directories(${OIIO_INCLUDE_DIRS})
+include_directories(${ASSIMP_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 

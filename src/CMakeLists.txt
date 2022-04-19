@@ -19,7 +19,8 @@ add_library(vkkk ${HEADERS} ${SRCS})
 target_link_libraries(vkkk
     ${GLFW_LIBRARIES}
     ${Vulkan_LIBRARIES}
-    ${OIIO_LIBRARIES})
+    ${OIIO_LIBRARIES}
+    ${ASSIMP_LIBRARIES})
 
 add_executable(vktest main.cpp)
 target_link_libraries(vktest

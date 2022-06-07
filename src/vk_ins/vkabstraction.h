@@ -88,6 +88,8 @@ struct MVPBuffer {
     glm::mat4 proj;
 };
 
+using UnifromUpdateCBK = std::function<void(MVPBuffer*)>;
+
 class VkWrappedInstance {
 public:
     VkWrappedInstance();
@@ -120,6 +122,10 @@ public:
 
     inline VkDevice get_device() {
         return device;
+    }
+
+    inline void set_uniform_cbk(UnifromUpdateCBK cbk) {
+        uniform_cbk = cbk;
     }
 
     bool validate_current_device(QueueFamilyIndex* idx);
@@ -213,6 +219,9 @@ private:
     VkDebugUtilsMessengerEXT debug_messenger;
 
     QueueFamilyIndex queue_family_idx;
+
+    // Uniform update callback
+    UnifromUpdateCBK uniform_cbk;
 
     // Currently only use one physical card and one logical device
     std::vector<VkPhysicalDevice> physical_devices;

@@ -1,6 +1,7 @@
 #include "mesh.h"
 
 #include <memory>
+#include <stdexcept>
 
 namespace vkkk
 {
@@ -40,7 +41,7 @@ void Mesh::load(aiMesh *mesh) {
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
 
-    for (uint i = 0; i < vcnt; ++i) {
+    for (uint32_t i = 0; i < vcnt; ++i) {
         vbuf[i * comp_size    ] = mesh->mVertices[i].x;
         vbuf[i * comp_size + 1] = mesh->mVertices[i].y;
         vbuf[i * comp_size + 2] = mesh->mVertices[i].z;
@@ -52,7 +53,7 @@ void Mesh::load(aiMesh *mesh) {
         if (!mesh->HasTextureCoords(0))
             throw std::runtime_error("Mesh doesn't have UVs");
 
-        for (uint i = 0; i < vcnt; ++i) {
+        for (uint32_t i = 0; i < vcnt; ++i) {
             auto uv = mesh->mTextureCoords[0][i];
             vbuf[i * comp_size + 3] = uv.x;
             vbuf[i * comp_size + 4] = uv.y;
@@ -64,7 +65,7 @@ void Mesh::load(aiMesh *mesh) {
         if (!mesh->HasVertexColors(0))
             throw std::runtime_error("Mesh doesn't have Vertex Colors");
 
-        for (uint i = 0; i < vcnt; ++i) {
+        for (uint32_t i = 0; i < vcnt; ++i) {
             auto vcolor = mesh->mColors[0][i];
             vbuf[i * comp_size + 5] = vcolor.r;
             vbuf[i * comp_size + 6] = vcolor.g;

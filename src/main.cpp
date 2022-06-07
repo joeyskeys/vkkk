@@ -4,8 +4,9 @@
 #include <GLFW/glfw3.h>
 
 #include "gui/gui.h"
-#include "vk_ins/vkabstraction.h"
 #include "asset_mgr/mesh_mgr.h"
+#include "concepts/camera.h"
+#include "vk_ins/vkabstraction.h"
 
 const static unsigned int WIDTH = 800;
 const static unsigned int HEIGHT = 600;
@@ -45,7 +46,31 @@ bool check_validation_layer_support() {
     return true;
 }
 
+Camera cam{glm::vec3{0, 0, -5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1, 0.1, 100};
+
+void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
+    if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+        cam.pos.z += 0.2;
+    }
+    else if (key == GLFW_KEY_S && action == GLFW_PRESS) {
+        cam.pos.z -= 0.2;
+    }
+    else if (key == GLFW_KEY_A && action == GLFW_PRESS) {
+        cam.pos.x -= 0.2;
+    }
+    else if (key == GLFW_KEY_D && action == GLFW_PRESS) {
+        cam.pos.x += 0.2;
+    }
+}
+
+void ubo_update(vkkk::MVPBuffer *buf) {
+    buf->model = glm::mat4(1);
+    buf->view = cam.get_view_mat();
+    buf->proj = cam.get_proj_mat();
+}
+
 int main() {
+
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
@@ -97,6 +122,7 @@ int main() {
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt);
 
     ins.create_uniform_buffer();
+    ins.set_uniform_cbk(ubo_update);
     ins.create_descriptor_pool();
     ins.create_descriptor_set();
 

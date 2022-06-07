@@ -333,11 +333,11 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
     if (path.is_relative())
         abs_path = fs::absolute(path);
     if (!fs::exists(abs_path))
-        throw std::runtime_error(fmt::format("texture does not exists .. {}", path.c_str()));
+        throw std::runtime_error(fmt::format("texture does not exists .. {}", path.string()));
 
-    OIIO::ImageBuf oiio_buf(abs_path.c_str());
+    OIIO::ImageBuf oiio_buf(abs_path.string().c_str());
     if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0))
-        throw std::runtime_error(fmt::format("texture init spec failed : {}", abs_path.c_str()));
+        throw std::runtime_error(fmt::format("texture init spec failed : {}", abs_path.string()));
 
     oiio_buf.read();
 
@@ -1244,12 +1244,16 @@ void VkWrappedInstance::update_uniform_buffer(uint32_t idx) {
     float time = std::chrono::duration<float, std::chrono::seconds::period>(current_time - start_time).count();
 
     MVPBuffer ubo{};
+    /*
     ubo.model = glm::rotate(glm::mat4(1.f), time * glm::radians(90.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.model = glm::rotate(glm::mat4(1.f), glm::radians(-90.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.view = glm::lookAt(glm::vec3(2.f, 2.f, 2.f), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
     ubo.proj = glm::perspective(glm::radians(45.f), swapchain_extent.width /
         static_cast<float>(swapchain_extent.height), 0.1f, 10.f);
     ubo.proj[1][1] *= -1;
+    */
+    if (uniform_cbk)
+        uniform_cbk(&ubo);
 
     void* data;
     vkMapMemory(device, uniform_buffer_memos[idx], 0, sizeof(ubo), 0, &data);
@@ -1442,7 +1446,8 @@ void VkWrappedInstance::draw_frame() {
         vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
     images_in_flight[image_idx] = in_flight_fences[current_frame];
 
-    update_uniform_buffer(image_idx);
+    //update_uniform_buffer(image_idx);
+    
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

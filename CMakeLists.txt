@@ -42,6 +42,17 @@ find_package(ASSIMP)
 
 if (NOT ASSIMP_FOUND)
     message(FATAL_ERROR "Could not find assimp library!")
+else()
+    message(STATUS "Found ASSIMP: ${ASSIMP_INCLUDE_DIRS}")
+endif()
+
+find_package(SPIRVCROSS)
+
+if (NOT SPIRVCROSS_FOUND)
+    message(FATAL_ERROR "Could not find spirv-cross library!")
+else()
+    message(STATUS "Found spirv-cross library")
+    message(STATUS ${SPIRVCROSS_LIBRARIES})
 endif()
 
 include_directories(${Vulkan_INCLUDE_DIRS})
@@ -52,3 +63,4 @@ include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
 add_subdirectory(src)
+add_subdirectory(tests)

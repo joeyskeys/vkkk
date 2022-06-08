@@ -19,7 +19,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         return false;
     }
 
-    auto shader_code = load_file(path);
+    auto shader_code = load_file<char>(path);
     VkShaderModuleCreateInfo module_create_info{};
     module_create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     module_create_info.codeSize = shader_code.size();

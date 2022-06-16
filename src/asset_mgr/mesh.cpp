@@ -29,7 +29,7 @@ Mesh::Mesh(Mesh&& b) {
     comp_size = b.comp_size;
     vcnt = b.vcnt;
     vbuf = std::move(b.vbuf);
-    icnt = icnt;
+    icnt = b.icnt;
     ibuf = std::move(b.ibuf);
 }
 

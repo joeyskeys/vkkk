@@ -1,6 +1,5 @@
 #include <vector>
 
-#define CARCH_CONFIG_MAIN
 #include <catch2/catch_all.hpp>
 #include <spirv_cross/spirv.hpp>
 #include <spirv_cross/spirv_glsl.hpp>
@@ -17,4 +16,6 @@ TEST_CASE("Resource test", "[single-file]") {
     auto resources = comp.get_shader_resources();
 
     REQUIRE(resources.uniform_buffers[0].name == "UniformBufferObject");
+    auto res_id = resources.uniform_buffers[0].id;
+    REQUIRE(comp.get_name(res_id) == "ubo");
 }

@@ -670,8 +670,10 @@ void VkWrappedInstance::create_imageviews() {
 }
 
 static std::vector<char> load_file(const fs::path& filepath) {
-    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
+    if (!fs::exists(filepath))
+        throw std::runtime_error(fmt::format("file {} not exists..", filepath.string()));
 
+    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
     if (!file.good()) {
         //throw std::runtime_error(std::format("failed to open file : {}..", filepath));
         throw std::runtime_error("failed to open file..");
@@ -1348,6 +1350,10 @@ void VkWrappedInstance::create_descriptor_set() {
 
         vkUpdateDescriptorSets(device, descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
     }
+}
+
+void VkWrappedInstance::create_descriptors(const ShaderModules& modules) {
+
 }
 
 void VkWrappedInstance::create_commandbuffers() {

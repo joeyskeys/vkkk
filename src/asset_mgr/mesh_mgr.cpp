@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include <fmt/format.h>
+
 #include "asset_mgr/mesh_mgr.h"
 
 namespace vkkk
@@ -20,7 +22,7 @@ void MeshMgr::process_node(aiNode *node, const aiScene *scene, uint32_t flag) {
 void MeshMgr::load_file(const fs::path& path, uint32_t flag) {
     if (!fs::exists(fs::absolute(path))) {
         std::cerr << "file : " << path << "does not exist" << std::endl;
-        return;
+        throw std::runtime_error("model file does not exist");
     }
 
     Assimp::Importer importer;

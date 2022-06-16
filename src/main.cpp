@@ -85,14 +85,15 @@ int main() {
     modules.add_module("../resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_LINE);
 
-    //ins.create_graphics_pipeline()
     ins.create_depth_resource();
     ins.create_framebuffers();
     ins.create_command_pool();
 
-    ins.load_texture("/Users/joey/Desktop/workspace/self/vkkk/resource/textures/texture.jpeg");
+    /*
+    ins.load_texture("../resource/textures/texture.jpeg");
     ins.create_texture_imageviews();
     ins.create_texture_sampler();
+    */
     
     /*
     const std::array<vkkk::VertexTmp, 8> verts{
@@ -116,7 +117,7 @@ int main() {
     */
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/model/fox_head.obj", vkkk::ONLY_VERTEX);
+    mesh_mgr.load_file("../resource/model/box.obj", vkkk::ONLY_VERTEX);
     const auto& mesh = mesh_mgr.meshes[0];
     ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt);

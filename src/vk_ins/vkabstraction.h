@@ -159,6 +159,7 @@ public:
     void create_depth_resource();
     void create_descriptor_pool();
     void create_descriptor_set();
+    void create_descriptors(const ShaderModules& modules);
     void create_commandbuffers();
     void create_sync_objects();
     void draw_frame();

@@ -36,7 +36,7 @@ private:
     std::unordered_map<VkShaderStageFlagBits, spirv_cross::ShaderResources> shader_resources_map;
 
     using BufferResources = std::tuple<std::vector<VkBuffer>, std::vector<VkDeviceMemory>>;
-    using ImageResources = std::tuple<VkImageLayout, VkImageView, VkSampler>;
+    using ImageResources = std::tuple<VkImage, VkDeviceMemory, VkImageView, VkSampler>;
     std::unordered_map<VkShaderStageFlagBits, std::vector<BufferResources>> m_ubo_resources;
     std::unordered_map<VkShaderStageFlagBits, std::vector<ImageResources>> m_img_resources;
 

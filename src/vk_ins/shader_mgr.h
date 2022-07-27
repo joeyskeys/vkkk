@@ -39,6 +39,7 @@ private:
     using ImageResources = std::tuple<VkImage, VkDeviceMemory, VkImageView, VkSampler>;
     std::unordered_map<VkShaderStageFlagBits, std::vector<BufferResources>> m_ubo_resources;
     std::unordered_map<VkShaderStageFlagBits, std::vector<ImageResources>> m_img_resources;
+    std::unordered_map<VkShaderStageFlagBits, std::vector<VkSampler>> m_sampler_resources;
 
     using BufInfoWithBinding = std::pair<VkDescriptorBufferInfo, uint32_t>;
     using ImgInfoWithBinding = std::pair<VkDescriptorImageInfo, uint32_t>;

@@ -77,9 +77,8 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         // Construct sampler info
         VkDescriptorImageInfo img_info{};
         img_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        // TODO : create vulkan image resource here immediately
-        //img_info.imageView = ;
-        //img_info.sampler = ;
+        // The actual texture view and sampler creation is postponed
+        // Make the DescriptorImageInfo here as a placeholder
         img_infos.emplace_back(std::make_pair(std::move(img_info), binding_idx));
     }
     m_img_infos.emplace(t, std::move(img_infos));
@@ -193,9 +192,15 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
         throw std::runtime_error("failed to allocate descriptor sets");
 
     for (size_t i = 0; i < swapchain_img_cnt; i++) {
+        int write_idx = 0;
         for (auto& ubo_info_pair : m_ubo_infos)
-            for (size_t j = 0; j < ubo_info_pair.second.size(); j++)
-                ubo_info_pair.second[i].first.buffer = std::get<0>(m_ubo_resources[ubo_info_pair.first][i])[j];
+            for (size_t j = 0; j < ubo_info_pair.second.size(); j++) {
+                ubo_info_pair.second[j].first.buffer = std::get<0>(m_ubo_resources[ubo_info_pair.first][i])[j];
+                writes[write_idx].dstBinding = write_idx;
+                writes[write_idx].pBufferInfo = &ubo_info_pair.second[j].first;
+            }
+
+        // TODO : finish img info handling
 
         for (auto& write : writes)
             write.dstSet = m_descriptor_sets[i];

@@ -61,8 +61,7 @@ std::pair<VkImage, VkDeviceMemory> create_image(const VkDevice& device,
     VkMemoryAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_reqs.size;
-    // Need info from physical device here
-    //alloc_info.memoryTypeIndex = 
+    alloc_info.memoryTypeIndex = find_memory_type(mem_reqs[0].memoryTypeBits, properties);
 
     if (vkAllocateMemory(device, &alloc_info, nullptr, &memo) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate image memory");
@@ -93,7 +92,7 @@ VkImageView create_imageview(const VkDevice& device, const VkImage img,
     return view;
 }
 
-VkSampler create_sampler() {
+VkSampler create_sampler(const VkPhysicalDeviceProperties props) {
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler_info.magFilter = VK_FILTER_LINEAR;
@@ -103,10 +102,9 @@ VkSampler create_sampler() {
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.anisotropyEnable = VK_TRUE;
 
-    // FIXME : implement correct physical device information get
     //VkPhysicalDeviceProperties props{};
     //vkGetPhysicalDeviceProperties(physical_device, &props);
-    //sampler_info.maxAnisotropy = props.limits.maxSamplerAnisotropy;
+    sampler_info.maxAnisotropy = props.limits.maxSamplerAnisotropy;
     
     sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
     sampler_info.unnormalizedCoordinates = VK_FALSE;

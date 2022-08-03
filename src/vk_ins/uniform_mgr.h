@@ -20,9 +20,10 @@ public:
 
 protected:
     VkDevice *device;
+    VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t swapchain_image_cnt;
 
-    void*                               bufs;
+    std::vector<void*>                  bufs;
 
     // 2D array of uniform buffers with following structure
     // [swapchain 1 uniform buffers : [buf1] [buf2] [buf3]]
@@ -33,6 +34,25 @@ protected:
     std::vector<void*>                  img_bufs;
     std::vector<VkImage>                uniform_imgs;
     std::vector<VkDeviceMemory>         uniform_img_mems;
+
+    void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
+        VkMemoryPropertyFlags properties, VkBuffer& buffer,
+        VkDeviceMemory& buffer_memory);
+
+    uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
+
+    void create_image(uint32_t width, uint32_t height, VkFormat format,
+        VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+        VkImage& image, VkDeviceMemory& image_memory);
+
+    VkCommandBuffer begin_single_time_commands();
+
+    void end_single_time_commands(VkCommandBuffer cmd_buf);
+
+    void transist_image_layout(VkImage image, VkFormat format, VkImageLayout old_layout,
+        VkImageLayout new_layout);
+
+    void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 };
 
 }

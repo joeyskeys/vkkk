@@ -23,7 +23,7 @@ protected:
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t swapchain_image_cnt;
 
-    std::vector<void*>                  bufs;
+    std::vector<void*>                  ubo_bufs;
 
     // 2D array of uniform buffers with following structure
     // [swapchain 1 uniform buffers : [buf1] [buf2] [buf3]]
@@ -34,6 +34,7 @@ protected:
     std::vector<void*>                  img_bufs;
     std::vector<VkImage>                uniform_imgs;
     std::vector<VkDeviceMemory>         uniform_img_mems;
+    std::vector<VkImageView>            uniform_img_views;
 
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags properties, VkBuffer& buffer,

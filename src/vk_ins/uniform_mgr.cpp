@@ -23,6 +23,19 @@ UniformMgr::~UniformMgr()
             vkFreeMemory(device, mem, nullptr);
         }
     }
+    for (auto buf : ubo_bufs) {
+        delete[] buf;
+    }
+
+    for (auto& img : uniform_imgs) {
+        vkDestroyImage(device, img, nullptr);
+    }
+    for (auto& mem : uniform_img_mems) {
+        vkFreeMemory(device, mem, nullptr);
+    }
+    for (auto buf : img_bufs) {
+        delete[] buf;
+    }
 }
 
 bool UniformMgr::add_uniform_buffer(uint32_t size) {
@@ -37,6 +50,9 @@ bool UniformMgr::add_uniform_buffer(uint32_t size) {
 
     uniform_bufs.push_back(bufs);
     uniform_buf_mems.push_back(mems);
+
+    void* buf = new char[size];
+    ubo_bufs.push_back(buf);
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
@@ -58,8 +74,9 @@ bool UniformMgr::add_texture(const fs::path& path) {
     int h = spec.height;
     // TODO : explicitly define pixel format
     VkDeviceSize img_size = w * h * 4;
-    std::vector<char> pixels;
-    pixels.resize(img_size);
+    //std::vector<char> pixels;
+    //pixels.resize(img_size);
+    void* pixels = new char[img_size];
     with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
 
     VkBuffer staging_buf;
@@ -72,6 +89,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
     vkMapMemory(device, staging_buf_mem, 0, img_size, 0, &data);
         memcpy(data, pixels.data(), img_size);
     vkUnmapMemory(device, staging_buf_mem);
+    img_bufs.push_back(pixels);
 
     VkImage tex_image;
     VkDeviceMemory tex_image_mem;

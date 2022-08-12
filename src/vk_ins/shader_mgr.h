@@ -17,15 +17,17 @@ namespace vkkk
 
 class ShaderModules {
 public:
-    ShaderModules(const VkDevice d) : device(d) {}
+    ShaderModules(const VkDevice d, UniformMgr *mgr);
     virtual ~ShaderModules();
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
     void create_descriptor_sets(const uint32_t);
+    void alloc_uniforms();
     
 private:
     VkDevice                                    device;
+    UniformMgr*                                 uniform_mgr;
     std::vector<VkShaderModule>                 shader_modules;
     std::vector<VkShaderStageFlagBits>          shader_types;
 

@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <filesystem>
+#include <utility>
 
 #include <vulkan/vulkan.h>
 
@@ -15,7 +16,7 @@ public:
     UniformMgr(const VkDevice* dev, uint32_t cnt);
     virtual ~UniformMgr();
 
-    bool add_uniform_buffer(uint32_t size);
+    bool add_uniform_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
 protected:
@@ -23,7 +24,7 @@ protected:
     VkPhysicalDeviceMemoryProperties mem_props;
     uint32_t swapchain_image_cnt;
 
-    std::vector<void*>                  ubo_bufs;
+    std::unordered_map<std::string, std::pair<uint32_t, void*>> ubo_bufs;
 
     // 2D array of uniform buffers with following structure
     // [swapchain 1 uniform buffers : [buf1] [buf2] [buf3]]

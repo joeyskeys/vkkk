@@ -5,6 +5,10 @@
 namespace vkkk
 {
 
+ShaderModules::ShaderModules(const VkDevice d, UniformMgr *mgr)
+    : device(d), uniform_mgr(mgr)
+{}
+
 ShaderModules::~ShaderModules() {
     for (const auto &shader_module : shader_modules)
         vkDestroyShaderModule(device, shader_module, nullptr);
@@ -206,6 +210,12 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
             write.dstSet = m_descriptor_sets[i];
 
         vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
+    }
+}
+
+void ShaderModules::alloc_uniforms() {
+    for (const auto& shader_resources_pair : shader_resources_map) {
+        
     }
 }
 

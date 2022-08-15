@@ -16,7 +16,7 @@ public:
     UniformMgr(const VkDevice* dev, uint32_t cnt);
     virtual ~UniformMgr();
 
-    bool add_uniform_buffer(const std::string& name, uint32_t size);
+    bool add_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
 protected:

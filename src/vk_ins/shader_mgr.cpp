@@ -90,6 +90,47 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     return true;
 }
 
+void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::unordered_map<std::string, std::string>& img_paths) {
+    auto setup = [&](const auto& res, const VkDescriptorType des_type) {
+        // Memory pool
+        VkDescriptorPoolSize pool_size{};
+        pool_size.type = des_type;
+        pool_size.descriptorCount = swapchain_img_cnt;
+        m_pool_sizes.emplace_back(std::move(pool_size));
+
+        // Write descriptor set
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = m_descriptor_sets[0];
+        write.dstArrayElement = 0;
+        write.descriptorType = des_type;
+        write.descriptorCount = 1;
+        m_writes.emplace_back(std::move(write));
+    };
+
+    for (const auto& shader_resources_pair : shader_resources_map) {
+        for (int i = 0; i < shader_resources_pair.second.uniform_buffers.size(); i++) {
+            const auto& ubo = shader_resources_pair.second.uniform_buffers[i];
+            const auto& buf_info = m_ubo_infos.at(shader_resources_pair.first)[i];
+            uniform_mgr->add_buffer(ubo.name, buf_info.first.range);
+            setup(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+            auto& last_write = m_writes[m_writes.size() - 1];
+            last_write.dstBinding = buf_info.second;
+            last_write.pBufferInfo = &buf_info.first;
+        }
+
+        for (int i = 0; i < shader_resources_pair.second.separate_samplers.size(); i++) {
+            auto& sampler = shader_resources_pair.second.separate_samplers[i];
+            auto& img_info = m_img_infos[shader_resources_pair.first][i];
+            uniform_mgr->add_texture(img_paths.at(sampler.name));
+            setup(sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+            auto& last_write = m_writes[m_writes.size() - 1];
+            last_write.dstBinding = img_info.second;
+            last_write.pImageInfo = &img_info.first;
+        }
+    }
+}
+
 std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_array() const {
     std::vector<VkPipelineShaderStageCreateInfo> stage_create_infos;
     for (int i = 0; i < shader_modules.size(); ++i) {
@@ -210,12 +251,6 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
             write.dstSet = m_descriptor_sets[i];
 
         vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
-    }
-}
-
-void ShaderModules::alloc_uniforms() {
-    for (const auto& shader_resources_pair : shader_resources_map) {
-        
     }
 }
 

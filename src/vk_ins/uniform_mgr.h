@@ -13,18 +13,20 @@ namespace vkkk
 
 class UniformMgr {
 public:
-    UniformMgr(const VkDevice* dev, uint32_t cnt);
+    UniformMgr(const VkDevice dev, const VkQueue graph_q, uint32_t cnt);
     virtual ~UniformMgr();
 
     bool add_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
 protected:
-    VkDevice *device;
+    VkDevice device;
     VkPhysicalDeviceMemoryProperties mem_props;
+    VkCommandPool command_pool;
+    VkQueue graphic_queue;
     uint32_t swapchain_image_cnt;
 
-    std::unordered_map<std::string, std::pair<uint32_t, void*>> ubo_bufs;
+    std::unordered_map<std::string, std::pair<uint32_t, char*>> ubo_bufs;
 
     // 2D array of uniform buffers with following structure
     // [swapchain 1 uniform buffers : [buf1] [buf2] [buf3]]

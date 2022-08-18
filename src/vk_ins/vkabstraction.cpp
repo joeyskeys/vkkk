@@ -520,7 +520,7 @@ void VkWrappedInstance::create_logical_device() {
     queue_created = true;
 }
 
-void VkWrappedInstance::create_swapchain() {
+uint32_t VkWrappedInstance::create_swapchain() {
     if (!queue_created)
         throw std::runtime_error("Queue not created yet, cannot create swapchain");
 
@@ -566,6 +566,7 @@ void VkWrappedInstance::create_swapchain() {
     vkGetSwapchainImagesKHR(device, swapchain, &image_cnt, swapchain_images.data());
 
     swapchain_created = true;
+    return image_cnt;
 }
 
 void VkWrappedInstance::cleanup_swapchain() {

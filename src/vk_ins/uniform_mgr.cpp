@@ -3,8 +3,12 @@
 
 #include "uniform_mgr.h"
 
-UniformMgr::UniformMgr(const VkDevice* device, uint32_t cnt)
+namespace vkkk
+{
+
+UniformMgr::UniformMgr(const VkDevice dev, const VkQueue graph_q, uint32_t cnt)
     : device(dev)
+    , graphic_queue(graph_q)
     , swapchain_image_cnt(cnt)
 {
     uniform_bufs.resize(swapchain_image_cnt);
@@ -23,8 +27,8 @@ UniformMgr::~UniformMgr()
             vkFreeMemory(device, mem, nullptr);
         }
     }
-    for (auto buf : ubo_bufs) {
-        delete[] buf;
+    for (auto buf_pair : ubo_bufs) {
+        delete[] buf_pair.second.second;
     }
 
     for (auto& img : uniform_imgs) {
@@ -38,12 +42,12 @@ UniformMgr::~UniformMgr()
     }
 }
 
-bool UniformMgr::add_uniform_buffer(uint32_t size) {
+bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
     std::vector<VkBuffer> bufs(swapchain_image_cnt);
     std::vector<VkDeviceMemory> mems(swapchain_image_cnt);
 
     for (int i = 0; i < swapchain_image_cnt; i++) {
-        create_buffer(size, VK_BUFFER_UNIFORM_BUFFER_BIT,
+        create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             bufs[i], mems[i]);
     }
@@ -51,8 +55,9 @@ bool UniformMgr::add_uniform_buffer(uint32_t size) {
     uniform_bufs.push_back(bufs);
     uniform_buf_mems.push_back(mems);
 
-    void* buf = new char[size];
-    ubo_bufs.push_back(buf);
+    char* buf = new char[size];
+    ubo_bufs.emplace(name, std::make_pair(size, buf));
+    return true;
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
@@ -77,7 +82,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
     //std::vector<char> pixels;
     //pixels.resize(img_size);
     void* pixels = new char[img_size];
-    with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
+    with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels);
 
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_mem;
@@ -87,7 +92,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
 
     void* data;
     vkMapMemory(device, staging_buf_mem, 0, img_size, 0, &data);
-        memcpy(data, pixels.data(), img_size);
+        memcpy(data, pixels, img_size);
     vkUnmapMemory(device, staging_buf_mem);
     img_bufs.push_back(pixels);
 
@@ -109,7 +114,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
     return true;
 }
 
-void UniformMgr::create_buffer(VkDeivceSize size, VkBufferUsageFlags usage,
+void UniformMgr::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
     VkMemoryPropertyFlags properties, VkBuffer& buffer,
     VkDeviceMemory& buffer_memory) {
     VkBufferCreateInfo buffer_info = {};
@@ -139,7 +144,7 @@ void UniformMgr::create_buffer(VkDeivceSize size, VkBufferUsageFlags usage,
     vkBindBufferMemory(device, buffer, buffer_memory, 0);
 }
 
-uint32_t UniformMgr::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) {
+uint32_t UniformMgr::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const {
     for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
         if (type_filter & (1 << i) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
             return i;
@@ -215,8 +220,8 @@ void UniformMgr::end_single_time_commands(VkCommandBuffer cmd_buf) {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &cmd_buf;
 
-    vkQueueSubmit(graphics_queue, 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(graphics_queue);
+    vkQueueSubmit(graphic_queue, 1, &submit_info, VK_NULL_HANDLE);
+    vkQueueWaitIdle(graphic_queue);
 
     vkFreeCommandBuffers(device, command_pool, 1, &cmd_buf);
 }
@@ -268,4 +273,6 @@ void UniformMgr::transist_image_layout(VkImage image, VkFormat format,
     );
 
     end_single_time_commands(cmd_buf);
+}
+
 }

@@ -74,17 +74,19 @@ int main() {
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
-    ins.create_swapchain();
+    auto swapchain_img_cnt = ins.create_swapchain();
     ins.create_imageviews();
     ins.create_renderpass();
     ins.create_descriptor_set_layout();
     //ins.create_graphics_pipeline();
 
-    vkkk::ShaderModules modules(ins.get_device());
+    vkkk::UniformMgr uniform_mgr{ ins.get_device(), ins.get_graphic_queue(), swapchain_img_cnt };
+    vkkk::ShaderModules modules{ ins.get_device(), &uniform_mgr };
     modules.add_module("../resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_LINE);
+    modules.alloc_uniforms(swapchain_img_cnt, std::unordered_map<std::string, std::string>());
 
+    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_LINE);
     ins.create_depth_resource();
     ins.create_framebuffers();
     ins.create_command_pool();

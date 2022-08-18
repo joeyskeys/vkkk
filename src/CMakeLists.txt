@@ -6,6 +6,7 @@ set(HEADERS
     utils/io.h
     utils/singleton.h
     vk_ins/shader_mgr.h
+    vk_ins/uniform_mgr.h
     vk_ins/vkabstraction.h)
 
 set(SRCS
@@ -13,6 +14,7 @@ set(SRCS
     asset_mgr/mesh_mgr.cpp
     gui/gui.cpp
     vk_ins/shader_mgr.cpp
+    vk_ins/uniform_mgr.cpp
     vk_ins/vkabstraction.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})

@@ -124,13 +124,17 @@ public:
         return device;
     }
 
+    inline VkQueue get_graphic_queue() {
+        return graphic_queue;
+    }
+
     inline void set_uniform_cbk(UnifromUpdateCBK cbk) {
         uniform_cbk = cbk;
     }
 
     bool validate_current_device(QueueFamilyIndex* idx);
     void create_logical_device();
-    void create_swapchain();
+    uint32_t create_swapchain();
     void cleanup_swapchain();
     void recreate_swapchain();
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);

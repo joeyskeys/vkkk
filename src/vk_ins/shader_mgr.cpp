@@ -119,6 +119,9 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
             last_write.pBufferInfo = &buf_info.first;
         }
 
+        if (img_paths.size() == 0)
+            continue;
+
         for (int i = 0; i < shader_resources_pair.second.separate_samplers.size(); i++) {
             auto& sampler = shader_resources_pair.second.separate_samplers[i];
             auto& img_info = m_img_infos[shader_resources_pair.first][i];

@@ -81,7 +81,7 @@ int main() {
     //ins.create_graphics_pipeline();
 
     vkkk::UniformMgr uniform_mgr{ ins.get_device(), ins.get_graphic_queue(), swapchain_img_cnt };
-    vkkk::ShaderModules modules{ ins.get_device(), &uniform_mgr };
+    vkkk::ShaderModules modules{ ins.get_device(), ins.get_memory_props(), &uniform_mgr };
     modules.add_module("../resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     modules.alloc_uniforms(swapchain_img_cnt, std::unordered_map<std::string, std::string>());

@@ -5,6 +5,7 @@ set(HEADERS
     utils/common.h
     utils/io.h
     utils/singleton.h
+    vk_ins/misc.h
     vk_ins/shader_mgr.h
     vk_ins/uniform_mgr.h
     vk_ins/vkabstraction.h)
@@ -13,6 +14,7 @@ set(SRCS
     asset_mgr/mesh.cpp
     asset_mgr/mesh_mgr.cpp
     gui/gui.cpp
+    vk_ins/misc.cpp
     vk_ins/shader_mgr.cpp
     vk_ins/uniform_mgr.cpp
     vk_ins/vkabstraction.cpp)
@@ -22,8 +24,10 @@ target_link_libraries(vkkk
     ${GLFW_LIBRARIES}
     ${Vulkan_LIBRARIES}
     ${OIIO_LIBRARIES}
-    ${ASSIMP_LIBRARIES})
+    ${ASSIMP_LIBRARIES}
+    ${SPIRVCROSS_LIBRARIES})
 
 add_executable(vktest main.cpp)
 target_link_libraries(vktest
-    vkkk)
+    vkkk
+    ${OIIO_LIBRARIES})

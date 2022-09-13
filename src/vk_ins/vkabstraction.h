@@ -120,6 +120,10 @@ public:
         return physical_devices;
     }
 
+    inline VkPhysicalDeviceMemoryProperties get_memory_props() {
+        return mem_props;
+    }
+
     inline VkDevice get_device() {
         return device;
     }
@@ -231,6 +235,7 @@ private:
     // Currently only use one physical card and one logical device
     std::vector<VkPhysicalDevice> physical_devices;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    VkPhysicalDeviceMemoryProperties mem_props;
     VkDevice device;
 
     // Textures

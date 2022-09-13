@@ -5,8 +5,12 @@
 namespace vkkk
 {
 
-ShaderModules::ShaderModules(const VkDevice d, UniformMgr *mgr)
-    : device(d), uniform_mgr(mgr)
+ShaderModules::ShaderModules(const VkDevice d,
+    const VkPhysicalDeviceMemoryProperties mp,
+    UniformMgr *mgr)
+    : device(d)
+    , mem_props(mp)
+    , uniform_mgr(mgr)
 {}
 
 ShaderModules::~ShaderModules() {
@@ -185,7 +189,7 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
             std::vector<VkBuffer> bufs(swapchain_img_cnt);
             std::vector<VkDeviceMemory> memos(swapchain_img_cnt);
             for (int j = 0; j < swapchain_img_cnt; j++)
-                create_buffer(device, buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                create_buffer(device, mem_props, buf_size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                     bufs[j], memos[j]);
             ubo_resource_vec.emplace_back(std::move(bufs), std::move(memos));

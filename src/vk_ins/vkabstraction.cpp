@@ -88,6 +88,7 @@ VkWrappedInstance::VkWrappedInstance()
         physical_devices.resize(device_cnt);
         vkEnumeratePhysicalDevices(instance, &device_cnt, physical_devices.data());
         physical_device = physical_devices[0];
+        vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
     }
 }
 

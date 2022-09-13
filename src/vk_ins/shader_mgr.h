@@ -17,7 +17,7 @@ namespace vkkk
 
 class ShaderModules {
 public:
-    ShaderModules(const VkDevice d, UniformMgr *mgr);
+    ShaderModules(const VkDevice d, const VkPhysicalDeviceMemoryProperties, UniformMgr *mgr);
     virtual ~ShaderModules();
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
@@ -27,6 +27,7 @@ public:
     
 private:
     VkDevice                                    device;
+    VkPhysicalDeviceMemoryProperties            mem_props;
     UniformMgr*                                 uniform_mgr;
     std::vector<VkShaderModule>                 shader_modules;
     std::vector<VkShaderStageFlagBits>          shader_types;

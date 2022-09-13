@@ -1,14 +1,28 @@
 #include "misc.h"
 
-#include <utility>
+#include <stdexcept>
 
 namespace vkkk
 {
 
-void create_buffer(const VkDevice& device, VkDeviceSize size,
-    VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer& buf, 
+uint32_t find_memory_type(
+    VkPhysicalDeviceMemoryProperties mem_props,
+    uint32_t type_filter,
+    VkMemoryPropertyFlags properties)
+{
+    for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
+        if (type_filter & (1 << i) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
+            return i;
+        }
+    }
+    throw std::runtime_error("failed to find suitable memory type!");
+}
+
+void create_buffer(const VkDevice& device, VkPhysicalDeviceMemoryProperties mem_props,
+    VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags props, VkBuffer& buf, 
     VkDeviceMemory& buf_memo)
 {
+    VkBufferCreateInfo buf_info{};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.size = size;
     buf_info.usage = usage;
@@ -23,7 +37,7 @@ void create_buffer(const VkDevice& device, VkDeviceSize size,
     VkMemoryAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = memo_req.size;
-    alloc_info.memoryTypeIndex = find_memory_type(memo_req.memoryTypeBits, props);
+    alloc_info.memoryTypeIndex = find_memory_type(mem_props, memo_req.memoryTypeBits, props);
 
     if (vkAllocateMemory(device, &alloc_info, nullptr, &buf_memo) != VK_SUCCESS)
         throw std::runtime_error("failed to allocate buffer memory!");
@@ -32,8 +46,9 @@ void create_buffer(const VkDevice& device, VkDeviceSize size,
 }
 
 std::pair<VkImage, VkDeviceMemory> create_image(const VkDevice& device,
-    const uint32_t w, const uint32_t h, const VkFormat format, const VkImageTiling tiling,
-    const VkImageUsageFlags usage, const VkMemoryPropertyFlags properties)
+    VkPhysicalDeviceMemoryProperties mem_props, const uint32_t w, const uint32_t h,
+    const VkFormat format, const VkImageTiling tiling, const VkImageUsageFlags usage,
+    const VkMemoryPropertyFlags properties)
 {
     VkImageCreateInfo img_info{};
     img_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -51,7 +66,7 @@ std::pair<VkImage, VkDeviceMemory> create_image(const VkDevice& device,
     img_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
     VkImage img;
-    VkMemoryDevice memo;
+    VkDeviceMemory memo;
     if (vkCreateImage(device, &img_info, nullptr, &img) != VK_SUCCESS)
         throw std::runtime_error("Failed to create image");
 
@@ -61,7 +76,7 @@ std::pair<VkImage, VkDeviceMemory> create_image(const VkDevice& device,
     VkMemoryAllocateInfo alloc_info{};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_reqs.size;
-    alloc_info.memoryTypeIndex = find_memory_type(mem_reqs[0].memoryTypeBits, properties);
+    alloc_info.memoryTypeIndex = find_memory_type(mem_props, mem_reqs.memoryTypeBits, properties);
 
     if (vkAllocateMemory(device, &alloc_info, nullptr, &memo) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate image memory");
@@ -92,7 +107,7 @@ VkImageView create_imageview(const VkDevice& device, const VkImage img,
     return view;
 }
 
-VkSampler create_sampler(const VkPhysicalDeviceProperties props) {
+VkSampler create_sampler(const VkDevice& device, const VkPhysicalDeviceProperties props) {
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     sampler_info.magFilter = VK_FILTER_LINEAR;

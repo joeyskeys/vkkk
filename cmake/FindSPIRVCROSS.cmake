@@ -17,10 +17,18 @@ find_path(SPIRVCROSS_INCLUDE_DIRS spirv_cross/spirv_cross.hpp
 
 set(CROSS_LIB_PATHS)
 foreach(CROSS_LIB ${CROSS_LIBS})
-    find_library(CROSS_${CROSS_LIB} ${CROSS_LIB}
-        HINTS
-            "$ENV{VULKAN_SDK}/${LIB_DIR}"
-            "$ENV{VULKAN_SDK}/${BIN_DIR}")
+    if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+        find_library(CROSS_${CROSS_LIB} ${CROSS_LIB}d
+            HINTS
+                "$ENV{VULKAN_SDK}/${LIB_DIR}"
+                "$ENV{VULKAN_SDK}/${BIN_DIR}")
+        message(STATUS "lib value : ${CROSS_${CROSS_LIB}}")
+    else()
+        find_library(CROSS_${CROSS_LIB} ${CROSS_LIB}
+            HINTS
+                "$ENV{VULKAN_SDK}/${LIB_DIR}"
+                "$ENV{VULKAN_SDK}/${BIN_DIR}")
+    endif()
 
     list(APPEND CROSS_LIB_PATHS CROSS_${CROSS_LIB})
 endforeach()

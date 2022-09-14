@@ -64,7 +64,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
 
     std::vector<BufInfoWithBinding> buf_infos{};
     for (auto& ubo : res.uniform_buffers) {
-        type_info = comp.get_type(ubo.id);
+        type_info = comp.get_type(ubo.base_type_id);
         binding_idx = m_descriptor_layout_bindings.size();
         setup(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
 
@@ -105,7 +105,7 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
         // Write descriptor set
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = m_descriptor_sets[0];
+        //write.dstSet = m_descriptor_sets[0];
         write.dstArrayElement = 0;
         write.descriptorType = des_type;
         write.descriptorCount = 1;

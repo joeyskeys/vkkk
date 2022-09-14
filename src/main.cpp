@@ -124,10 +124,10 @@ int main() {
     ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt);
 
-    ins.create_uniform_buffer();
-    ins.set_uniform_cbk(ubo_update);
-    ins.create_descriptor_pool();
-    ins.create_descriptor_set();
+    //ins.create_uniform_buffer();
+    //ins.set_uniform_cbk(ubo_update);
+    //ins.create_descriptor_pool();
+    //ins.create_descriptor_set();
 
     ins.create_commandbuffers();
     ins.create_sync_objects();

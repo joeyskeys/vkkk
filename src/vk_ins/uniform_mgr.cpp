@@ -44,7 +44,8 @@ UniformMgr::~UniformMgr()
 
 bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
     std::vector<VkBuffer> bufs(swapchain_image_cnt);
-    std::vector<VkDeviceMemory> mems(swapchain_image_cnt);
+    // The vector(count) ctor left memory uninitialized, causing crash
+    std::vector<VkDeviceMemory> mems(swapchain_image_cnt, VK_NULL_HANDLE);
 
     for (int i = 0; i < swapchain_image_cnt; i++) {
         create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,

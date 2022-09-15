@@ -280,7 +280,7 @@ private:
     VkDescriptorSetLayout           descriptor_layout;
     bool                            descriptor_layout_created = false;
     VkDescriptorPool                descriptor_pool;
-    bool                            descriptor_pool_created = true;
+    bool                            descriptor_pool_created = false;
     std::vector<VkDescriptorSet>    descriptor_sets;
 
     // Buffers

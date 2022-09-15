@@ -129,10 +129,10 @@ int main() {
     //ins.create_descriptor_pool();
     //ins.create_descriptor_set();
 
-    ins.create_commandbuffers();
-    ins.create_sync_objects();
+    //ins.create_commandbuffers();
+    //ins.create_sync_objects();
 
-    ins.mainloop();
+    //ins.mainloop();
 
     return 0;
 }

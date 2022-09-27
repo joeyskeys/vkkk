@@ -62,9 +62,11 @@ bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
+    // Validate path
     if (!fs::exists(path))
         return false;
 
+    // Load img with OIIO
     OIIO::ImageBuf oiio_buf(path.string().c_str());
     if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0))
         return false;
@@ -85,6 +87,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
     void* pixels = new char[img_size];
     with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels);
 
+    // Create staging buffer
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_mem;
     create_buffer(img_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -97,6 +100,7 @@ bool UniformMgr::add_texture(const fs::path& path) {
     vkUnmapMemory(device, staging_buf_mem);
     img_bufs.push_back(pixels);
 
+    // Create vk image and relating device memory
     VkImage tex_image;
     VkDeviceMemory tex_image_mem;
     create_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
@@ -111,6 +115,17 @@ bool UniformMgr::add_texture(const fs::path& path) {
 
     vkDestroyBuffer(device, staging_buf, nullptr);
     vkFreeMemory(device, staging_buf_mem, nullptr);
+    uniform_imgs.push_back(tex_image);
+    uniform_img_mems.push_back(tex_image_mem);
+
+    // Create the view to the image
+    auto tex_imageview = create_imageview(tex_image, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_ASPECT_COLOR_BIT);
+    uniform_img_views.push_back(tex_imageview);
+
+    // Create sampler
+    auto tex_sampler = create_sampler();
+    uniform_img_samplers.push_back(tex_sampler);
 
     return true;
 }
@@ -192,6 +207,56 @@ void UniformMgr::create_image(uint32_t w, uint32_t h, VkFormat format,
     }
 
     vkBindImageMemory(device, image, image_memory, 0);
+}
+
+VkImageView UniformMgr::create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags) {
+    VkImageViewCreateInfo create_info{};
+    create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    create_info.image = image;
+    create_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    create_info.format = format;
+
+    //create_info.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+    //create_info.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+    
+    create_info.subresourceRange.aspectMask = aspect_flags;
+    create_info.subresourceRange.baseMipLevel = 0;
+    create_info.subresourceRange.levelCount = 1;
+    create_info.subresourceRange.baseArrayLayer = 0;
+    create_info.subresourceRange.layerCount = 1;
+
+    VkImageView image_view;
+    if (vkCreateImageView(device, &create_info, nullptr, &image_view) != VK_SUCCESS)
+        throw std::runtime_error("failed to create texture image view");
+
+    return image_view;
+}
+
+VkSampler UniformMgr::create_sampler() {
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.anisotropyEnable = VK_TRUE;
+    sampler_info.maxAnisotropy = props.limits.maxSamplerAnisotropy;
+    sampler_info.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.mipLodBias = 0.f;
+    sampler_info.minLod = 0.f;
+    sampler_info.maxLod = 0.f;
+
+    VkSampler tex_sampler;
+    if (vkCreateSampler(device, &sampler_info, nullptr, &tex_sampler) != VK_SUCCESS)
+        throw std::runtime_error("failed to create texture sampler");
+    return tex_sampler;
 }
 
 VkCommandBuffer UniformMgr::begin_single_time_commands() {

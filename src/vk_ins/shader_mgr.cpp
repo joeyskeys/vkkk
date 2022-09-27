@@ -95,7 +95,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
 }
 
 void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::unordered_map<std::string, std::string>& img_paths) {
-    auto setup = [&](const auto& res, const VkDescriptorType des_type) {
+    auto setup = [&](const VkDescriptorType des_type) {
         // Memory pool
         VkDescriptorPoolSize pool_size{};
         pool_size.type = des_type;
@@ -117,7 +117,7 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
             const auto& ubo = shader_resources_pair.second.uniform_buffers[i];
             const auto& buf_info = m_ubo_infos.at(shader_resources_pair.first)[i];
             uniform_mgr->add_buffer(ubo.name, buf_info.first.range);
-            setup(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+            setup(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
             auto& last_write = m_writes[m_writes.size() - 1];
             last_write.dstBinding = buf_info.second;
             last_write.pBufferInfo = &buf_info.first;
@@ -130,7 +130,10 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
             auto& sampler = shader_resources_pair.second.separate_samplers[i];
             auto& img_info = m_img_infos[shader_resources_pair.first][i];
             uniform_mgr->add_texture(img_paths.at(sampler.name));
-            setup(sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+            auto img_idx = uniform_mgr->uniform_imgs.size() - 1;
+            img_info.first.imageView = uniform_mgr->uniform_img_views[img_idx];
+            img_info.first.sampler = uniform_mgr->uniform_img_samplers[img_idx];
+            setup(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             auto& last_write = m_writes[m_writes.size() - 1];
             last_write.dstBinding = img_info.second;
             last_write.pImageInfo = &img_info.first;
@@ -158,7 +161,7 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
     std::vector<VkDescriptorPoolSize> pool_sizes{};
     std::vector<VkWriteDescriptorSet> writes{};
 
-    auto setup = [&](const auto& res, const VkDescriptorType des_type) {
+    auto setup = [&](const VkDescriptorType des_type) {
         // Memory pool
         VkDescriptorPoolSize pool_size{};
         pool_size.type = des_type;
@@ -177,12 +180,13 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
 
     // Prepare pool create info and write descriptor set update info
     for (const auto& shader_resources_pair : shader_resources_map) {
-        std::vector<BufferResources> ubo_resource_vec{};
+        //std::vector<BufferResources> ubo_resource_vec{};
 
         for (int i = 0; i < shader_resources_pair.second.uniform_buffers.size(); i++) {
             auto& ubo = shader_resources_pair.second.uniform_buffers[i];
             auto& buf_info_with_binding = m_ubo_infos[shader_resources_pair.first][i];
 
+            /*
             // Create uniform buffer objects here cause it needs the swapchain image count
             // info
             auto buf_size = buf_info_with_binding.first.range;
@@ -193,19 +197,20 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
                     VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
                     bufs[j], memos[j]);
             ubo_resource_vec.emplace_back(std::move(bufs), std::move(memos));
+            */
 
-            setup(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+            setup(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
             auto& last_write = writes[writes.size() - 1];
             last_write.dstBinding = buf_info_with_binding.second;
             last_write.pBufferInfo = &buf_info_with_binding.first;
         }
-        m_ubo_resources.emplace(shader_resources_pair.first, ubo_resource_vec);
+        //m_ubo_resources.emplace(shader_resources_pair.first, ubo_resource_vec);
 
         for (int i = 0; i < shader_resources_pair.second.separate_samplers.size(); i++) {
             auto& sampler = shader_resources_pair.second.separate_samplers[i];
             auto& img_info_with_binding = m_img_infos[shader_resources_pair.first][i];
 
-            setup(sampler, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+            setup(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             auto& last_write = writes[writes.size() - 1];
             last_write.dstBinding = img_info_with_binding.second;
             last_write.pImageInfo = &img_info_with_binding.first;

@@ -104,15 +104,19 @@ VkWrappedInstance::~VkWrappedInstance() {
 
     if (sampler_created)
         vkDestroySampler(device, texture_sampler, nullptr);
+    
+    if (texture_views.size() > 0) {
+        for (auto& tex_view : texture_views)
+            vkDestroyImageView(device, tex_view, nullptr);
+    }
 
-    for (auto& tex_view : texture_views)
-        vkDestroyImageView(device, tex_view, nullptr);
+    if (vk_images.size() > 0)
+        for (auto& vk_image : vk_images)
+            vkDestroyImage(device, vk_image, nullptr);
 
-    for (auto& vk_image : vk_images)
-        vkDestroyImage(device, vk_image, nullptr);
-
-    for (auto& vk_image_memo : vk_image_memos)
-        vkFreeMemory(device, vk_image_memo, nullptr);
+    if (vk_image_memos.size() > 0)
+        for (auto& vk_image_memo : vk_image_memos)
+            vkFreeMemory(device, vk_image_memo, nullptr);
 
     if (descriptor_layout_created)
         vkDestroyDescriptorSetLayout(device, descriptor_layout, nullptr);
@@ -327,6 +331,8 @@ void VkWrappedInstance::create_texture_sampler() {
 
     if (vkCreateSampler(device, &sampler_info, nullptr, &texture_sampler) != VK_SUCCESS)
         throw std::runtime_error("failed to create texture sampler");
+
+    sampler_created = true;
 }
 
 bool VkWrappedInstance::load_texture(const fs::path& path) {

@@ -248,7 +248,7 @@ private:
     VkDeviceMemory                  tex_img_memo;
     VkImageView                     tex_view;
     VkSampler                       texture_sampler;
-    bool                            sampler_created;
+    bool                            sampler_created = false;
 
     // Surface
     VkSurfaceKHR surface;

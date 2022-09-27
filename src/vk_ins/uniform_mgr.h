@@ -19,9 +19,16 @@ public:
     bool add_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
+    std::vector<void*>                  img_bufs;
+    std::vector<VkImage>                uniform_imgs;
+    std::vector<VkDeviceMemory>         uniform_img_mems;
+    std::vector<VkImageView>            uniform_img_views;
+    std::vector<VkSampler>              uniform_img_samplers;
+
 protected:
     VkDevice device;
-    VkPhysicalDeviceMemoryProperties mem_props;
+    VkPhysicalDeviceProperties          props;
+    VkPhysicalDeviceMemoryProperties    mem_props;
     VkCommandPool command_pool;
     VkQueue graphic_queue;
     uint32_t swapchain_image_cnt;
@@ -34,11 +41,6 @@ protected:
     std::vector<std::vector<VkBuffer>>  uniform_bufs;
     std::vector<std::vector<VkDeviceMemory>> uniform_buf_mems;
 
-    std::vector<void*>                  img_bufs;
-    std::vector<VkImage>                uniform_imgs;
-    std::vector<VkDeviceMemory>         uniform_img_mems;
-    std::vector<VkImageView>            uniform_img_views;
-
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags properties, VkBuffer& buffer,
         VkDeviceMemory& buffer_memory);
@@ -48,6 +50,10 @@ protected:
     void create_image(uint32_t width, uint32_t height, VkFormat format,
         VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
         VkImage& image, VkDeviceMemory& image_memory);
+
+    VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
+
+    VkSampler create_sampler();
 
     VkCommandBuffer begin_single_time_commands();
 

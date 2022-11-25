@@ -6,6 +6,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "vktexture.h"
+
 namespace fs = std::filesystem;
 
 namespace vkkk
@@ -24,6 +26,7 @@ public:
     std::vector<VkDeviceMemory>         uniform_img_mems;
     std::vector<VkImageView>            uniform_img_views;
     std::vector<VkSampler>              uniform_img_samplers;
+    std::vector<Texture>                textures;
 
 protected:
     VkDevice device;

@@ -8,7 +8,8 @@ set(HEADERS
     vk_ins/misc.h
     vk_ins/shader_mgr.h
     vk_ins/uniform_mgr.h
-    vk_ins/vkabstraction.h)
+    vk_ins/vkabstraction.h
+    vk_ins/vktexture.h)
 
 set(SRCS
     asset_mgr/mesh.cpp
@@ -17,7 +18,8 @@ set(SRCS
     vk_ins/misc.cpp
     vk_ins/shader_mgr.cpp
     vk_ins/uniform_mgr.cpp
-    vk_ins/vkabstraction.cpp)
+    vk_ins/vkabstraction.cpp
+    vk_ins/vktexture.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})
 target_link_libraries(vkkk

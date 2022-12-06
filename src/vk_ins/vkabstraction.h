@@ -318,7 +318,7 @@ private:
     VkImage                         depth_img;
     VkDeviceMemory                  depth_img_memo;
     VkImageView                     depth_img_view;
-    bool                            depth_created;
+    bool                            depth_created = false;
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;

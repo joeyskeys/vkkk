@@ -4,18 +4,18 @@
 
 #include <vulkan/vulkan.h>
 
-#include "vkabstraction.h"
-
 namespace fs = std::filesystem;
 
 namespace vkkk
 {
 
+class VkWrappedInstance;
+
 class Texture {
 public:
     VkWrappedInstance*      instance;
     VkImage                 image;
-    VKImageLayout           image_layout;
+    VkImageLayout           image_layout;
     VkDeviceMemory          memory;
     VkImageView             view;
     uint32_t                width, height;

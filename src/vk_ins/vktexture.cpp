@@ -1,4 +1,8 @@
+#include <fmt/format.h>
+#include <OpenImageIO/imagebuf.h>
+#include <OpenImageIO/imagebufalgo.h>
 
+#include "vkabstraction.h"
 #include "vktexture.h"
 
 namespace vkkk
@@ -14,7 +18,7 @@ void Texture::destroy() {
     vkDestroyImageView(instance->get_device(), view, nullptr);
     vkDestroyImage(instance->get_device(), image, nullptr);
     if (sampler)
-        vkDesctroySampler(instance->get_device(), sampler, nullptr);
+        vkDestroySampler(instance->get_device(), sampler, nullptr);
 
     vkFreeMemory(instance->get_device(), memory, nullptr);
 }
@@ -60,14 +64,48 @@ bool Texture::load_image(const fs::path& path) {
 
     instance->create_vk_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
-    instance->transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        instance->copy_buffer_to_image(staging_buf, tex_img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-    instance->transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        instance->copy_buffer_to_image(staging_buf, image, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(instance->get_device(), staging_buf, nullptr);
     vkFreeMemory(instance->get_device(), staging_buf_memo, nullptr);
+
+    // Create a default sampler
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.mipLodBias = 0.f;
+    sampler_info.compareOp = VK_COMPARE_OP_NEVER;
+    sampler_info.minLod = 0.f;
+    sampler_info.maxLod = 0.f;
+    sampler_info.maxAnisotropy = 1.f;
+    sampler_info.anisotropyEnable = false;
+    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    if (!vkCreateSampler(instance->get_device(), &sampler_info, nullptr, &sampler))
+        throw std::runtime_error(fmt::format("failed to create sampler for texture {}", path.string()));
+
+    // Create imageview
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
+    view_info.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
+        VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    view_info.subresourceRange.levelCount = 1;
+    view_info.image = image;
+    if (!vkCreateImageView(instance->get_device(), &view_info, nullptr, &view))
+        throw std::runtime_error(fmt::format("failed to create imageview for texture {}", path.string()));
+
+    update_descriptor();
 
     return true;
 }

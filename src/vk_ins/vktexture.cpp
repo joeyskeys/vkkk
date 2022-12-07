@@ -38,7 +38,7 @@ bool Texture::load_image(const fs::path& path) {
 
     int ch_ords[] = {0, 1, 2, -1};
     float ch_vals[] = {0, 0, 0, 1.f};
-    std::string ch_names[] = {"", "", "", "A"};
+    std::string ch_names[] = {"R", "G", "B", "A"};
     OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(oiio_buf, 4, ch_ords, ch_vals, ch_names);
 
     auto spec = with_alpha_buf.spec();
@@ -89,7 +89,7 @@ bool Texture::load_image(const fs::path& path) {
     sampler_info.maxAnisotropy = 1.f;
     sampler_info.anisotropyEnable = false;
     sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
-    if (!vkCreateSampler(instance->get_device(), &sampler_info, nullptr, &sampler))
+    if (vkCreateSampler(instance->get_device(), &sampler_info, nullptr, &sampler) != VK_SUCCESS)
         throw std::runtime_error(fmt::format("failed to create sampler for texture {}", path.string()));
 
     // Create imageview
@@ -102,7 +102,7 @@ bool Texture::load_image(const fs::path& path) {
     view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
     view_info.subresourceRange.levelCount = 1;
     view_info.image = image;
-    if (!vkCreateImageView(instance->get_device(), &view_info, nullptr, &view))
+    if (vkCreateImageView(instance->get_device(), &view_info, nullptr, &view) != VK_SUCCESS)
         throw std::runtime_error(fmt::format("failed to create imageview for texture {}", path.string()));
 
     update_descriptor();

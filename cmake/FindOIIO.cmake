@@ -5,14 +5,22 @@ find_path(OIIO_INCLUDE_DIRS OpenImageIO/imageio.h
     PATH_SUFFIXES
         include)
 
-find_library(OIIO_LIB OpenImageIO
+if (CMAKE_BUILD_TYPE EQUAL "Debug")
+    set(OIIO_LIB_NAME "OpenImageIO_d")
+    set(OIIO_UTIL_NAME "OpenImageIO_Util_d")
+else()
+    set(OIIO_LIB_NAME "OpenImageIO")
+    set(OIIO_UTIL_NAME "OpenImageIO_Util_d")
+endif()
+
+find_library(OIIO_LIB ${OIIO_LIB_NAME}
     HINTS
         /usr
         /usr/local
     PATH_SUFFIXES
         lib)
 
-find_library(OIIO_UTIL_LIB OpenImageIO_Util
+find_library(OIIO_UTIL_LIB ${OIIO_UTIL_NAME}
     HINTS
         /usr
         /usr/local

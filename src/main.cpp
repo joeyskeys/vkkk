@@ -80,7 +80,7 @@ int main() {
     ins.create_descriptor_set_layout();
     //ins.create_graphics_pipeline();
 
-    vkkk::UniformMgr uniform_mgr{ ins.get_device(), ins.get_graphic_queue(), swapchain_img_cnt };
+    vkkk::UniformMgr uniform_mgr{ &ins };
     vkkk::ShaderModules modules{ ins.get_device(), ins.get_memory_props(), &uniform_mgr };
     modules.add_module("../resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);

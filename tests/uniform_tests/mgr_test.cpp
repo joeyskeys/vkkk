@@ -9,6 +9,6 @@ TEST_CASE("Manager test", "[single-file]") {
     ins.create_logical_device();
     ins.create_command_pool();
 
-    UniformMgr mgr(&ins);
+    vkkk::UniformMgr mgr(&ins);
     mgr.add_texture("D:/repo/floss/vkkk/resource/textures/texture.jpeg");
 }

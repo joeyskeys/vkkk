@@ -130,13 +130,15 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
             auto& sampler = shader_resources_pair.second.separate_samplers[i];
             auto& img_info = m_img_infos[shader_resources_pair.first][i];
             uniform_mgr->add_texture(img_paths.at(sampler.name));
-            auto img_idx = uniform_mgr->uniform_imgs.size() - 1;
+            /*
+            auto img_idx = uniform_mgr->textures.size() - 1;
             img_info.first.imageView = uniform_mgr->uniform_img_views[img_idx];
             img_info.first.sampler = uniform_mgr->uniform_img_samplers[img_idx];
             setup(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             auto& last_write = m_writes[m_writes.size() - 1];
             last_write.dstBinding = img_info.second;
             last_write.pImageInfo = &img_info.first;
+            */
         }
     }
 }

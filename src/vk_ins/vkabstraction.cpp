@@ -573,6 +573,7 @@ uint32_t VkWrappedInstance::create_swapchain() {
     vkGetSwapchainImagesKHR(device, swapchain, &image_cnt, swapchain_images.data());
 
     swapchain_created = true;
+    swapchain_cnt = image_cnt;
     return image_cnt;
 }
 

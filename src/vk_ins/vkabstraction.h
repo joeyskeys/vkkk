@@ -132,6 +132,10 @@ public:
         return graphic_queue;
     }
 
+    inline auto get_swapchain_cnt() {
+        return swapchain_cnt;
+    }
+
     inline void set_uniform_cbk(UnifromUpdateCBK cbk) {
         uniform_cbk = cbk;
     }
@@ -222,6 +226,7 @@ private:
     std::string engine_name = "vulkan";
     uint32_t app_version = VK_MAKE_VERSION(1, 0, 0);
     uint32_t api_version = VK_API_VERSION_1_1;
+    uint32_t swapchain_cnt = 0;
     bool enable_validation_layers = true;
 
     VkInstance instance;

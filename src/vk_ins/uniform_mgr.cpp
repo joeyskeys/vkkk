@@ -2,15 +2,18 @@
 #include <OpenImageIO/imagebufalgo.h>
 
 #include "uniform_mgr.h"
+#include "vk_ins/vkabstraction.h"
+#include "vk_ins/vktexture.h"
 
 namespace vkkk
 {
 
-UniformMgr::UniformMgr(const VkDevice dev, const VkQueue graph_q, uint32_t cnt)
-    : device(dev)
-    , graphic_queue(graph_q)
-    , swapchain_image_cnt(cnt)
+UniformMgr::UniformMgr(VkWrappedInstance* ins)
+    : instance(ins)
+    , graphic_queue(ins->get_graphic_queue())
+    , swapchain_image_cnt(ins->get_swapchain_cnt())
 {
+    device = ins->get_device();
     uniform_bufs.resize(swapchain_image_cnt);
     uniform_buf_mems.resize(swapchain_image_cnt);
 }
@@ -31,12 +34,14 @@ UniformMgr::~UniformMgr()
         delete[] buf_pair.second.second;
     }
 
+    /*
     for (auto& img : uniform_imgs) {
         vkDestroyImage(device, img, nullptr);
     }
     for (auto& mem : uniform_img_mems) {
         vkFreeMemory(device, mem, nullptr);
     }
+    */
     for (auto buf : img_bufs) {
         delete[] buf;
     }
@@ -62,6 +67,7 @@ bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
+    /*
     // Validate path
     if (!fs::exists(path))
         return false;
@@ -127,6 +133,13 @@ bool UniformMgr::add_texture(const fs::path& path) {
     auto tex_sampler = create_sampler();
     uniform_img_samplers.push_back(tex_sampler);
 
+    return true;
+    */
+
+    auto tex = Texture(instance);
+    if (!tex.load_image(path))
+        return false;
+    textures.push_back(tex);
     return true;
 }
 

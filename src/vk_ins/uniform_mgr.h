@@ -13,22 +13,25 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
+class VkWrappedInstance;
+
 class UniformMgr {
 public:
-    UniformMgr(const VkDevice dev, const VkQueue graph_q, uint32_t cnt);
+    UniformMgr(VkWrappedInstance* ins);
     virtual ~UniformMgr();
 
     bool add_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
     std::vector<void*>                  img_bufs;
-    std::vector<VkImage>                uniform_imgs;
-    std::vector<VkDeviceMemory>         uniform_img_mems;
-    std::vector<VkImageView>            uniform_img_views;
-    std::vector<VkSampler>              uniform_img_samplers;
+    //std::vector<VkImage>                uniform_imgs;
+    //std::vector<VkDeviceMemory>         uniform_img_mems;
+    //std::vector<VkImageView>            uniform_img_views;
+    //std::vector<VkSampler>              uniform_img_samplers;
     std::vector<Texture>                textures;
 
 protected:
+    VkWrappedInstance*                  instance;
     VkDevice device;
     VkPhysicalDeviceProperties          props;
     VkPhysicalDeviceMemoryProperties    mem_props;

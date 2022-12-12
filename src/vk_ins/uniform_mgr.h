@@ -47,10 +47,6 @@ protected:
     std::vector<std::vector<VkBuffer>>  uniform_bufs;
     std::vector<std::vector<VkDeviceMemory>> uniform_buf_mems;
 
-    void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties, VkBuffer& buffer,
-        VkDeviceMemory& buffer_memory);
-
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
 
     void create_image(uint32_t width, uint32_t height, VkFormat format,

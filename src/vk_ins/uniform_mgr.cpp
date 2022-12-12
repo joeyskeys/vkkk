@@ -53,7 +53,7 @@ bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
     std::vector<VkDeviceMemory> mems(swapchain_image_cnt, VK_NULL_HANDLE);
 
     for (int i = 0; i < swapchain_image_cnt; i++) {
-        create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        instance->create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             bufs[i], mems[i]);
     }
@@ -67,110 +67,11 @@ bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
-    /*
-    // Validate path
-    if (!fs::exists(path))
-        return false;
-
-    // Load img with OIIO
-    OIIO::ImageBuf oiio_buf(path.string().c_str());
-    if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0))
-        return false;
-
-    oiio_buf.read();
-    int ch_ords[] = { 0, 1, 2, -1 };
-    float ch_vals[] = { 0, 0, 0, 1.f };
-    std::string ch_names[] = { "", "", "", "A" };
-    OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(oiio_buf, 4, ch_ords, ch_vals, ch_names);
-
-    auto spec = with_alpha_buf.spec();
-    int w = spec.width;
-    int h = spec.height;
-    // TODO : explicitly define pixel format
-    VkDeviceSize img_size = w * h * 4;
-    //std::vector<char> pixels;
-    //pixels.resize(img_size);
-    void* pixels = new char[img_size];
-    with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels);
-
-    // Create staging buffer
-    VkBuffer staging_buf;
-    VkDeviceMemory staging_buf_mem;
-    create_buffer(img_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-        staging_buf, staging_buf_mem);
-
-    void* data;
-    vkMapMemory(device, staging_buf_mem, 0, img_size, 0, &data);
-        memcpy(data, pixels, img_size);
-    vkUnmapMemory(device, staging_buf_mem);
-    img_bufs.push_back(pixels);
-
-    // Create vk image and relating device memory
-    VkImage tex_image;
-    VkDeviceMemory tex_image_mem;
-    create_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_image, tex_image_mem);
-
-    transist_image_layout(tex_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copy_buffer_to_image(staging_buf, tex_image, w, h);
-    transist_image_layout(tex_image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    vkDestroyBuffer(device, staging_buf, nullptr);
-    vkFreeMemory(device, staging_buf_mem, nullptr);
-    uniform_imgs.push_back(tex_image);
-    uniform_img_mems.push_back(tex_image_mem);
-
-    // Create the view to the image
-    auto tex_imageview = create_imageview(tex_image, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_ASPECT_COLOR_BIT);
-    uniform_img_views.push_back(tex_imageview);
-
-    // Create sampler
-    auto tex_sampler = create_sampler();
-    uniform_img_samplers.push_back(tex_sampler);
-
-    return true;
-    */
-
     auto tex = Texture(instance);
     if (!tex.load_image(path))
         return false;
     textures.push_back(tex);
     return true;
-}
-
-void UniformMgr::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags properties, VkBuffer& buffer,
-    VkDeviceMemory& buffer_memory) {
-    VkBufferCreateInfo buffer_info = {};
-    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.size = size;
-    buffer_info.usage = usage;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-
-    VkResult res = vkCreateBuffer(device, &buffer_info, nullptr, &buffer);
-    if (res != VK_SUCCESS) {
-        throw std::runtime_error("failed to create buffer!");
-    }
-
-    VkMemoryRequirements mem_requirements;
-    vkGetBufferMemoryRequirements(device, buffer, &mem_requirements);
-
-    VkMemoryAllocateInfo alloc_info = {};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize = mem_requirements.size;
-    alloc_info.memoryTypeIndex = find_memory_type(mem_requirements.memoryTypeBits, properties);
-
-    res = vkAllocateMemory(device, &alloc_info, nullptr, &buffer_memory);
-    if (res != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate buffer memory!");
-    }
-
-    vkBindBufferMemory(device, buffer, buffer_memory, 0);
 }
 
 uint32_t UniformMgr::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const {

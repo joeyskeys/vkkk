@@ -15,17 +15,22 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
+class VkWrappedInstance;
+
+using texture_map = std::unordered_map<std::string, std::string>;
+
 class ShaderModules {
 public:
-    ShaderModules(const VkDevice d, const VkPhysicalDeviceMemoryProperties, UniformMgr *mgr);
+    ShaderModules(VkWrappedInstance *ins, UniformMgr *mgr);
     virtual ~ShaderModules();
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
-    void alloc_uniforms(const uint32_t swapchain_img_cnt, const std::unordered_map<std::string, std::string>& img_paths);
+    void alloc_uniforms(const texture_map& img_paths);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
-    void create_descriptor_sets(const uint32_t);
+    void create_descriptor_sets();
     
 private:
+    VkWrappedInstance*                          instance;
     VkDevice                                    device;
     VkPhysicalDeviceMemoryProperties            mem_props;
     UniformMgr*                                 uniform_mgr;

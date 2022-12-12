@@ -1,15 +1,16 @@
 #include "utils/io.h"
+#include "vk_ins/vkabstraction.h"
 #include "vk_ins/shader_mgr.h"
 #include "vk_ins/misc.h"
 
 namespace vkkk
 {
 
-ShaderModules::ShaderModules(const VkDevice d,
-    const VkPhysicalDeviceMemoryProperties mp,
+ShaderModules::ShaderModules(VkWrappedInstance *ins,
     UniformMgr *mgr)
-    : device(d)
-    , mem_props(mp)
+    : instance(ins)
+    , device(ins->get_device())
+    , mem_props(ins->get_memory_props())
     , uniform_mgr(mgr)
 {}
 
@@ -94,12 +95,12 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     return true;
 }
 
-void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::unordered_map<std::string, std::string>& img_paths) {
+void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
     auto setup = [&](const VkDescriptorType des_type) {
         // Memory pool
         VkDescriptorPoolSize pool_size{};
         pool_size.type = des_type;
-        pool_size.descriptorCount = swapchain_img_cnt;
+        pool_size.descriptorCount = instance->get_swapchain_cnt();
         m_pool_sizes.emplace_back(std::move(pool_size));
 
         // Write descriptor set
@@ -130,15 +131,14 @@ void ShaderModules::alloc_uniforms(const uint32_t swapchain_img_cnt, const std::
             auto& sampler = shader_resources_pair.second.separate_samplers[i];
             auto& img_info = m_img_infos[shader_resources_pair.first][i];
             uniform_mgr->add_texture(img_paths.at(sampler.name));
-            /*
             auto img_idx = uniform_mgr->textures.size() - 1;
-            img_info.first.imageView = uniform_mgr->uniform_img_views[img_idx];
-            img_info.first.sampler = uniform_mgr->uniform_img_samplers[img_idx];
+            auto last_tex = uniform_mgr->textures[img_idx];
+            img_info.first.imageView = last_tex.view;
+            img_info.first.sampler = last_tex.sampler;
             setup(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
             auto& last_write = m_writes[m_writes.size() - 1];
             last_write.dstBinding = img_info.second;
             last_write.pImageInfo = &img_info.first;
-            */
         }
     }
 }
@@ -159,9 +159,11 @@ std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_arra
     return stage_create_infos;
 }
 
-void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
+void ShaderModules::create_descriptor_sets() {
     std::vector<VkDescriptorPoolSize> pool_sizes{};
     std::vector<VkWriteDescriptorSet> writes{};
+    auto swapchain_img_cnt = instance->get_swapchain_cnt();
+    m_descriptor_sets.resize(swapchain_img_cnt);
 
     auto setup = [&](const VkDescriptorType des_type) {
         // Memory pool
@@ -245,8 +247,7 @@ void ShaderModules::create_descriptor_sets(const uint32_t swapchain_img_cnt) {
     alloc_info.descriptorPool = m_descriptor_pool;
     alloc_info.descriptorSetCount = swapchain_img_cnt;
     alloc_info.pSetLayouts = layouts.data();
-
-    m_descriptor_sets.resize(swapchain_img_cnt);
+    
     if (vkAllocateDescriptorSets(device, &alloc_info, m_descriptor_sets.data()) != VK_SUCCESS)
         throw std::runtime_error("failed to allocate descriptor sets");
 

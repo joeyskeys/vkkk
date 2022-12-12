@@ -81,10 +81,10 @@ int main() {
     //ins.create_graphics_pipeline();
 
     vkkk::UniformMgr uniform_mgr{ &ins };
-    vkkk::ShaderModules modules{ ins.get_device(), ins.get_memory_props(), &uniform_mgr };
+    vkkk::ShaderModules modules{ &ins, &uniform_mgr };
     modules.add_module("../resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    modules.alloc_uniforms(swapchain_img_cnt, std::unordered_map<std::string, std::string>());
+    modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
 
     ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_LINE);
     ins.create_depth_resource();
@@ -128,9 +128,10 @@ int main() {
     //ins.set_uniform_cbk(ubo_update);
     //ins.create_descriptor_pool();
     //ins.create_descriptor_set();
+    modules.create_descriptor_sets();
 
-    //ins.create_commandbuffers();
-    //ins.create_sync_objects();
+    ins.create_commandbuffers();
+    ins.create_sync_objects();
 
     //ins.mainloop();
 

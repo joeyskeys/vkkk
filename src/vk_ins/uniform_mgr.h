@@ -6,7 +6,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include "vktexture.h"
+#include "shading/vktexture.h"
+#include "shading/vkubo.h"
 
 namespace fs = std::filesystem;
 
@@ -23,11 +24,13 @@ public:
     bool add_buffer(const std::string& name, uint32_t size);
     bool add_texture(const fs::path& path);
 
-    std::vector<void*>                  img_bufs;
+    //std::vector<std::vector<VkBuffer>>  uniform_bufs;
+    //std::vector<void*>                  img_bufs;
     //std::vector<VkImage>                uniform_imgs;
     //std::vector<VkDeviceMemory>         uniform_img_mems;
     //std::vector<VkImageView>            uniform_img_views;
     //std::vector<VkSampler>              uniform_img_samplers;
+    std::vector<UBO>                    ubos;
     std::vector<Texture>                textures;
 
 protected:
@@ -39,32 +42,31 @@ protected:
     VkQueue graphic_queue;
     uint32_t swapchain_image_cnt;
 
-    std::unordered_map<std::string, std::pair<uint32_t, char*>> ubo_bufs;
+    //std::unordered_map<std::string, std::pair<uint32_t, char*>> ubo_bufs;
 
     // 2D array of uniform buffers with following structure
     // [swapchain 1 uniform buffers : [buf1] [buf2] [buf3]]
     // [swapchain 2 uniform buffers : [buf1] [buf2] [buf3]]
-    std::vector<std::vector<VkBuffer>>  uniform_bufs;
-    std::vector<std::vector<VkDeviceMemory>> uniform_buf_mems;
+    //std::vector<std::vector<VkDeviceMemory>> uniform_buf_mems;
 
-    uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
+    //uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const;
 
-    void create_image(uint32_t width, uint32_t height, VkFormat format,
-        VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkImage& image, VkDeviceMemory& image_memory);
+    //void create_image(uint32_t width, uint32_t height, VkFormat format,
+        //VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+        //VkImage& image, VkDeviceMemory& image_memory);
 
-    VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
+    //VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
 
-    VkSampler create_sampler();
+    //VkSampler create_sampler();
 
-    VkCommandBuffer begin_single_time_commands();
+    //VkCommandBuffer begin_single_time_commands();
 
-    void end_single_time_commands(VkCommandBuffer cmd_buf);
+    //void end_single_time_commands(VkCommandBuffer cmd_buf);
 
-    void transist_image_layout(VkImage image, VkFormat format, VkImageLayout old_layout,
-        VkImageLayout new_layout);
+    //void transist_image_layout(VkImage image, VkFormat format, VkImageLayout old_layout,
+        //VkImageLayout new_layout);
 
-    void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
+    //void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t w, uint32_t h);
 };
 
 }

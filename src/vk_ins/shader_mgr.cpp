@@ -255,7 +255,7 @@ void ShaderModules::create_descriptor_sets() {
         int write_idx = 0;
         for (auto& ubo_info_pair : m_ubo_infos)
             for (size_t j = 0; j < ubo_info_pair.second.size(); j++) {
-                ubo_info_pair.second[j].first.buffer = std::get<0>(m_ubo_resources[ubo_info_pair.first][i])[j];
+                //ubo_info_pair.second[j].first.buffer = std::get<0>(m_ubo_resources[ubo_info_pair.first][i])[j];
                 writes[write_idx].dstBinding = write_idx;
                 writes[write_idx].pBufferInfo = &ubo_info_pair.second[j].first;
             }

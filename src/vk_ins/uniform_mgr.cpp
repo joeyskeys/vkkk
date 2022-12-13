@@ -48,10 +48,11 @@ UniformMgr::~UniformMgr()
 }
 
 bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
-    std::vector<VkBuffer> bufs(swapchain_image_cnt);
+    //std::vector<VkBuffer> bufs(swapchain_image_cnt);
     // The vector(count) ctor left memory uninitialized, causing crash
-    std::vector<VkDeviceMemory> mems(swapchain_image_cnt, VK_NULL_HANDLE);
+    //std::vector<VkDeviceMemory> mems(swapchain_image_cnt, VK_NULL_HANDLE);
 
+    /*
     for (int i = 0; i < swapchain_image_cnt; i++) {
         instance->create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
@@ -64,16 +65,22 @@ bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
     char* buf = new char[size];
     ubo_bufs.emplace(name, std::make_pair(size, buf));
     return true;
+    */
+
+    auto ubo = UBO(instance);
+    ubos.eamplace_back(std::move(ubo));
+    return true;
 }
 
 bool UniformMgr::add_texture(const fs::path& path) {
     auto tex = Texture(instance);
     if (!tex.load_image(path))
         return false;
-    textures.push_back(tex);
+    textures.emplace_back(std::move(tex));
     return true;
 }
 
+/*
 uint32_t UniformMgr::find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags properties) const {
     for (uint32_t i = 0; i < mem_props.memoryTypeCount; i++) {
         if (type_filter & (1 << i) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
@@ -273,5 +280,6 @@ void UniformMgr::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w, u
 
     end_single_time_commands(cmd_buf);
 }
+*/
 
 }

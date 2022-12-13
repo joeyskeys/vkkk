@@ -2,8 +2,8 @@
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 
-#include "vkabstraction.h"
-#include "vktexture.h"
+#include "shading/vkabstraction.h"
+#include "shading/vktexture.h"
 
 namespace vkkk
 {

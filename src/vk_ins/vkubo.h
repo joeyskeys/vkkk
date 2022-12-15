@@ -19,6 +19,7 @@ public:
     std::vector<VkDeviceMemory>             memos;
 
     UBO(VkWrappedInstance* ins, size_t s);
+    ~UBO();
 
     void update(uint32_t idx);
 };

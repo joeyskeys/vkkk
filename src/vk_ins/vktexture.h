@@ -23,10 +23,12 @@ public:
     uint32_t                layout_cnt;
     VkDescriptorImageInfo   descriptor;
     VkSampler               sampler;
+    bool                    loaded = false;
 
     Texture(VkWrappedInstance* ins)
         : instance(ins)
     {}
+    ~Texture();
 
     void update_descriptor();
     void destroy();

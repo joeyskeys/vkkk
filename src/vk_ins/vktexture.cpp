@@ -8,6 +8,11 @@
 namespace vkkk
 {
 
+Texture::~Texture() {
+    if (loaded)
+        destroy();
+}
+
 void Texture::update_descriptor() {
     descriptor.sampler = sampler;
     descriptor.imageView = view;
@@ -107,6 +112,7 @@ bool Texture::load_image(const fs::path& path) {
 
     update_descriptor();
 
+    loaded = true;
     return true;
 }
 

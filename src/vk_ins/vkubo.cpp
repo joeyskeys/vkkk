@@ -20,6 +20,13 @@ UBO::UBO(VkWrappedInstance* ins, size_t s)
             gpu_bufs[i], memos[i]);
 }
 
+UBO::~UBO() {
+    for (int i = 0; i < ins->get_swapchain_cnt(); ++i) {
+        vkDestroyBuffer(instance->get_device(), gpu_bufs[i], nullptr);
+        vkFreeMemory(instance->get_device(), memos[i], nullptr);
+    }
+}
+
 void UBO::update(uint32_t idx) {
     void* mapped_data;
     vkMapMemory(instance->get_device(), memos[idx], 0, size, 0, &mapped_data);

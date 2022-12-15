@@ -27,7 +27,7 @@ public:
     bool add_module(fs::path path, VkShaderStageFlagBits t);
     void alloc_uniforms(const texture_map& img_paths);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
-    void create_descriptor_sets();
+    void create_descriptor_pool_and_sets();
     
 private:
     VkWrappedInstance*                          instance;

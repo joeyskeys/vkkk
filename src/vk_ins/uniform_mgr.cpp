@@ -4,6 +4,7 @@
 #include "uniform_mgr.h"
 #include "vk_ins/vkabstraction.h"
 #include "vk_ins/vktexture.h"
+#include "vk_ins/vkubo.h"
 
 namespace vkkk
 {
@@ -14,16 +15,16 @@ UniformMgr::UniformMgr(VkWrappedInstance* ins)
     , swapchain_image_cnt(ins->get_swapchain_cnt())
 {
     device = ins->get_device();
-    uniform_bufs.resize(swapchain_image_cnt);
-    uniform_buf_mems.resize(swapchain_image_cnt);
+    //uniform_bufs.resize(swapchain_image_cnt);
+    //uniform_buf_mems.resize(swapchain_image_cnt);
 }
 
 UniformMgr::~UniformMgr()
 {}
 
 bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
-    auto ubo = UBO(instance);
-    ubos.eamplace_back(std::move(ubo));
+    auto ubo = UBO(instance, size);
+    ubos.emplace_back(std::move(ubo));
     return true;
 }
 

@@ -6,8 +6,8 @@
 
 #include <vulkan/vulkan.h>
 
-#include "shading/vktexture.h"
-#include "shading/vkubo.h"
+#include "vk_ins/vktexture.h"
+#include "vk_ins/vkubo.h"
 
 namespace fs = std::filesystem;
 

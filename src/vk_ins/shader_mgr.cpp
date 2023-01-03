@@ -138,10 +138,10 @@ void ShaderModules::create_descriptor_pool_and_sets() {
     auto swapchain_img_cnt = instance->get_swapchain_cnt();
     m_descriptor_sets.resize(swapchain_img_cnt);
 
-    for (auto& ubo : uniform_mgr->ubos)
-        setup_pool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    for (auto& tex : uniform_mgr->textures)
-        setup_pool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
+    setup_pool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        uniform_mgr->ubos.size() * instance->get_swapchain_cnt());
+    setup_pool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        uniform_mgr->textures.size() * instance->get_swapchain_cnt());
 
     // Create the pool
     VkDescriptorPoolCreateInfo pool_info{};
@@ -189,6 +189,13 @@ void ShaderModules::create_descriptor_pool_and_sets() {
 
         vkUpdateDescriptorSets(device, writes.size(), writes.data(), 0, nullptr);
     }
+}
+
+void ShaderModules::setup_pool(const VkDescriptorType des_type, const uint32_t cnt) {
+    VkDescriptorPoolSize pool_size{};
+    pool_size.type = des_type;
+    pool_size.descriptorCount = cnt;
+    m_pool_sizes.emplace_back(std::move(pool_size));
 }
 
 }

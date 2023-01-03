@@ -20,6 +20,7 @@ public:
 
     UBO(VkWrappedInstance* ins, size_t s);
     ~UBO();
+    UBO(UBO&& rhs);
 
     void update(uint32_t idx);
 };

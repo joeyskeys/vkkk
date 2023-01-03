@@ -1,5 +1,5 @@
-#include "shading/vkabstraction.h"
-#include "shading/vktexture.h"
+#include "vk_ins/vkabstraction.h"
+#include "vk_ins/vktexture.h"
 
 namespace vkkk
 {
@@ -21,16 +21,24 @@ UBO::UBO(VkWrappedInstance* ins, size_t s)
 }
 
 UBO::~UBO() {
-    for (int i = 0; i < ins->get_swapchain_cnt(); ++i) {
+    for (int i = 0; i < instance->get_swapchain_cnt(); ++i) {
         vkDestroyBuffer(instance->get_device(), gpu_bufs[i], nullptr);
         vkFreeMemory(instance->get_device(), memos[i], nullptr);
     }
 }
 
+UBO::UBO(UBO&& rhs)
+    : size(rhs.size)
+    , instance(rhs.instance)
+    , cpu_buf(std::move(rhs.cpu_buf))
+    , gpu_bufs(std::move(rhs.gpu_bufs))
+    , memos(std::move(rhs.memos))
+{}
+
 void UBO::update(uint32_t idx) {
     void* mapped_data;
     vkMapMemory(instance->get_device(), memos[idx], 0, size, 0, &mapped_data);
-        memcpy(data, cpu_buf.get(), size);
+        memcpy(mapped_data, cpu_buf.get(), size);
     vkUnmapMemory(instance->get_device(), memos[idx]);
 }
 

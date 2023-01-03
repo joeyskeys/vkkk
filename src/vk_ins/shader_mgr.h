@@ -28,6 +28,9 @@ public:
     void alloc_uniforms(const texture_map& img_paths);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
     void create_descriptor_pool_and_sets();
+
+private:
+    void setup_pool(const VkDescriptorType des_type, const uint32_t cnt);
     
 private:
     VkWrappedInstance*                          instance;

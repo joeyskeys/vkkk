@@ -14,6 +14,9 @@ class VkWrappedInstance;
 class Texture {
 public:
     VkWrappedInstance*      instance;
+    std::string             name;
+    VkShaderStageFlagBits   stage;
+    size_t                  vecsize = 1;
     VkImage                 image;
     VkImageLayout           image_layout;
     VkDeviceMemory          memory;
@@ -25,9 +28,8 @@ public:
     VkSampler               sampler;
     bool                    loaded = false;
 
-    Texture(VkWrappedInstance* ins)
-        : instance(ins)
-    {}
+    Texture(VkWrappedInstance* ins, const std::string& n,
+        VkShaderStageFlagBits t=VK_SHADER_STAGE_VERTEX_BIT);
     ~Texture();
 
     void update_descriptor();

@@ -8,7 +8,7 @@ TEST_CASE("Texture test", "[single-file]") {
     ins.create_surface();
     ins.create_logical_device();
     ins.create_command_pool();
-    vkkk::Texture tex(&ins);
+    vkkk::Texture tex(&ins, "tex1");
     tex.load_image("D:/repo/floss/vkkk/resource/textures/texture.jpeg");
 
     REQUIRE(true);

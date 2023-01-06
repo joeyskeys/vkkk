@@ -22,16 +22,20 @@ UniformMgr::UniformMgr(VkWrappedInstance* ins)
 UniformMgr::~UniformMgr()
 {}
 
-bool UniformMgr::add_buffer(const std::string& name, uint32_t size) {
-    auto ubo = UBO(instance, size);
+bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
+    uint32_t size, uint32_t vecsize)
+{
+    auto ubo = UBO(instance, t, size, vecsize);
     ubos.emplace_back(std::move(ubo));
     return true;
 }
 
-bool UniformMgr::add_texture(const fs::path& path) {
-    auto tex = Texture(instance);
+bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t) {
+    auto tex = Texture(instance, name, t);
+    /*
     if (!tex.load_image(path))
         return false;
+    */
     textures.emplace_back(std::move(tex));
     return true;
 }

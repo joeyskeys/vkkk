@@ -12,13 +12,15 @@ class VkWrappedInstance;
 
 class UBO {
 public:
-    size_t                                  size;
     VkWrappedInstance*                      instance;
+    VkShaderStageFlagBits                   stage;
+    size_t                                  size;
+    size_t                                  vecsize;
     std::unique_ptr<char[]>                 cpu_buf;
     std::vector<VkBuffer>                   gpu_bufs;
     std::vector<VkDeviceMemory>             memos;
 
-    UBO(VkWrappedInstance* ins, size_t s);
+    UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, size_t s, size_t vs=1);
     ~UBO();
     UBO(UBO&& rhs);
 

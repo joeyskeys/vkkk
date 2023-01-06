@@ -21,8 +21,9 @@ public:
     UniformMgr(VkWrappedInstance* ins);
     virtual ~UniformMgr();
 
-    bool add_buffer(const std::string& name, uint32_t size);
-    bool add_texture(const fs::path& path);
+    bool add_buffer(const std::string& name, VkShaderStageFlagBits t,
+        uint32_t size, uint32_t vecsize=1);
+    bool add_texture(const std::string& name, VkShaderStageFlagBits t);
     void generate_writes();
     void set_dest_set(const uint32_t dst_set);
 

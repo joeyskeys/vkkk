@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <vector>
 #include <utility>
+#include <tuple>
 
 #include <vulkan/vulkan.h>
 #include <spirv_cross/spirv.hpp>
@@ -52,11 +53,14 @@ private:
     std::unordered_map<VkShaderStageFlagBits, std::vector<ImageResources>> m_img_resources;
     std::unordered_map<VkShaderStageFlagBits, std::vector<VkSampler>> m_sampler_resources;
 
-    using BufInfoWithBinding = std::pair<VkDescriptorBufferInfo, uint32_t>;
-    using ImgInfoWithBinding = std::pair<VkDescriptorImageInfo, uint32_t>;
-    std::unordered_map<VkShaderStageFlagBits, std::vector<BufInfoWithBinding>> m_ubo_infos;
-    std::unordered_map<VkShaderStageFlagBits, std::vector<ImgInfoWithBinding>> m_img_infos;
+    using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
+        uint32_t>;
+    using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits>;
+    std::vector<BufInfoWithBinding> m_buf_brefs;
+    std::vector<ImgInfoWithBinding> m_img_brefs;
 
+    std::vector<VkDescriptorBufferInfo> m_buf_infos;
+    std::vector<VkDescriptorImageInfo>  m_img_infos;
     std::vector<VkWriteDescriptorSet> m_writes;
     std::vector<VkDescriptorPoolSize> m_pool_sizes;
 };

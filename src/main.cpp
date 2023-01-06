@@ -128,7 +128,7 @@ int main() {
     //ins.set_uniform_cbk(ubo_update);
     //ins.create_descriptor_pool();
     //ins.create_descriptor_set();
-    modules.create_descriptor_sets();
+    modules.create_descriptor_pool_and_sets();
 
     ins.create_commandbuffers();
     ins.create_sync_objects();

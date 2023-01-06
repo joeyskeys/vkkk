@@ -4,32 +4,35 @@
 namespace vkkk
 {
 
-UBO::UBO(VkWrappedInstance* ins, size_t s)
+UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, size_t s, size_t vs)
     : instance(ins)
+    , stage(t)
     , size(s)
+    , vecsize(vs)
 {
-    cpu_buf = std::make_unique<char[]>(size);
+    cpu_buf = std::make_unique<char[]>(size * vecsize);
 
     auto cnt = ins->get_swapchain_cnt();
     gpu_bufs.resize(cnt);
     memos.resize(cnt);
 
     for (int i = 0; i < cnt; ++i)
-        ins->create_buffer(size, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+        ins->create_buffer(size * vecsize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
             gpu_bufs[i], memos[i]);
 }
 
 UBO::~UBO() {
-    for (int i = 0; i < instance->get_swapchain_cnt(); ++i) {
-        vkDestroyBuffer(instance->get_device(), gpu_bufs[i], nullptr);
-        vkFreeMemory(instance->get_device(), memos[i], nullptr);
-    }
+    for (auto& gpu_buf : gpu_bufs)
+        vkDestroyBuffer(instance->get_device(), gpu_buf, nullptr);
+    for (auto& memo : memos)
+        vkFreeMemory(instance->get_device(), memo, nullptr);
 }
 
 UBO::UBO(UBO&& rhs)
-    : size(rhs.size)
-    , instance(rhs.instance)
+    : instance(rhs.instance)
+    , size(rhs.size)
+    , vecsize(rhs.vecsize)
     , cpu_buf(std::move(rhs.cpu_buf))
     , gpu_bufs(std::move(rhs.gpu_bufs))
     , memos(std::move(rhs.memos))

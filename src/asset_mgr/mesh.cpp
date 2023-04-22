@@ -18,7 +18,7 @@ Mesh::Mesh(const Mesh& b) {
     vcnt = b.vcnt;
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     memcpy(vbuf.get(), b.vbuf.get(), vcnt * comp_size * sizeof(float));
-    icnt = icnt;
+    icnt = b.icnt;
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
     memcpy(ibuf.get(), b.ibuf.get(), icnt * 3 * sizeof(uint32_t));
 }

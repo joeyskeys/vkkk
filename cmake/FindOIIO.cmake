@@ -10,7 +10,7 @@ if (CMAKE_BUILD_TYPE EQUAL "Debug")
     set(OIIO_UTIL_NAME "OpenImageIO_Util_d")
 else()
     set(OIIO_LIB_NAME "OpenImageIO")
-    set(OIIO_UTIL_NAME "OpenImageIO_Util_d")
+    set(OIIO_UTIL_NAME "OpenImageIO_Util")
 endif()
 
 find_library(OIIO_LIB ${OIIO_LIB_NAME}

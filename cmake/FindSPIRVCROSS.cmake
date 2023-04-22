@@ -6,28 +6,38 @@ if(WIN32)
     set(LIB_DIR "Lib")
     set(BIN_DIR "Bin")
 else()
-    set(INCLUDE_DIR "include")
+    set(INC_DIR "include")
     set(LIB_DIR "lib")
-    set(bin_dir "bin")
+    set(BIN_DIR "bin")
 endif()
 
 find_path(SPIRVCROSS_INCLUDE_DIRS spirv_cross/spirv_cross.hpp
     HINTS
-        "$ENV{VULKAN_SDK}/${INC_DIR}")
+        /usr
+        /usr/local
+        "$ENV{VULKAN_SDK}"
+    PATH_SUFFIXES
+        ${INC_DIR})
 
 set(CROSS_LIB_PATHS)
 foreach(CROSS_LIB ${CROSS_LIBS})
-    if (${CMAKE_BUILD_TYPE} MATCHES Debug)
+    if (${CMAKE_BUILD_TYPE} MATCHES Debug AND WIN32)
         find_library(CROSS_${CROSS_LIB} ${CROSS_LIB}d
             HINTS
-                "$ENV{VULKAN_SDK}/${LIB_DIR}"
-                "$ENV{VULKAN_SDK}/${BIN_DIR}")
+                /usr
+                /usr/local
+                "$ENV{VULKAN_SDK}"
+            PATH_SUFFIXES
+                ${LIB_DIR})
         message(STATUS "lib value : ${CROSS_${CROSS_LIB}}")
     else()
         find_library(CROSS_${CROSS_LIB} ${CROSS_LIB}
             HINTS
-                "$ENV{VULKAN_SDK}/${LIB_DIR}"
-                "$ENV{VULKAN_SDK}/${BIN_DIR}")
+                /usr
+                /usr/local
+                "$ENV{VULKAN_SDK}"
+            PATH_SUFFIXES
+                ${LIB_DIR})
     endif()
 
     list(APPEND CROSS_LIB_PATHS CROSS_${CROSS_LIB})

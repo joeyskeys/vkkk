@@ -15,7 +15,8 @@ find_path(SPIRVCROSS_INCLUDE_DIRS spirv_cross/spirv_cross.hpp
     HINTS
         /usr
         /usr/local
-        "$ENV{VULKAN_SDK}"
+        $ENV{SPIRVCROSS_ROOT}
+        "$ENV{VULKAN_SDK}
     PATH_SUFFIXES
         ${INC_DIR})
 
@@ -26,7 +27,8 @@ foreach(CROSS_LIB ${CROSS_LIBS})
             HINTS
                 /usr
                 /usr/local
-                "$ENV{VULKAN_SDK}"
+                $ENV{SPIRVCROSS_ROOT}
+                $ENV{VULKAN_SDK}
             PATH_SUFFIXES
                 ${LIB_DIR})
         message(STATUS "lib value : ${CROSS_${CROSS_LIB}}")
@@ -35,7 +37,8 @@ foreach(CROSS_LIB ${CROSS_LIBS})
             HINTS
                 /usr
                 /usr/local
-                "$ENV{VULKAN_SDK}"
+                $ENV{SPIRVCROSS_ROOT}
+                $ENV{VULKAN_SDK}
             PATH_SUFFIXES
                 ${LIB_DIR})
     endif()

@@ -24,12 +24,18 @@ set(SRCS
     vk_ins/vkubo.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})
+set(PLATFORM_RELATED_LIBS)
+if (UNIX)
+    set(PLATFORM_RELATED_LIBS ${X11_LIBRARIES})
+endif()
+
 target_link_libraries(vkkk
     ${GLFW_LIBRARIES}
     ${Vulkan_LIBRARIES}
     ${OIIO_LIBRARIES}
     ${ASSIMP_LIBRARIES}
-    ${SPIRVCROSS_LIBRARIES})
+    ${SPIRVCROSS_LIBRARIES}
+    ${PLATFORM_RELATED_LIBS})
 
 add_executable(vktest main.cpp)
 target_link_libraries(vktest

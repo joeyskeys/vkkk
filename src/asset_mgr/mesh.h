@@ -4,7 +4,9 @@
 #include <cstdint>
 #include <concepts>
 #include <functional>
+#include <memory>
 #include <type_traits>
+#include <tuple>
 #include <vector>
 
 #include <assimp/Importer.hpp>
@@ -21,7 +23,7 @@ namespace vkkk
 
 template <typename T, uint32_t D>
 concept VertexConstraint = requires(T t, uint32_t d) {
-    std::floating_point<T>;
+    requires std::floating_point<T>;
     2 <= d && d <= 3;
 };
 
@@ -91,12 +93,12 @@ public:
         des[0].binding = binding;
         des[0].location = loc_pos;
         des[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[0].offset = offsetof(VertexUV, pos);
+        des[0].offset = 0;
 
         des[1].binding = binding;
         des[1].location = loc_uv;
         des[1].format = VK_FORMAT_R32G32_SFLOAT;
-        des[1].offset = offsetof(VertexUV, uv);
+        des[1].offset = sizeof(glm::vec3);
 
         return des;
     }
@@ -111,10 +113,7 @@ public:
             float u;
             float v;
         };
-        struct {
-            glm::vec3 pos;
-            glm::vec2 uv;
-        };
+        std::tuple<glm::vec3, glm::vec2> pos_uv;
     };
 };
 
@@ -140,12 +139,12 @@ public:
         des[1].binding = binding;
         des[1].location = loc_uv;
         des[1].format = VK_FORMAT_R32G32_SFLOAT;
-        des[1].offset = offsetof(VertexUVColor, uv);
+        des[1].offset = sizeof(glm::vec3);
 
         des[2].binding = binding;
         des[2].location = loc_color;
         des[2].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[2].offset = offsetof(VertexUVColor, color);
+        des[2].offset = des[1].offset + sizeof(glm::vec2);
 
         return des;
     }
@@ -163,11 +162,7 @@ public:
             float g;
             float b;
         };
-        struct {
-            glm::vec3 pos;
-            glm::vec2 uv;
-            glm::vec3 color;
-        };
+        std::tuple<glm::vec3, glm::vec2, glm::vec3> pos_uv_color;
     };
 };
 

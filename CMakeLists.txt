@@ -9,7 +9,7 @@ project(vkkk)
 
 find_package(Vulkan)
 
-if(NOT Vulkan_FOUND)
+if (NOT Vulkan_FOUND)
     message(FATAL_ERROR "Could not find Vulkan library!")
 else()
     message(STATUS "Found Vulkan: ${Vulkan_LIBRARY}")
@@ -17,7 +17,7 @@ endif()
 
 find_package(GLFW)
 
-if(NOT GLFW_FOUND)
+if (NOT GLFW_FOUND)
     message(FATAL_ERROR "Could not find GLFW library!")
 else()
     message(STATUS "Found GLFW: ${GLFW_LIBRARY}")
@@ -29,6 +29,14 @@ if (NOT GLM_FOUND)
     message(FATAL_ERROR "Could not find GLM library!")
 else()
     message(STATUS "Found GLM: ${GLM_INCLUDE_DIRS}")
+endif()
+
+find_package(FMT)
+
+if (NOT FMT_FOUND)
+    message(FATAL_ERROR "Could not find fmt library!")
+else()
+    message(STATUS "Found fmt: ${FMT_INCLUDE_DIRS}")
 endif()
 
 find_package(OIIO)
@@ -56,8 +64,20 @@ else()
     message(STATUS ${SPIRVCROSS_INCLUDE_DIRS})
 endif()
 
+if (UNIX)
+    find_package(X11)
+
+    if (NOT X11_FOUND)
+        message(FATAL_ERROR "Could not find X11!")
+    else()
+        message(STATUS "Found X11")
+    endif()
+endif()
+
 include_directories(${Vulkan_INCLUDE_DIRS})
 include_directories(${GLFW_INCLUDE_DIRS})
+include_directories(${GLM_INCLUDE_DIRS})
+include_directories(${FMT_INCLUDE_DIRS})
 include_directories(${OIIO_INCLUDE_DIRS})
 include_directories(${ASSIMP_INCLUDE_DIRS})
 include_directories(${SPIRVCROSS_INCLUDE_DIRS})

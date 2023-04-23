@@ -16,7 +16,7 @@ find_path(SPIRVCROSS_INCLUDE_DIRS spirv_cross/spirv_cross.hpp
         /usr
         /usr/local
         $ENV{SPIRVCROSS_ROOT}
-        "$ENV{VULKAN_SDK}
+        "$ENV{VULKAN_SDK}"
     PATH_SUFFIXES
         ${INC_DIR})
 

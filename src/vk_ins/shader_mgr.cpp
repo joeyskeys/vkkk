@@ -94,15 +94,13 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     m_img_infos.emplace(t, std::move(img_infos));
     */
 
-    for (const auto& shader_resources_pair : shader_resources_map) {
-        for (auto& ubo : res.uniform_buffers) {
-            type_info = comp.get_type(ubo.base_type_id);
-            m_buf_brefs.emplace_back(ubo.name, t, comp.get_declared_struct_size(type_info));
-        }
+    for (auto& ubo : res.uniform_buffers) {
+        type_info = comp.get_type(ubo.base_type_id);
+        m_buf_brefs.emplace_back(ubo.name, t, comp.get_declared_struct_size(type_info));
+    }
 
-        for (auto& sampler : res.sampled_images) {
-            m_img_brefs.emplace_back(sampler.name, t);
-        }
+    for (auto& sampler : res.sampled_images) {
+        m_img_brefs.emplace_back(sampler.name, t);
     }
 
     return true;

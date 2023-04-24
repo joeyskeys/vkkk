@@ -17,6 +17,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "asset_mgr/mesh.h"
+#include "asset_mgr/mesh_mgr.h"
 #include "vk_ins/shader_mgr.h"
 
 namespace fs = std::filesystem;
@@ -173,6 +174,7 @@ public:
     void create_descriptor_set();
     void create_descriptors(const ShaderModules& modules);
     void create_commandbuffers();
+    void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
     void create_sync_objects();
     void draw_frame();
     void mainloop();

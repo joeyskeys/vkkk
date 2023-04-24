@@ -30,6 +30,10 @@ public:
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
     void create_descriptor_pool_and_sets();
 
+    inline const VkDescriptorSet* get_descriptor_set(uint32_t idx) {
+        return &m_descriptor_sets[idx];
+    }
+
 private:
     void setup_pool(const VkDescriptorType des_type, const uint32_t cnt);
     

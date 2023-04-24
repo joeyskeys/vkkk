@@ -1422,6 +1422,65 @@ void VkWrappedInstance::create_commandbuffers() {
     }
 }
 
+void VkWrappedInstance::create_commandbuffers(
+    uint32_t fb_cnt,
+    ShaderModules& shader_modules,
+    MeshMgr& mesh_mgr)
+{
+    commandbuffers.resize(fb_cnt);
+
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_pool;
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = fb_cnt;
+
+    if (vkAllocateCommandBuffers(device, &alloc_info, commandbuffers.data()) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate command buffers!");
+
+    for (int i = 0; i < fb_cnt; ++i) {
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(commandbuffers[i], &begin_info) != VK_SUCCESS)
+            throw std::runtime_error("failed to begin recording command buffer");
+
+        VkRenderPassBeginInfo renderpass_info{};
+        renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderpass_info.renderPass = render_pass;
+        renderpass_info.framebuffer = swapchain_framebuffers[i];
+        renderpass_info.renderArea.offset = { 0, 0 };
+        renderpass_info.renderArea.extent = swapchain_extent;
+
+        std::array<VkClearValue, 2> clear_values{};
+        clear_values[0].color = { { 0.f, 0.f, 0.f, 1.f } };
+        clear_values[1].depthStencil = { 1.f, 0 };
+        renderpass_info.clearValueCount = clear_values.size();
+        renderpass_info.pClearValues = clear_values.data();
+
+        vkCmdBeginRenderPass(commandbuffers[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
+            vkCmdBindPipeline(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
+
+            // This part is not dynamic yet
+            VkBuffer vert_buffers[] = {vert_buffer};
+            VkDeviceSize offsets[] = {0};
+            vkCmdBindVertexBuffers(commandbuffers[i], 0, 1, vert_buffers, offsets);
+
+            vkCmdBindDescriptorSets(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
+                0, 1, shader_modules.get_descriptor_set(i), 0, nullptr);
+            vkCmdBindIndexBuffer(commandbuffers[i], index_buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            // This part is still kinda fixed, the first mesh's index count
+            vkCmdDrawIndexed(commandbuffers[i], mesh_mgr.meshes[0].icnt * 3, 1, 0, 0, 0);
+        vkCmdEndRenderPass(commandbuffers[i]);
+
+        if (vkEndCommandBuffer(commandbuffers[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to record command buffer!");
+
+        commandbuffer_created = true;
+    }
+}
+
 void VkWrappedInstance::create_sync_objects() {
     image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
     render_finished_semaphores.resize(MAX_FRAMES_IN_FLIGHT);

@@ -130,10 +130,11 @@ int main() {
     //ins.create_descriptor_set();
     modules.create_descriptor_pool_and_sets();
 
-    ins.create_commandbuffers();
+    //ins.create_commandbuffers();
+    ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
     ins.create_sync_objects();
 
-    //ins.mainloop();
+    ins.mainloop();
 
     return 0;
 }

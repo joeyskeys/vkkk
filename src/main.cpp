@@ -84,9 +84,11 @@ int main() {
     vkkk::ShaderModules modules{ &ins, &uniform_mgr };
     modules.add_module("../resource/shaders/depth_no_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/depth_no_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    //modules.add_module("../resource/shaders/default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    //modules.add_module("../resource/shaders/default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
 
-    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_LINE);
+    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
     ins.create_depth_resource();
     ins.create_framebuffers();
     ins.create_command_pool();
@@ -128,6 +130,19 @@ int main() {
     //ins.set_uniform_cbk(ubo_update);
     //ins.create_descriptor_pool();
     //ins.create_descriptor_set();
+
+    auto update_cbk = [&](uint32_t idx) {
+        auto ubo_ptr = uniform_mgr.find_ubo("UniformBufferObject");
+        if (!ubo_ptr)
+            return;
+        auto buf = reinterpret_cast<vkkk::MVPBuffer*>(ubo_ptr->cpu_buf.get());
+        buf->model = glm::mat4(1);
+        buf->view = cam.get_view_mat();
+        buf->proj = cam.get_proj_mat();
+        uniform_mgr.update_ubos(idx);
+    };
+    ins.set_update_cbk(update_cbk);
+
     modules.create_descriptor_pool_and_sets();
 
     //ins.create_commandbuffers();

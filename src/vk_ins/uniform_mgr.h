@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <filesystem>
+#include <unordered_map>
 #include <utility>
 
 #include <vulkan/vulkan.h>
@@ -26,10 +27,23 @@ public:
     bool add_texture(const std::string& name, VkShaderStageFlagBits t);
     void generate_writes();
     void set_dest_set(const uint32_t dst_set);
+    
+    inline UBO* find_ubo(const std::string& name) {
+        auto dest = ubos.find(name);
+        if (dest == ubos.end())
+            return nullptr;
+        return &(dest->second);
+    }
 
-    std::vector<UBO>                    ubos;
-    std::vector<Texture>                textures;
-    std::vector<VkWriteDescriptorSet>   writes;
+    inline void update_ubos(uint32_t idx) {
+        for (auto& [ubo_name, ubo] : ubos)
+            ubo.update(idx);
+    }
+
+    //std::vector<UBO>                      ubos;
+    std::unordered_map<std::string, UBO>    ubos;
+    std::vector<Texture>                    textures;
+    std::vector<VkWriteDescriptorSet>       writes;
 
 protected:
     VkWrappedInstance*                  instance;

@@ -186,7 +186,7 @@ void ShaderModules::create_descriptor_pool_and_sets() {
         m_descriptor_layout_bindings.emplace_back(std::move(binding));
     };
 
-    for (auto& ubo : uniform_mgr->ubos)
+    for (auto& [ubo_name, ubo] : uniform_mgr->ubos)
         setup_binding(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
     for (auto& tex : uniform_mgr->textures)
         setup_binding(tex, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
@@ -272,7 +272,7 @@ void ShaderModules::create_descriptor_pool_and_sets() {
         auto buf_infos = std::vector<VkDescriptorBufferInfo>(uniform_mgr->ubos.size());
         auto tex_infos = std::vector<VkDescriptorImageInfo>(uniform_mgr->textures.size());
         binding_cnt = 0;
-        for (int j = 0; auto& ubo : uniform_mgr->ubos) {
+        for (int j = 0; auto& [ubo_name, ubo] : uniform_mgr->ubos) {
             auto& buf_info = buf_infos[j];
             buf_info.offset = 0;
             buf_info.range = ubo.size * ubo.vecsize;

@@ -14,6 +14,7 @@ class UBO {
 public:
     VkWrappedInstance*                      instance;
     VkShaderStageFlagBits                   stage;
+    std::string                             name;
     size_t                                  size;
     size_t                                  vecsize;
     std::unique_ptr<char[]>                 cpu_buf;

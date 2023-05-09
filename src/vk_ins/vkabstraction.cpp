@@ -1395,7 +1395,7 @@ void VkWrappedInstance::create_commandbuffers() {
         renderpass_info.renderArea.extent = swapchain_extent;
 
         std::array<VkClearValue, 2> clear_values{};
-        clear_values[0].color = { {0.f, 0.f, 0.f, 1.f} };
+        clear_values[0].color = { {0.0f, 0.f, 0.f, 1.f} };
         clear_values[1].depthStencil = {1.f, 0};
         renderpass_info.clearValueCount = clear_values.size();
         renderpass_info.pClearValues = clear_values.data();
@@ -1453,7 +1453,7 @@ void VkWrappedInstance::create_commandbuffers(
         renderpass_info.renderArea.extent = swapchain_extent;
 
         std::array<VkClearValue, 2> clear_values{};
-        clear_values[0].color = { { 0.f, 0.f, 0.f, 1.f } };
+        clear_values[0].color = { { 0.1f, 0.f, 0.f, 1.f } };
         clear_values[1].depthStencil = { 1.f, 0 };
         renderpass_info.clearValueCount = clear_values.size();
         renderpass_info.pClearValues = clear_values.data();
@@ -1521,7 +1521,8 @@ void VkWrappedInstance::draw_frame() {
     images_in_flight[image_idx] = in_flight_fences[current_frame];
 
     //update_uniform_buffer(image_idx);
-    
+    if (update_cbk)
+        update_cbk(image_idx);
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;

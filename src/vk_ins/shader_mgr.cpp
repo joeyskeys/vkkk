@@ -154,21 +154,22 @@ std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_arra
 
 void ShaderModules::create_descriptor_pool_and_sets() {
     // Create the descriptor set layout
-    VkDescriptorSetLayoutBinding layout_binding{};
-    std::vector<VkDescriptorPoolSize> pool_sizes{};
+    //std::vector<VkDescriptorPoolSize> pool_sizes{};
     auto swapchain_img_cnt = instance->get_swapchain_cnt();
     m_descriptor_sets.resize(swapchain_img_cnt);
 
-    setup_pool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-        uniform_mgr->ubos.size() * instance->get_swapchain_cnt());
-    setup_pool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-        uniform_mgr->textures.size() * instance->get_swapchain_cnt());
+    if (uniform_mgr->ubos.size() > 0)
+        setup_pool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            uniform_mgr->ubos.size() * instance->get_swapchain_cnt());
+    if (uniform_mgr->textures.size() > 0)
+        setup_pool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            uniform_mgr->textures.size() * instance->get_swapchain_cnt());
 
     // Create the pool
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.poolSizeCount = pool_sizes.size();
-    pool_info.pPoolSizes = pool_sizes.data();
+    pool_info.poolSizeCount = m_pool_sizes.size();
+    pool_info.pPoolSizes = m_pool_sizes.data();
     pool_info.maxSets = swapchain_img_cnt;
 
     if (vkCreateDescriptorPool(device, &pool_info, nullptr, &m_descriptor_pool) != VK_SUCCESS)
@@ -306,6 +307,18 @@ void ShaderModules::create_descriptor_pool_and_sets() {
 
         vkUpdateDescriptorSets(instance->get_device(), writes.size(), writes.data(), 0, nullptr);
     }
+}
+
+void ShaderModules::create_descriptor_layouts() {
+
+}
+
+void ShaderModules::create_descriptor_pool() {
+
+}
+
+void ShaderModules::create_descriptor_set() {
+    
 }
 
 void ShaderModules::setup_pool(const VkDescriptorType des_type, const uint32_t cnt) {

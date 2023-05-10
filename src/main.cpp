@@ -46,7 +46,7 @@ bool check_validation_layer_support() {
     return true;
 }
 
-Camera cam{glm::vec3{0, 0, -5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1, 0.1, 100};
+Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E && action == GLFW_PRESS) {
@@ -70,7 +70,6 @@ void ubo_update(vkkk::MVPBuffer *buf) {
 }
 
 int main() {
-
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
@@ -87,11 +86,6 @@ int main() {
     //modules.add_module("../resource/shaders/default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     //modules.add_module("../resource/shaders/default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
-
-    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
-    ins.create_depth_resource();
-    ins.create_framebuffers();
-    ins.create_command_pool();
 
     /*
     ins.load_texture("../resource/textures/texture.jpeg");
@@ -119,17 +113,6 @@ int main() {
     };
     ins.create_index_buffer(indices.data(), indices.size());
     */
-    
-    auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/box.obj", vkkk::ONLY_VERTEX);
-    const auto& mesh = mesh_mgr.meshes[0];
-    ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
-    ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt);
-
-    //ins.create_uniform_buffer();
-    //ins.set_uniform_cbk(ubo_update);
-    //ins.create_descriptor_pool();
-    //ins.create_descriptor_set();
 
     auto update_cbk = [&](uint32_t idx) {
         auto ubo_ptr = uniform_mgr.find_ubo("UniformBufferObject");
@@ -144,6 +127,22 @@ int main() {
     ins.set_update_cbk(update_cbk);
 
     modules.create_descriptor_pool_and_sets();
+
+    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+    ins.create_depth_resource();
+    ins.create_framebuffers();
+    ins.create_command_pool();
+    
+    auto mesh_mgr = vkkk::MeshMgr::instance();
+    mesh_mgr.load_file("../resource/models/sphere.obj", vkkk::ONLY_VERTEX);
+    const auto& mesh = mesh_mgr.meshes[0];
+    ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
+    ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);
+
+    //ins.create_uniform_buffer();
+    //ins.set_uniform_cbk(ubo_update);
+    //ins.create_descriptor_pool();
+    //ins.create_descriptor_set();
 
     //ins.create_commandbuffers();
     ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);

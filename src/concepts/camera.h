@@ -18,6 +18,6 @@ public:
     }
 
     inline glm::mat4 get_proj_mat() const {
-        return glm::perspective(fov, ratio, near, far);
+        return glm::perspective(glm::radians(fov), ratio, near, far);
     }
 };

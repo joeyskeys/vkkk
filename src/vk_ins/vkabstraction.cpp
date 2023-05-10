@@ -1035,7 +1035,8 @@ void VkWrappedInstance::create_graphics_pipeline(
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount = 1;
-    pipeline_layout_info.pSetLayouts = &descriptor_layout;
+    //pipeline_layout_info.pSetLayouts = &descriptor_layout;
+    pipeline_layout_info.pSetLayouts = modules.get_descriptor_set_layout();
 
     if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS)
         throw std::runtime_error("failed to create pipeline layout!");

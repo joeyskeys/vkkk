@@ -76,7 +76,7 @@ int main() {
     auto swapchain_img_cnt = ins.create_swapchain();
     ins.create_imageviews();
     ins.create_renderpass();
-    ins.create_descriptor_set_layout();
+    //ins.create_descriptor_set_layout();
     //ins.create_graphics_pipeline();
 
     vkkk::UniformMgr uniform_mgr{ &ins };
@@ -126,9 +126,22 @@ int main() {
     };
     ins.set_update_cbk(update_cbk);
 
-    modules.create_descriptor_pool_and_sets();
+    //modules.create_descriptor_pool_and_sets();
+    modules.create_descriptor_layouts();
 
     ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+
+    modules.create_descriptor_pool();
+    modules.create_descriptor_set();
+    /*
+    ins.create_descriptor_pool();
+    ins.uniform_buffers.resize(ins.get_swapchain_cnt());
+    for (int i = ins.get_swapchain_cnt(); i > 0; --i) {
+        ins.uniform_buffers[i] = uniform_mgr.ubos.at(std::string("UniformBufferObject")).gpu_bufs[i];
+    }
+    ins.create_descriptor_set();
+    */
+
     ins.create_depth_resource();
     ins.create_framebuffers();
     ins.create_command_pool();

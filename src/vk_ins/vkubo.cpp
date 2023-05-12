@@ -31,6 +31,7 @@ UBO::~UBO() {
 
 UBO::UBO(UBO&& rhs)
     : instance(rhs.instance)
+    , stage(rhs.stage)
     , size(rhs.size)
     , vecsize(rhs.vecsize)
     , cpu_buf(std::move(rhs.cpu_buf))

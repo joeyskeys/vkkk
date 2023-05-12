@@ -23,7 +23,8 @@ void main() {
         0.0, 0.0, -1.02, -1,
         0.0, 0.0, -1.02, 0.0
     );
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * vec4(inPosition, 1.0);
+    //gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
     //gl_Position = proj * view * vec4(inPosition, 1.0);
     fragColor = vec3(1.0, 0.2, 0.2);
 }

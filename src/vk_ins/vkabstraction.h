@@ -323,7 +323,7 @@ private:
     VkBuffer                        index_buffer;
     VkDeviceMemory                  index_buffer_memo;
     bool                            indexbuffer_created = false;
-    std::vector<VkBuffer>           uniform_buffers;
+    //std::vector<VkBuffer>           uniform_buffers;
     std::vector<VkDeviceMemory>     uniform_buffer_memos;
     bool                            uniform_buffer_created = false;
 
@@ -335,6 +335,9 @@ private:
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;
+
+public:
+    std::vector<VkBuffer>           uniform_buffers;
 };
 
 }

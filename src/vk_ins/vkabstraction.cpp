@@ -784,7 +784,8 @@ void VkWrappedInstance::create_descriptor_set_layout() {
     spl_layout_binding.pImmutableSamplers = nullptr;
     spl_layout_binding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    std::array<VkDescriptorSetLayoutBinding, 2> bindings = {layout_binding, spl_layout_binding};
+    //std::array<VkDescriptorSetLayoutBinding, 2> bindings = {layout_binding, spl_layout_binding};
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings = {layout_binding};
     VkDescriptorSetLayoutCreateInfo layout_info{};
     layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layout_info.bindingCount = bindings.size();
@@ -1299,11 +1300,12 @@ void VkWrappedInstance::create_depth_resource() {
 }
 
 void VkWrappedInstance::create_descriptor_pool() {
-    std::array<VkDescriptorPoolSize, 2> pool_sizes{};
+    //std::array<VkDescriptorPoolSize, 2> pool_sizes{};
+    std::array<VkDescriptorPoolSize, 1> pool_sizes{};
     pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     pool_sizes[0].descriptorCount = static_cast<uint32_t>(swapchain_images.size());
-    pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    pool_sizes[1].descriptorCount = static_cast<uint32_t>(swapchain_images.size());
+    //pool_sizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    //pool_sizes[1].descriptorCount = static_cast<uint32_t>(swapchain_images.size());
 
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -1340,7 +1342,8 @@ void VkWrappedInstance::create_descriptor_set() {
         img_info.imageView = tex_view;
         img_info.sampler = texture_sampler;
 
-        std::array<VkWriteDescriptorSet, 2> descriptor_writes{};
+        //std::array<VkWriteDescriptorSet, 2> descriptor_writes{};
+        std::array<VkWriteDescriptorSet, 1> descriptor_writes{};
 
         descriptor_writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptor_writes[0].dstSet = descriptor_sets[i];
@@ -1350,6 +1353,7 @@ void VkWrappedInstance::create_descriptor_set() {
         descriptor_writes[0].descriptorCount = 1;
         descriptor_writes[0].pBufferInfo = &buf_info;
 
+        /*
         descriptor_writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         descriptor_writes[1].dstSet = descriptor_sets[i];
         descriptor_writes[1].dstBinding = 1;
@@ -1357,6 +1361,7 @@ void VkWrappedInstance::create_descriptor_set() {
         descriptor_writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         descriptor_writes[1].descriptorCount = 1;
         descriptor_writes[1].pImageInfo = &img_info;
+        */
 
         vkUpdateDescriptorSets(device, descriptor_writes.size(), descriptor_writes.data(), 0, nullptr);
     }
@@ -1469,6 +1474,8 @@ void VkWrappedInstance::create_commandbuffers(
 
             vkCmdBindDescriptorSets(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
                 0, 1, shader_modules.get_descriptor_set(i), 0, nullptr);
+            //vkCmdBindDescriptorSets(commandbuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout,
+                //0, 1, &descriptor_sets[i], 0, nullptr);
             vkCmdBindIndexBuffer(commandbuffers[i], index_buffer, 0, VK_INDEX_TYPE_UINT32);
 
             // This part is still kinda fixed, the first mesh's index count

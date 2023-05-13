@@ -115,7 +115,7 @@ int main() {
     */
 
     auto update_cbk = [&](uint32_t idx) {
-        auto ubo_ptr = uniform_mgr.find_ubo("UniformBufferObject");
+        auto ubo_ptr = uniform_mgr.find_ubo("ubo");
         if (!ubo_ptr)
             return;
         auto buf = reinterpret_cast<vkkk::MVPBuffer*>(ubo_ptr->cpu_buf.get());

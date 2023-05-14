@@ -1528,9 +1528,13 @@ void VkWrappedInstance::draw_frame() {
         vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
     images_in_flight[image_idx] = in_flight_fences[current_frame];
 
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - time);
+    time = now;
+
     //update_uniform_buffer(image_idx);
     if (update_cbk)
-        update_cbk(image_idx);
+        update_cbk(image_idx, duration.count());
 
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -1643,6 +1647,10 @@ VkExtent2D VkWrappedInstance::choose_swap_extent(const VkSurfaceCapabilitiesKHR&
         actual_extent.height = std::clamp(actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
         return actual_extent;
     }
+}
+
+void VkWrappedInstance::setup_key_cbk(KeyCBK cbk) {
+    glfwSetKeyCallback(window, cbk);
 }
 
 }

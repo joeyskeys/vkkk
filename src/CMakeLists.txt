@@ -1,6 +1,7 @@
 set(HEADERS
     asset_mgr/mesh.h
     asset_mgr/mesh_mgr.h
+    concepts/camera.h
     gui/gui.h
     utils/common.h
     utils/io.h
@@ -15,6 +16,7 @@ set(HEADERS
 set(SRCS
     asset_mgr/mesh.cpp
     asset_mgr/mesh_mgr.cpp
+    concepts/camera.cpp
     gui/gui.cpp
     vk_ins/misc.cpp
     vk_ins/shader_mgr.cpp

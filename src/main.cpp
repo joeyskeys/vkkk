@@ -49,17 +49,41 @@ bool check_validation_layer_support() {
 Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
-    if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-        cam.pos.z += 0.2;
+    if (key == GLFW_KEY_E) {
+        if (action == GLFW_PRESS)
+            cam.y = 1.f;
+        else
+            cam.y = 0.f;
     }
-    else if (key == GLFW_KEY_S && action == GLFW_PRESS) {
-        cam.pos.z -= 0.2;
+    else if (key == GLFW_KEY_Q) {
+        if (action == GLFW_PRESS)
+            cam.y = -1.f;
+        else
+            cam.y = 0.f;
     }
-    else if (key == GLFW_KEY_A && action == GLFW_PRESS) {
-        cam.pos.x -= 0.2;
+    else if (key == GLFW_KEY_W) {
+        if (action == GLFW_PRESS)
+            cam.z = 1.f;
+        else
+            cam.z = 0.f;
     }
-    else if (key == GLFW_KEY_D && action == GLFW_PRESS) {
-        cam.pos.x += 0.2;
+    else if (key == GLFW_KEY_S) {
+        if (action == GLFW_PRESS)
+            cam.z = -1.f;
+        else
+            cam.z = 0.f;
+    }
+    else if (key == GLFW_KEY_A) {
+        if (action == GLFW_PRESS)
+            cam.x = -1.f;
+        else
+            cam.x = 0.f;
+    }
+    else if (key == GLFW_KEY_D) {
+        if (action == GLFW_PRESS)
+            cam.x = 1.f;
+        else
+            cam.x = 0.f;
     }
 }
 
@@ -114,7 +138,8 @@ int main() {
     ins.create_index_buffer(indices.data(), indices.size());
     */
 
-    auto update_cbk = [&](uint32_t idx) {
+    auto update_cbk = [&](uint32_t idx, float duration) {
+        cam.update_position(duration);
         auto ubo_ptr = uniform_mgr.find_ubo("UniformBufferObject");
         if (!ubo_ptr)
             return;
@@ -160,6 +185,8 @@ int main() {
     //ins.create_commandbuffers();
     ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
     ins.create_sync_objects();
+
+    ins.setup_key_cbk(key_callback);
 
     ins.mainloop();
 

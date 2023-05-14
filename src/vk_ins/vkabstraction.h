@@ -90,7 +90,7 @@ struct MVPBuffer {
 };
 
 using UniformUpdateCBK = std::function<void(MVPBuffer*)>;
-using UpdateCBK = std::function<void(uint32_t)>;
+using UpdateCBK = std::function<void(uint32_t, float)>;
 
 class VkWrappedInstance {
 public:
@@ -184,6 +184,9 @@ public:
     void draw_frame();
     void mainloop();
 
+    using KeyCBK = void(*)(GLFWwindow*, int, int, int, int);
+    void setup_key_cbk(KeyCBK);
+
 private:
     // Private methods
     std::vector<const char*> get_default_instance_extensions();
@@ -224,6 +227,10 @@ private:
 
     inline bool has_stencil_comp(VkFormat format) {
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+    }
+
+    inline void init_time() {
+        time = std::chrono::high_resolution_clock::now();
     }
 
 private:
@@ -335,6 +342,7 @@ private:
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;
+    std::chrono::time_point<std::chrono::system_clock>  time;
 
 public:
     std::vector<VkBuffer>           uniform_buffers;

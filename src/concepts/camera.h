@@ -12,6 +12,10 @@ public:
     float ratio;
     float near;
     float far;
+    float speed = 1.f;
+    float x = 0.f;
+    float y = 0.f;
+    float z = 0.f;
 
     inline glm::mat4 get_view_mat() const {
         return glm::lookAt(pos, pos + front, up);
@@ -20,4 +24,6 @@ public:
     inline glm::mat4 get_proj_mat() const {
         return glm::perspective(glm::radians(fov), ratio, near, far);
     }
+
+    void update_position(float duration);
 };

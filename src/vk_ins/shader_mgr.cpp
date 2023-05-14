@@ -50,8 +50,9 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     uint32_t binding_idx;
 
     for (auto& ubo : res.uniform_buffers) {
+        auto name = comp.get_name(ubo.id);
         type_info = comp.get_type(ubo.base_type_id);
-        m_buf_brefs.emplace_back(ubo.name, t, comp.get_declared_struct_size(type_info));
+        m_buf_brefs.emplace_back(name, t, comp.get_declared_struct_size(type_info));
     }
 
     for (auto& sampler : res.sampled_images) {

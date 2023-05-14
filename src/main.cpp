@@ -140,7 +140,7 @@ int main() {
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
-        auto ubo_ptr = uniform_mgr.find_ubo("UniformBufferObject");
+        auto ubo_ptr = uniform_mgr.find_ubo("ubo");
         if (!ubo_ptr)
             return;
         auto buf = reinterpret_cast<vkkk::MVPBuffer*>(ubo_ptr->cpu_buf.get());
@@ -185,8 +185,6 @@ int main() {
     //ins.create_commandbuffers();
     ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
     ins.create_sync_objects();
-
-    ins.setup_key_cbk(key_callback);
 
     ins.mainloop();
 

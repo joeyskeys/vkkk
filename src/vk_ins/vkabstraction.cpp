@@ -1653,4 +1653,12 @@ void VkWrappedInstance::setup_key_cbk(KeyCBK cbk) {
     glfwSetKeyCallback(window, cbk);
 }
 
+void VkWrappedInstance::setup_mouse_btn_cbk(MouseBtnCBK cbk) {
+    glfwSetMouseButtonCallback(window, cbk);
+}
+
+void VkWrappedInstance::setup_mouse_pos_cbk(MousePosCBK cbk) {
+    glfwSetCursorPosCallback(window, cbk);
+}
+
 }

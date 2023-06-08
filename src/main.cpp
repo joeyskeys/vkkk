@@ -87,6 +87,28 @@ void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     }
 }
 
+void mouse_btn_callback(GLFWwindow* win, int btn, int action, int mods) {
+    if (btn == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            cam.rotating = true;
+            glfwGetCursorPos(win, &cam.prev_x, &cam.prev_y);
+        }
+        else
+            cam.rotating = false;
+    }
+}
+
+void mouse_pos_callback(GLFWwindow* win, double x, double y) {
+    if (cam.rotating) {
+        float delta_x = (x - cam.prev_x) / 100.0;
+        float delta_y = (y - cam.prev_y) / 100.0;
+        cam.prev_x = x;
+        cam.prev_y = y;
+        cam.rotation = glm::angleAxis(delta_x, glm::vec3(0, 1, 0));
+        cam.rotation = glm::angleAxis(-delta_y, glm::vec3(1, 0, 0)) * cam.rotation;
+    }
+}
+
 void ubo_update(vkkk::MVPBuffer *buf) {
     buf->model = glm::mat4(1);
     buf->view = cam.get_view_mat();
@@ -140,6 +162,7 @@ int main() {
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
+        cam.update_orientation();
         auto ubo_ptr = uniform_mgr.find_ubo("ubo");
         if (!ubo_ptr)
             return;
@@ -150,6 +173,9 @@ int main() {
         uniform_mgr.update_ubos(idx);
     };
     ins.set_update_cbk(update_cbk);
+    ins.setup_key_cbk(key_callback);
+    ins.setup_mouse_btn_cbk(mouse_btn_callback);
+    ins.setup_mouse_pos_cbk(mouse_pos_callback);
 
     //modules.create_descriptor_pool_and_sets();
     modules.create_descriptor_layouts();

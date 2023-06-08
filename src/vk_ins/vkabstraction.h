@@ -186,6 +186,10 @@ public:
 
     using KeyCBK = void(*)(GLFWwindow*, int, int, int, int);
     void setup_key_cbk(KeyCBK);
+    using MouseBtnCBK = void(*)(GLFWwindow*, int, int, int);
+    void setup_mouse_btn_cbk(MouseBtnCBK);
+    using MousePosCBK = void(*)(GLFWwindow*, double, double);
+    void setup_mouse_pos_cbk(MousePosCBK);
 
 private:
     // Private methods

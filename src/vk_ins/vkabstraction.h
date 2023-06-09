@@ -346,7 +346,7 @@ private:
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;
-    std::chrono::time_point<std::chrono::system_clock>  time;
+    std::chrono::time_point<std::chrono::steady_clock>  time;
 
 public:
     std::vector<VkBuffer>           uniform_buffers;

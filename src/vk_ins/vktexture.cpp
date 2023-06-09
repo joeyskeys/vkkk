@@ -53,13 +53,13 @@ bool Texture::load_image(const fs::path& path) {
     OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(oiio_buf, 4, ch_ords, ch_vals, ch_names);
 
     auto spec = with_alpha_buf.spec();
-    int w = spec.width;
-    int h = spec.height;
-    std::cout << "tex w : " << w << ", h : " << h << std::endl;
-    VkDeviceSize image_size = w * h * sizeof(Pixel);
+    width = spec.width;
+    height = spec.height;
+    std::cout << "tex w : " << width << ", h : " << height << std::endl;
+    VkDeviceSize image_size = width * height * sizeof(Pixel);
 
     std::vector<Pixel> pixels;
-    pixels.resize(w * h);
+    pixels.resize(width * height);
     with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
 
     VkBuffer staging_buf;
@@ -73,12 +73,12 @@ bool Texture::load_image(const fs::path& path) {
         memcpy(data, pixels.data(), static_cast<size_t>(image_size));
     vkUnmapMemory(instance->get_device(), staging_buf_memo);
 
-    instance->create_vk_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+    instance->create_vk_image(width, height, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
     instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        instance->copy_buffer_to_image(staging_buf, image, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
+        instance->copy_buffer_to_image(staging_buf, image, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
     instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     vkDestroyBuffer(instance->get_device(), staging_buf, nullptr);

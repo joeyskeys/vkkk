@@ -32,12 +32,11 @@ bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
     return true;
 }
 
-bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t) {
+bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t, const std::string& path) {
     auto tex = Texture(instance, name, t);
-    /*
     if (!tex.load_image(path))
         return false;
-    */
+
     textures.emplace_back(std::move(tex));
     return true;
 }

@@ -26,6 +26,7 @@ public:
     virtual ~ShaderModules();
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
+    void assign_tex_image(const std::string& tex_name, const std::string& tex_path);
     void alloc_uniforms(const texture_map& img_paths);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
     void create_descriptor_pool_and_sets();
@@ -68,8 +69,10 @@ private:
     using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
         uint32_t>;
     using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits>;
+    using TexImgPairs = std::unordered_map<std::string, std::string>;
     std::vector<BufInfoWithBinding> m_buf_brefs;
     std::vector<ImgInfoWithBinding> m_img_brefs;
+    TexImgPairs                     m_tex_img_pairs;
 
     std::vector<VkDescriptorBufferInfo> m_buf_infos;
     std::vector<VkDescriptorImageInfo>  m_img_infos;

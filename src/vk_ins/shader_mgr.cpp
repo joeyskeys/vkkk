@@ -1,3 +1,5 @@
+#include <fmt/format.h>
+
 #include "utils/io.h"
 #include "vk_ins/vkabstraction.h"
 #include "vk_ins/shader_mgr.h"
@@ -62,6 +64,10 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     return true;
 }
 
+void ShaderModules::assign_tex_image(const std::string& tex_name, const std::string& tex_path) {
+    m_tex_img_pairs[tex_name] = tex_path;
+}
+
 void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
     for (auto& bref : m_buf_brefs) {
         auto [name, stage, size] = bref;
@@ -69,7 +75,10 @@ void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
     }
     for (auto& bref : m_img_brefs) {
         auto [name, stage] = bref;
-        uniform_mgr->add_texture(name, stage);
+        auto path = m_tex_img_pairs.find(name);
+        if (path == m_tex_img_pairs.end())
+            throw std::runtime_error(fmt::format("texure image for sampler {} not assigned", name));
+        uniform_mgr->add_texture(name, stage, path->second);
     }
 }
 
@@ -170,7 +179,7 @@ void ShaderModules::create_descriptor_pool_and_sets() {
             write.pBufferInfo = &buf_info;
         }
         for (int j = 0; auto& tex : uniform_mgr->textures) {
-            auto tex_info = tex_infos[j];
+            auto& tex_info = tex_infos[j];
             tex_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             tex_info.imageView = tex.view;
             tex_info.sampler = tex.sampler;
@@ -278,7 +287,7 @@ void ShaderModules::create_descriptor_set() {
             write.pBufferInfo = &buf_info;
         }
         for (int j = 0; auto& tex : uniform_mgr->textures) {
-            auto tex_info = tex_infos[j];
+            auto& tex_info = tex_infos[j];
             tex_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             tex_info.imageView = tex.view;
             tex_info.sampler = tex.sampler;

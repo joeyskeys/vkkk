@@ -125,12 +125,17 @@ int main() {
     //ins.create_descriptor_set_layout();
     //ins.create_graphics_pipeline();
 
+    ins.create_command_pool();
+
     vkkk::UniformMgr uniform_mgr{ &ins };
     vkkk::ShaderModules modules{ &ins, &uniform_mgr };
-    modules.add_module("../resource/shaders/depth_no_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    modules.add_module("../resource/shaders/depth_no_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    //modules.add_module("../resource/shaders/default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    //modules.add_module("../resource/shaders/default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    // Seperation of sampler in shader and it's corresponding texture image
+    // allows a more flexible way of texture assigning
+    modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
+
     modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
 
     /*
@@ -180,7 +185,7 @@ int main() {
     //modules.create_descriptor_pool_and_sets();
     modules.create_descriptor_layouts();
 
-    ins.create_graphics_pipeline(modules, vkkk::ONLY_VERTEX, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+    ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
 
     modules.create_descriptor_pool();
     modules.create_descriptor_set();
@@ -195,10 +200,9 @@ int main() {
 
     ins.create_depth_resource();
     ins.create_framebuffers();
-    ins.create_command_pool();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/sphere.obj", vkkk::ONLY_VERTEX);
+    mesh_mgr.load_file("../resource/models/moon.obj", vkkk::WITH_UV);
     const auto& mesh = mesh_mgr.meshes[0];
     ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);

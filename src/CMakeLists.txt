@@ -43,3 +43,8 @@ add_executable(vktest main.cpp)
 target_link_libraries(vktest
     vkkk
     ${OIIO_LIBRARIES})
+
+add_executable(vktutor tutor_main.cpp)
+target_link_libraries(vktutor
+    vkkk
+    ${OIIO_LIBRARIES})

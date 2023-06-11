@@ -19,6 +19,26 @@ Texture::~Texture() {
         destroy();
 }
 
+Texture::Texture(Texture&& t)
+    : instance(t.instance)
+    , name(std::move(t.name))
+    , stage(t.stage)
+    , vecsize(t.vecsize)
+    , image(t.image)
+    , image_layout(t.image_layout)
+    , memory(t.memory)
+    , view(t.view)
+    , width(t.width)
+    , height(t.height)
+    , mipmap_lv(t.mipmap_lv)
+    , layout_cnt(t.layout_cnt)
+    , descriptor(t.descriptor)
+    , sampler(t.sampler)
+    , loaded(t.loaded)
+{
+    t.loaded = false;
+}
+
 void Texture::update_descriptor() {
     descriptor.sampler = sampler;
     descriptor.imageView = view;
@@ -84,6 +104,16 @@ bool Texture::load_image(const fs::path& path) {
     vkDestroyBuffer(instance->get_device(), staging_buf, nullptr);
     vkFreeMemory(instance->get_device(), staging_buf_memo, nullptr);
 
+    // Create imageview
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    view_info.image = image;
+    if (vkCreateImageView(instance->get_device(), &view_info, nullptr, &view) != VK_SUCCESS)
+        throw std::runtime_error(fmt::format("failed to create imageview for texture {}", name));
+
     // Create sampler
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
@@ -94,27 +124,16 @@ bool Texture::load_image(const fs::path& path) {
     sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.mipLodBias = 0.f;
-    sampler_info.compareOp = VK_COMPARE_OP_NEVER;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
     sampler_info.minLod = 0.f;
     sampler_info.maxLod = 0.f;
     sampler_info.maxAnisotropy = 1.f;
     sampler_info.anisotropyEnable = false;
     sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
     if (vkCreateSampler(instance->get_device(), &sampler_info, nullptr, &sampler) != VK_SUCCESS)
         throw std::runtime_error(fmt::format("failed to create sampler for texture {}", name));
-
-    // Create imageview
-    VkImageViewCreateInfo view_info{};
-    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
-    view_info.components = {VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G,
-        VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A};
-    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-    view_info.subresourceRange.levelCount = 1;
-    view_info.image = image;
-    if (vkCreateImageView(instance->get_device(), &view_info, nullptr, &view) != VK_SUCCESS)
-        throw std::runtime_error(fmt::format("failed to create imageview for texture {}", name));
 
     update_descriptor();
 

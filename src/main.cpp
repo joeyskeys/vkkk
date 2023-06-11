@@ -187,6 +187,8 @@ int main() {
 
     ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
 
+    ins.create_framebuffers();
+
     modules.create_descriptor_pool();
     modules.create_descriptor_set();
     /*
@@ -198,8 +200,7 @@ int main() {
     ins.create_descriptor_set();
     */
 
-    ins.create_depth_resource();
-    ins.create_framebuffers();
+    //ins.create_depth_resource();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
     mesh_mgr.load_file("../resource/models/moon.obj", vkkk::WITH_UV);

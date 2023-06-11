@@ -180,6 +180,8 @@ public:
     void create_descriptors(const ShaderModules& modules);
     void create_commandbuffers();
     void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
+    void record_commandbuffers(VkCommandBuffer, uint32_t);
+    void record_commandbuffers(VkCommandBuffer, uint32_t, VkDescriptorSet*);
     void create_sync_objects();
     void draw_frame();
     void mainloop();
@@ -346,7 +348,7 @@ private:
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;
-    std::chrono::time_point<std::chrono::steady_clock>  time;
+    std::chrono::time_point<std::chrono::system_clock>  time;
 
 public:
     std::vector<VkBuffer>           uniform_buffers;

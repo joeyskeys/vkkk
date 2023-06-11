@@ -31,6 +31,7 @@ public:
     Texture(VkWrappedInstance* ins, const std::string& n,
         VkShaderStageFlagBits t=VK_SHADER_STAGE_VERTEX_BIT);
     ~Texture();
+    Texture(Texture&& t);
 
     void update_descriptor();
     void destroy();

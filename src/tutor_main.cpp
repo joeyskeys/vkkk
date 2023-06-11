@@ -38,6 +38,17 @@ bool check_validation_layer_support() {
 }
 
 int main() {
+    const std::vector<vkkk::VertexTmp> vertices = {
+        {{-0.5f, -0.5f, -1.f}, {1.0f, 0.0f, 0.0f}, {1.0f, 0.0f}},
+        {{0.5f, -0.5f, -1.f}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}},
+        {{0.5f, 0.5f, -1.f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f}},
+        {{-0.5f, 0.5f, -1.f}, {1.0f, 1.0f, 1.0f}, {1.0f, 1.0f}}
+    };
+
+    const std::vector<uint32_t> indices = {
+        0, 1, 2, 2, 3, 0
+    };
+
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
     ins.create_logical_device();
@@ -46,10 +57,16 @@ int main() {
     ins.create_renderpass();
     ins.create_descriptor_set_layout();
     ins.create_graphics_pipeline();
+    ins.create_framebuffers();
     ins.create_command_pool();
+    ins.load_texture("../resource/textures/texture.jpeg");
+    ins.create_texture_imageviews();
+    ins.create_texture_sampler();
+    ins.create_vertex_buffer(vertices.data(), vertices.size());
+    ins.create_index_buffer(indices.data(), indices.size());
+    ins.create_uniform_buffer();
     ins.create_descriptor_pool();
     ins.create_descriptor_set();
-    ins.create_uniform_buffer();
     ins.create_commandbuffers();
     ins.create_sync_objects();
     ins.mainloop();

@@ -299,7 +299,8 @@ void ShaderModules::create_descriptor_set() {
             write.dstArrayElement = 0;
             write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             write.descriptorCount = 1;
-            write.pImageInfo = &tex_info;
+            //write.pImageInfo = &tex_info;
+            write.pImageInfo = &tex.descriptor;
             j++;
         }
 

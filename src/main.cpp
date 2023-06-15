@@ -132,7 +132,7 @@ int main() {
 
     // Seperation of sampler in shader and it's corresponding texture image
     // allows a more flexible way of texture assigning
-    modules.assign_tex_image("tex_sampler", "../resource/textures/viking_room.png");
+    modules.assign_tex_image("tex_sampler", "../resource/textures/vnums.png");
 
     modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
 
@@ -164,7 +164,7 @@ int main() {
     modules.create_descriptor_set();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/viking_room.obj", vkkk::WITH_UV);
+    mesh_mgr.load_file("../resource/models/plane.obj", vkkk::WITH_UV);
     const auto& mesh = mesh_mgr.meshes[0];
     ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);

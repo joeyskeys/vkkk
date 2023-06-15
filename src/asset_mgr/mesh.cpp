@@ -55,7 +55,7 @@ void Mesh::load(aiMesh *mesh) {
 
         for (uint32_t i = 0; i < vcnt; ++i) {
             auto uv = mesh->mTextureCoords[0][i];
-            vbuf[i * comp_size + 3] = 1.f- uv.x;
+            vbuf[i * comp_size + 3] = uv.x;
             vbuf[i * comp_size + 4] = uv.y;
         }
     }

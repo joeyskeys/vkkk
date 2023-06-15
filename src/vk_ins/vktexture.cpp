@@ -66,6 +66,7 @@ bool Texture::load_image(const fs::path& path) {
         throw std::runtime_error(fmt::format("texture init spec failed : {}", abs_path.string()));
 
     oiio_buf.read();
+    oiio_buf = OIIO::ImageBufAlgo::flip(oiio_buf);
 
     int ch_ords[] = {0, 1, 2, -1};
     float ch_vals[] = {0, 0, 0, 1.f};

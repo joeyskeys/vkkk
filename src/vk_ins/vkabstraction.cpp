@@ -708,7 +708,6 @@ void VkWrappedInstance::create_renderpass() {
     attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     
-    /*
     VkAttachmentDescription depth_attach{};
     depth_attach.format = find_depth_format();
     depth_attach.samples = VK_SAMPLE_COUNT_1_BIT;
@@ -718,42 +717,34 @@ void VkWrappedInstance::create_renderpass() {
     depth_attach.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attach.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     depth_attach.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    */
 
     VkAttachmentReference attachment_ref{};
     attachment_ref.attachment = 0;
     attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
-    /*
     VkAttachmentReference depth_attach_ref{};
     depth_attach_ref.attachment = 1;
     depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-    */
 
     VkSubpassDescription subpass{};
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &attachment_ref;
-    //subpass.pDepthStencilAttachment = &depth_attach_ref;
+    subpass.pDepthStencilAttachment = &depth_attach_ref;
 
     VkSubpassDependency dependency{};
     dependency.srcSubpass = VK_SUBPASS_EXTERNAL;
     dependency.dstSubpass = 0;
-    //dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    dependency.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.srcAccessMask = 0;
-    //dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
-    //dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-    dependency.dstAccessMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
+    dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    //std::array<VkAttachmentDescription, 2> attachments = {attachment, depth_attach};
+    std::array<VkAttachmentDescription, 2> attachments = {attachment, depth_attach};
     VkRenderPassCreateInfo pass_info{};
     pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    //pass_info.attachmentCount = attachments.size();
-    //pass_info.pAttachments = attachments.data();
-    pass_info.attachmentCount = 1;
-    pass_info.pAttachments = &attachment;
+    pass_info.attachmentCount = attachments.size();
+    pass_info.pAttachments = attachments.data();
     pass_info.subpassCount = 1;
     pass_info.pSubpasses = &subpass;
     pass_info.dependencyCount = 1;
@@ -1374,10 +1365,6 @@ void VkWrappedInstance::create_descriptor_set() {
     }
 }
 
-void VkWrappedInstance::create_descriptors(const ShaderModules& modules) {
-
-}
-
 void VkWrappedInstance::create_commandbuffers() {
     if (!commandpool_created)
         throw std::runtime_error("command pool not created!");
@@ -1410,14 +1397,11 @@ void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t 
     renderpass_info.renderArea.offset = { 0, 0 };
     renderpass_info.renderArea.extent = swapchain_extent;
 
-    //std::array<VkClearValue, 2> clear_values{};
-    //clear_values[0].color = { {0.0f, 0.f, 0.f, 1.f} };
-    //clear_values[1].depthStencil = {1.f, 0};
-    //renderpass_info.clearValueCount = clear_values.size();
-    //renderpass_info.pClearValues = clear_values.data();
-    VkClearValue clearColor = {{{0.f, 0.f, 0.f, 1.f}}};
-    renderpass_info.clearValueCount = 1;
-    renderpass_info.pClearValues = &clearColor;
+    std::array<VkClearValue, 2> clear_values{};
+    clear_values[0].color = { {0.0f, 0.f, 0.f, 1.f} };
+    clear_values[1].depthStencil = {1.f, 0};
+    renderpass_info.clearValueCount = clear_values.size();
+    renderpass_info.pClearValues = clear_values.data();
 
     vkCmdBeginRenderPass(cmd_buf, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
         vkCmdBindPipeline(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);

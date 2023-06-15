@@ -36,7 +36,7 @@ Mesh::Mesh(Mesh&& b) {
 void Mesh::load(aiMesh *mesh) {
     vcnt = mesh->mNumVertices;
     icnt = mesh->mNumFaces;
-    comp_size = 3 + 3 * (comp_flag & COLOR_BIT) + 2 * (comp_flag & UV_BIT >> 1);
+    comp_size = 3 + 3 * (comp_flag & COLOR_BIT) + 2 * (comp_flag & UV_BIT);
 
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
@@ -55,7 +55,7 @@ void Mesh::load(aiMesh *mesh) {
 
         for (uint32_t i = 0; i < vcnt; ++i) {
             auto uv = mesh->mTextureCoords[0][i];
-            vbuf[i * comp_size + 3] = uv.x;
+            vbuf[i * comp_size + 3] = 1.f- uv.x;
             vbuf[i * comp_size + 4] = uv.y;
         }
     }

@@ -54,11 +54,14 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     for (auto& ubo : res.uniform_buffers) {
         auto name = comp.get_name(ubo.id);
         type_info = comp.get_type(ubo.base_type_id);
-        m_buf_brefs.emplace_back(name, t, comp.get_declared_struct_size(type_info));
+        binding_idx = comp.get_decoration(ubo.id, spv::DecorationBinding);
+        m_buf_brefs.emplace_back(name, t, comp.get_declared_struct_size(type_info),
+            binding_idx);
     }
 
     for (auto& sampler : res.sampled_images) {
-        m_img_brefs.emplace_back(sampler.name, t);
+        binding_idx = comp.get_decoration(sampler.id, spv::DecorationBinding);
+        m_img_brefs.emplace_back(sampler.name, t, binding_idx);
     }
 
     return true;

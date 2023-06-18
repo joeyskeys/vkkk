@@ -67,8 +67,9 @@ private:
     std::unordered_map<VkShaderStageFlagBits, std::vector<VkSampler>> m_sampler_resources;
 
     using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
+        uint32_t, uint32_t>;
+    using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
         uint32_t>;
-    using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits>;
     using TexImgPairs = std::unordered_map<std::string, std::string>;
     std::vector<BufInfoWithBinding> m_buf_brefs;
     std::vector<ImgInfoWithBinding> m_img_brefs;

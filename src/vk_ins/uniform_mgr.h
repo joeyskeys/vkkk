@@ -23,9 +23,9 @@ public:
     virtual ~UniformMgr();
 
     bool add_buffer(const std::string& name, VkShaderStageFlagBits t,
-        uint32_t size, uint32_t vecsize=1);
+        uint32_t binding, uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, VkShaderStageFlagBits t,
-        const std::string& path);
+        uint32_t binding, const std::string& path);
     void generate_writes();
     void set_dest_set(const uint32_t dst_set);
     

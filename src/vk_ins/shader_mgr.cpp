@@ -73,15 +73,15 @@ void ShaderModules::assign_tex_image(const std::string& tex_name, const std::str
 
 void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
     for (auto& bref : m_buf_brefs) {
-        auto [name, stage, size] = bref;
-        uniform_mgr->add_buffer(name, stage, size);
+        auto [name, stage, size, binding] = bref;
+        uniform_mgr->add_buffer(name, stage, binding, size);
     }
     for (auto& bref : m_img_brefs) {
-        auto [name, stage] = bref;
+        auto [name, stage, binding] = bref;
         auto path = m_tex_img_pairs.find(name);
         if (path == m_tex_img_pairs.end())
             throw std::runtime_error(fmt::format("texure image for sampler {} not assigned", name));
-        uniform_mgr->add_texture(name, stage, path->second);
+        uniform_mgr->add_texture(name, stage, binding, path->second);
     }
 }
 
@@ -273,7 +273,6 @@ void ShaderModules::create_descriptor_set() {
             uniform_mgr->textures.size());
         auto buf_infos = std::vector<VkDescriptorBufferInfo>(uniform_mgr->ubos.size());
         auto tex_infos = std::vector<VkDescriptorImageInfo>(uniform_mgr->textures.size());
-        uint32_t binding_cnt = 0;
         for (int j = 0; auto& [ubo_name, ubo] : uniform_mgr->ubos) {
             auto& buf_info = buf_infos[j];
             buf_info.offset = 0;
@@ -283,7 +282,7 @@ void ShaderModules::create_descriptor_set() {
             auto& write = writes[j++];
             write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write.dstSet = m_descriptor_sets[i];
-            write.dstBinding = binding_cnt++;
+            write.dstBinding = ubo.binding;
             write.dstArrayElement = 0;
             write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             write.descriptorCount = 1;
@@ -298,7 +297,7 @@ void ShaderModules::create_descriptor_set() {
             auto& write = writes[uniform_mgr->ubos.size() + j];
             write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write.dstSet = m_descriptor_sets[i];
-            write.dstBinding = binding_cnt++;
+            write.dstBinding = tex.binding;
             write.dstArrayElement = 0;
             write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             write.descriptorCount = 1;

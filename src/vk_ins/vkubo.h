@@ -17,6 +17,7 @@ public:
     std::string                             name;
     size_t                                  size;
     size_t                                  vecsize;
+    uint32_t                                binding;
     std::unique_ptr<char[]>                 cpu_buf;
     std::vector<VkBuffer>                   gpu_bufs;
     std::vector<VkDeviceMemory>             memos;

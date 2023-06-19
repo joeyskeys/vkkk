@@ -17,6 +17,7 @@ public:
     std::string             name;
     VkShaderStageFlagBits   stage;
     size_t                  vecsize = 1;
+    uint32_t                binding;
     VkImage                 image;
     VkImageLayout           image_layout;
     VkDeviceMemory          memory;

@@ -8,10 +8,11 @@
 namespace vkkk
 {
 
-Texture::Texture(VkWrappedInstance* ins, const std::string& n, VkShaderStageFlagBits t)
+Texture::Texture(VkWrappedInstance* ins, const std::string& n, VkShaderStageFlagBits t, uint32_t b)
     : instance(ins)
     , name(n)
     , stage(t)
+    , binding(b)
 {}
 
 Texture::~Texture() {
@@ -24,6 +25,7 @@ Texture::Texture(Texture&& t)
     , name(std::move(t.name))
     , stage(t.stage)
     , vecsize(t.vecsize)
+    , binding(t.binding)
     , image(t.image)
     , image_layout(t.image_layout)
     , memory(t.memory)

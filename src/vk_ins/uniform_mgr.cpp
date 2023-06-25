@@ -23,17 +23,18 @@ UniformMgr::~UniformMgr()
 {}
 
 bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
-    uint32_t size, uint32_t vecsize)
+    uint32_t binding, uint32_t size, uint32_t vecsize)
 {
-    auto ubo = UBO(instance, t, size, vecsize);
+    auto ubo = UBO(instance, t, binding, size, vecsize);
     ubo.name = name;
     //ubos.emplace_back(std::move(ubo));
     ubos.emplace(name, std::move(ubo));
     return true;
 }
 
-bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t, const std::string& path) {
-    auto tex = Texture(instance, name, t);
+bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t,
+    uint32_t binding, const std::string& path) {
+    auto tex = Texture(instance, name, t, binding);
     if (!tex.load_image(path))
         return false;
 

@@ -41,7 +41,6 @@ public:
             ubo.update(idx);
     }
 
-    //std::vector<UBO>                      ubos;
     std::unordered_map<std::string, UBO>    ubos;
     std::vector<Texture>                    textures;
     std::vector<VkWriteDescriptorSet>       writes;

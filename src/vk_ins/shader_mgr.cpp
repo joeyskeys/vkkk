@@ -21,6 +21,16 @@ ShaderModules::~ShaderModules() {
         vkDestroyShaderModule(device, shader_module, nullptr);
 }
 
+static GLSLTYPE find_vec_type(spirv_cross::SIRType t) {
+    enum GLSLTYPE vt = GLSLTYPE::UNKNOW;
+    assert(t.vecsize > 1);
+    if (t.base_type == SPIRType::Float)
+        vt = t.vecsize;
+    else if (t.base_type == SPIRType::Int)
+        vt = 3 + t.vecsize - 1;
+    return vt;
+}
+
 bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     fs::path abs_path = path;
     if (path.is_relative())
@@ -49,7 +59,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     auto res = comp.get_shader_resources();
     shader_resources_map[t] = res;
     spirv_cross::SPIRType type_info;
-    uint32_t binding_idx;
+    uint32_t binding_idx, location_idx;
 
     for (auto& ubo : res.uniform_buffers) {
         auto name = comp.get_name(ubo.id);
@@ -62,6 +72,15 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     for (auto& sampler : res.sampled_images) {
         binding_idx = comp.get_decoration(sampler.id, spv::DecorationBinding);
         m_img_brefs.emplace_back(sampler.name, t, binding_idx);
+    }
+
+    for (auto& input : res.stage_inputs) {
+        // TODO : handle the inputs properly
+        auto name = comp.get_name(input.id);
+        type_info = comp.get_type(input.base_type_id);
+        auto vectype = find_vec_type(type_info);
+        location_idx = comp.get_decoration(input.id, spv::DecorationLocation);
+        m_attr_brefs.emplace_back(location_idx, std::make_tuple(name, t, vectype));
     }
 
     return true;
@@ -101,104 +120,34 @@ std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_arra
     return stage_create_infos;
 }
 
-void ShaderModules::create_descriptor_pool_and_sets() {
-    // Create the descriptor set layout
-    auto swapchain_img_cnt = instance->get_swapchain_cnt();
-    m_descriptor_sets.resize(swapchain_img_cnt);
+void ShaderModules::set_attribute_binding(uint32_t binding_idx, uint32_t attr_location) {
+    if (m_input_brefs.find(binding_idx) == m_input_brefs.end())
+        m_input_brefs[binding_idx] = std::vector<uint32_t>({attr_location});
+    else
+        m_input_brefs[binding_idx].push_back(attr_location);
+}
 
-    if (uniform_mgr->ubos.size() > 0)
-        setup_pool(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            uniform_mgr->ubos.size() * instance->get_swapchain_cnt());
-    if (uniform_mgr->textures.size() > 0)
-        setup_pool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-            uniform_mgr->textures.size() * instance->get_swapchain_cnt());
-
-    // Create the pool
-    VkDescriptorPoolCreateInfo pool_info{};
-    pool_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    pool_info.poolSizeCount = m_pool_sizes.size();
-    pool_info.pPoolSizes = m_pool_sizes.data();
-    pool_info.maxSets = swapchain_img_cnt;
-
-    if (vkCreateDescriptorPool(device, &pool_info, nullptr, &m_descriptor_pool) != VK_SUCCESS)
-        throw std::runtime_error("failed to create descriptor pool..");
-
-    // Create bindings
-    uint32_t binding_cnt = 0;
-    auto setup_binding = [&](const auto& des, const VkDescriptorType des_type) {
-        VkDescriptorSetLayoutBinding binding{};
-        binding.binding = binding_cnt++;
-        binding.descriptorType = des_type;
-        binding.descriptorCount = des.vecsize;
-        binding.pImmutableSamplers = nullptr;
-        binding.stageFlags = des.stage;
-        m_descriptor_layout_bindings.emplace_back(std::move(binding));
-    };
-
-    for (auto& [ubo_name, ubo] : uniform_mgr->ubos)
-        setup_binding(ubo, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
-    for (auto& tex : uniform_mgr->textures)
-        setup_binding(tex, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER);
-    
-    // Create descriptor set layout
-    VkDescriptorSetLayoutCreateInfo layout_info{};
-    layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout_info.bindingCount = m_descriptor_layout_bindings.size();
-    layout_info.pBindings = m_descriptor_layout_bindings.data();
-
-    if (vkCreateDescriptorSetLayout(device, &layout_info, nullptr, &m_descriptor_layout) != VK_SUCCESS)
-        throw std::runtime_error("failed to create descriptor set layout");
-
-    // Create descriptor sets
-    std::vector<VkDescriptorSetLayout> layouts(swapchain_img_cnt, m_descriptor_layout);
-    VkDescriptorSetAllocateInfo alloc_info{};
-    alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    alloc_info.descriptorPool = m_descriptor_pool;
-    alloc_info.descriptorSetCount = swapchain_img_cnt;
-    alloc_info.pSetLayouts = layouts.data();
-    
-    if (vkAllocateDescriptorSets(device, &alloc_info, m_descriptor_sets.data()) != VK_SUCCESS)
-        throw std::runtime_error("failed to allocate descriptor sets");
-
-    for (int i = 0; i < swapchain_img_cnt; i++) {
-        auto writes = std::vector<VkWriteDescriptorSet>(uniform_mgr->ubos.size() +
-            uniform_mgr->textures.size());
-        auto buf_infos = std::vector<VkDescriptorBufferInfo>(uniform_mgr->ubos.size());
-        auto tex_infos = std::vector<VkDescriptorImageInfo>(uniform_mgr->textures.size());
-        binding_cnt = 0;
-        for (int j = 0; auto& [ubo_name, ubo] : uniform_mgr->ubos) {
-            auto& buf_info = buf_infos[j];
-            buf_info.offset = 0;
-            buf_info.range = ubo.size * ubo.vecsize;
-            buf_info.buffer = ubo.gpu_bufs[i];
-            
-            auto& write = writes[j++];
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_descriptor_sets[i];
-            write.dstBinding = binding_cnt++;
-            write.dstArrayElement = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            write.descriptorCount = 1;
-            write.pBufferInfo = &buf_info;
+void ShaderModules::create_input_descriptions() {
+    for (auto& [b_idx, attrs] : m_input_brefs) {
+        VkVertexInputBindingDescription input_des{};
+        input_des.binding = b_idx;
+        uint32_t stride = 0;
+        for (const auto& attr_loc : attrs) {
+            const auto& attr_bref = m_attr_brefs[attr_loc];
+            VkVertexInputAttributeDescription attr_des{};
+            attr_des.binding = b_idx;
+            attr_des.location = attr_loc;
+            auto glsl_type = std::get<2>(attr_bref);
+            attr_des.format = glsl_type_macro[glsl_type];
+            attr_des.offset = stride;
+            stride += glsl_type_sizes[glsl_type];
+            m_attr_descriptions.emplace_back(std::move(attr_des));
         }
-        for (int j = 0; auto& tex : uniform_mgr->textures) {
-            auto& tex_info = tex_infos[j];
-            tex_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            tex_info.imageView = tex.view;
-            tex_info.sampler = tex.sampler;
-
-            auto& write = writes[uniform_mgr->ubos.size() + j];
-            write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            write.dstSet = m_descriptor_sets[i];
-            write.dstBinding = binding_cnt++;
-            write.dstArrayElement = 0;
-            write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            write.descriptorCount = 1;
-            write.pImageInfo = &tex_info;
-            j++;
-        }
-
-        vkUpdateDescriptorSets(instance->get_device(), writes.size(), writes.data(), 0, nullptr);
+        input_des.stride = stride;
+        // Fixed for now, maybe make it a parameter when we're going to
+        // do instanced drawing
+        input_des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+        m_input_descriptions.emplace_back(std::move(input_des));
     }
 }
 

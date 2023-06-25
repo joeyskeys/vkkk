@@ -4,12 +4,12 @@
 namespace vkkk
 {
 
-UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, size_t s, size_t vs, uint32_t b)
+UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size_t s, size_t vs)
     : instance(ins)
     , stage(t)
+    , binding(b)
     , size(s)
     , vecsize(vs)
-    , binding(b)
 {
     cpu_buf = std::make_unique<char[]>(size * vecsize);
 

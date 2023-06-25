@@ -10,7 +10,7 @@ TEST_CASE("Uniform Manager test", "[single-file]") {
     ins.create_command_pool();
 
     vkkk::UniformMgr mgr(&ins);
-    mgr.add_texture("test_tex", VK_SHADER_STAGE_VERTEX_BIT, "D:/repo/floss/vkkk/resource/textures/texture.jpeg");
+    mgr.add_texture("test_tex", VK_SHADER_STAGE_VERTEX_BIT, 0, "D:/repo/floss/vkkk/resource/textures/texture.jpeg");
 
     REQUIRE(true);
 }

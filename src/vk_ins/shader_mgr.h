@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <map>
 #include <vector>
 #include <utility>
 #include <tuple>
@@ -9,7 +10,8 @@
 #include <spirv_cross/spirv.hpp>
 #include <spirv_cross/spirv_glsl.hpp>
 
-#include "uniform_mgr.h"
+#include "vk_ins/types.h"
+#include "vk_ins/uniform_mgr.h"
 
 namespace fs = std::filesystem;
 
@@ -29,11 +31,28 @@ public:
     void assign_tex_image(const std::string& tex_name, const std::string& tex_path);
     void alloc_uniforms(const texture_map& img_paths);
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
-    void create_descriptor_pool_and_sets();
 
+    void set_attribute_binding(uint32_t binding_idx, uint32_t attr_location);
+    void create_input_description();
     void create_descriptor_layouts();
     void create_descriptor_pool();
     void create_descriptor_set();
+
+    inline uint32_t get_binding_description_count() const {
+        return m_input_descriptions.size();
+    }
+
+    inline const VkVertexInputBindingDescription* get_binding_descriptions() const {
+        return m_input_descriptions.data();
+    }
+
+    inline uint32_t get_attr_description_count() const {
+        return m_attr_descriptions.size();
+    }
+
+    inline const VkVertexInputAttributeDescription* get_attr_descriptions() const {
+        return m_attr_descriptions.data();
+    }
 
     inline const VkDescriptorSet* get_descriptor_set(uint32_t idx) {
         return &m_descriptor_sets[idx];
@@ -54,6 +73,9 @@ private:
     std::vector<VkShaderModule>                 shader_modules;
     std::vector<VkShaderStageFlagBits>          shader_types;
 
+    std::vector<VkVertexInputBindingDescription>    m_input_descriptions;
+    std::vector<VkVertexInputAttributeDescription>  m_attr_descriptions;
+
     VkDescriptorSetLayout                       m_descriptor_layout;
     std::vector<VkDescriptorSetLayoutBinding>   m_descriptor_layout_bindings;
     VkDescriptorPool                            m_descriptor_pool;
@@ -70,15 +92,19 @@ private:
         uint32_t, uint32_t>;
     using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
         uint32_t>;
+    using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
+        GLSLTYPE>;
     using TexImgPairs = std::unordered_map<std::string, std::string>;
-    std::vector<BufInfoWithBinding> m_buf_brefs;
-    std::vector<ImgInfoWithBinding> m_img_brefs;
-    TexImgPairs                     m_tex_img_pairs;
+    std::vector<BufInfoWithBinding>             m_buf_brefs;
+    std::vector<ImgInfoWithBinding>             m_img_brefs;
+    std::map<uint32_t, std::vector<uint32_t>>   m_input_brefs;
+    std::map<uint32_t, AttrInfoWithLoc>         m_attr_brefs;
+    TexImgPairs                                 m_tex_img_pairs;
 
-    std::vector<VkDescriptorBufferInfo> m_buf_infos;
-    std::vector<VkDescriptorImageInfo>  m_img_infos;
-    std::vector<VkWriteDescriptorSet> m_writes;
-    std::vector<VkDescriptorPoolSize> m_pool_sizes;
+    std::vector<VkDescriptorBufferInfo>         m_buf_infos;
+    std::vector<VkDescriptorImageInfo>          m_img_infos;
+    std::vector<VkWriteDescriptorSet>           m_writes;
+    std::vector<VkDescriptorPoolSize>           m_pool_sizes;
 };
 
 }

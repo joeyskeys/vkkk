@@ -22,7 +22,7 @@ public:
     std::vector<VkBuffer>                   gpu_bufs;
     std::vector<VkDeviceMemory>             memos;
 
-    UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, size_t s, size_t vs=1);
+    UBO(VkWrappedInstance*, const VkShaderStageFlagBits, uint32_t, size_t, size_t vs=1);
     ~UBO();
     UBO(UBO&& rhs);
 

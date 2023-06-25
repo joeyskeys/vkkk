@@ -29,8 +29,8 @@ public:
     VkSampler               sampler;
     bool                    loaded = false;
 
-    Texture(VkWrappedInstance* ins, const std::string& n,
-        VkShaderStageFlagBits t=VK_SHADER_STAGE_VERTEX_BIT);
+    Texture(VkWrappedInstance*, const std::string&, VkShaderStageFlagBits,
+        uint32_t);
     ~Texture();
     Texture(Texture&& t);
 

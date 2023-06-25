@@ -939,6 +939,7 @@ void VkWrappedInstance::create_graphics_pipeline(
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
 
+    /*
     VkVertexInputBindingDescription binding_des{};
     std::vector<VkVertexInputAttributeDescription> attr_des;
     
@@ -961,6 +962,12 @@ void VkWrappedInstance::create_graphics_pipeline(
     vert_input_info.vertexAttributeDescriptionCount = attr_des.size();
     vert_input_info.pVertexBindingDescriptions = &binding_des;
     vert_input_info.pVertexAttributeDescriptions = attr_des.data();
+    */
+
+    vert_input_info.vertexBindingDescriptionCount = modules.get_binding_description_count();
+    vert_input_info.pVertexBindingDescriptions = modules.get_binding_descriptions();
+    vert_input_info.vertexAttributeDescriptionCount = modules.get_attr_description_count();
+    vert_input_info.pVertexAttributeDescriptions = modules.get_attr_descriptions();
 
     // Input assembly, a.k.a drawing type
     VkPipelineInputAssemblyStateCreateInfo input_assembly{};

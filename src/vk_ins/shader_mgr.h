@@ -33,7 +33,7 @@ public:
     std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
 
     void set_attribute_binding(uint32_t binding_idx, uint32_t attr_location);
-    void create_input_description();
+    void create_input_descriptions();
     void create_descriptor_layouts();
     void create_descriptor_pool();
     void create_descriptor_set();

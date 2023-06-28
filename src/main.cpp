@@ -155,6 +155,10 @@ int main() {
 
     modules.create_descriptor_layouts();
 
+    modules.set_attribute_binding(0, 0);
+    modules.set_attribute_binding(0, 1);
+    modules.create_input_descriptions();
+
     ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
 
     ins.create_depth_resource();

@@ -21,13 +21,13 @@ ShaderModules::~ShaderModules() {
         vkDestroyShaderModule(device, shader_module, nullptr);
 }
 
-static GLSLTYPE find_vec_type(spirv_cross::SIRType t) {
-    enum GLSLTYPE vt = GLSLTYPE::UNKNOW;
+static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {
+    enum GLSLTYPE vt = GLSLTYPE::UNKNOWN;
     assert(t.vecsize > 1);
-    if (t.base_type == SPIRType::Float)
-        vt = t.vecsize;
-    else if (t.base_type == SPIRType::Int)
-        vt = 3 + t.vecsize - 1;
+    if (t.basetype == spirv_cross::SPIRType::Float)
+        vt = static_cast<GLSLTYPE>(t.vecsize - 1);
+    else if (t.basetype == spirv_cross::SPIRType::Int)
+        vt = static_cast<GLSLTYPE>(2 + t.vecsize);
     return vt;
 }
 
@@ -80,7 +80,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         type_info = comp.get_type(input.base_type_id);
         auto vectype = find_vec_type(type_info);
         location_idx = comp.get_decoration(input.id, spv::DecorationLocation);
-        m_attr_brefs.emplace_back(location_idx, std::make_tuple(name, t, vectype));
+        m_attr_brefs.emplace(location_idx, std::make_tuple(name, t, vectype));
     }
 
     return true;

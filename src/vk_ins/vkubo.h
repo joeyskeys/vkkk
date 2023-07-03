@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <vector>
 #include <utility>
 
@@ -21,11 +22,13 @@ public:
     std::unique_ptr<char[]>                 cpu_buf;
     std::vector<VkBuffer>                   gpu_bufs;
     std::vector<VkDeviceMemory>             memos;
+    std::vector<VkDescriptorBufferInfo>     descriptors;
 
     UBO(VkWrappedInstance*, const VkShaderStageFlagBits, uint32_t, size_t, size_t vs=1);
     ~UBO();
     UBO(UBO&& rhs);
 
+    void update_descriptor();
     void update(uint32_t idx);
 };
 

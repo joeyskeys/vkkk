@@ -220,13 +220,8 @@ void ShaderModules::create_descriptor_set() {
     for (int i = 0; i < swapchain_img_cnt; i++) {
         auto writes = std::vector<VkWriteDescriptorSet>(uniform_mgr->ubos.size() +
             uniform_mgr->textures.size());
-        auto buf_infos = std::vector<VkDescriptorBufferInfo>(uniform_mgr->ubos.size());
-        auto tex_infos = std::vector<VkDescriptorImageInfo>(uniform_mgr->textures.size());
         for (int j = 0; auto& [ubo_name, ubo] : uniform_mgr->ubos) {
-            auto& buf_info = buf_infos[j];
-            buf_info.offset = 0;
-            buf_info.range = ubo.size * ubo.vecsize;
-            buf_info.buffer = ubo.gpu_bufs[i];
+            ubo.update_descriptor();
             
             auto& write = writes[j++];
             write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -235,14 +230,9 @@ void ShaderModules::create_descriptor_set() {
             write.dstArrayElement = 0;
             write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
             write.descriptorCount = 1;
-            write.pBufferInfo = &buf_info;
+            write.pBufferInfo = &ubo.descriptors[i];
         }
         for (int j = 0; auto& tex : uniform_mgr->textures) {
-            auto& tex_info = tex_infos[j];
-            tex_info.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            tex_info.imageView = tex.view;
-            tex_info.sampler = tex.sampler;
-
             auto& write = writes[uniform_mgr->ubos.size() + j];
             write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             write.dstSet = m_descriptor_sets[i];
@@ -250,7 +240,6 @@ void ShaderModules::create_descriptor_set() {
             write.dstArrayElement = 0;
             write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             write.descriptorCount = 1;
-            //write.pImageInfo = &tex_info;
             write.pImageInfo = &tex.descriptor;
             j++;
         }

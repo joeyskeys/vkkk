@@ -16,6 +16,7 @@ UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size
     auto cnt = ins->get_swapchain_cnt();
     gpu_bufs.resize(cnt);
     memos.resize(cnt);
+    descriptors.resize(cnt);
 
     for (int i = 0; i < cnt; ++i)
         ins->create_buffer(size * vecsize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
@@ -39,7 +40,17 @@ UBO::UBO(UBO&& rhs)
     , cpu_buf(std::move(rhs.cpu_buf))
     , gpu_bufs(std::move(rhs.gpu_bufs))
     , memos(std::move(rhs.memos))
+    , descriptors(std::move(rhs.descriptors))
 {}
+
+void UBO::update_descriptor() {
+    for (int i = 0; i < descriptors.size(); ++i) {
+        auto& descriptor = descriptors[i];
+        descriptor.buffer = gpu_bufs[i];
+        descriptor.offset = 0;
+        descriptor.range = size * vecsize;
+    }
+}
 
 void UBO::update(uint32_t idx) {
     void* mapped_data;

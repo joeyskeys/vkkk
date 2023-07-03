@@ -934,7 +934,8 @@ void VkWrappedInstance::create_graphics_pipeline(
     const VkPolygonMode mode)
 {
     // Shader stage contents
-    auto shader_stages = modules.get_create_info_array();
+    //auto shader_stages = modules.get_create_info_array();
+    modules.generate_create_infos();
 
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
@@ -1053,8 +1054,8 @@ void VkWrappedInstance::create_graphics_pipeline(
     // The final pipeline info
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline_info.stageCount = 2;
-    pipeline_info.pStages = shader_stages.data();
+    pipeline_info.stageCount = modules.get_stages_count();
+    pipeline_info.pStages = modules.get_stages_data();
     pipeline_info.pVertexInputState = &vert_input_info;
     pipeline_info.pInputAssemblyState = &input_assembly;
     pipeline_info.pViewportState = &viewport_info;

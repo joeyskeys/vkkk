@@ -134,7 +134,15 @@ int main() {
     // allows a more flexible way of texture assigning
     modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
 
-    modules.alloc_uniforms(std::unordered_map<std::string, std::string>());
+    modules.alloc_uniforms();
+
+    vkkk::UniformMgr skybox_uniforms{ &ins };
+    vkkk::ShaderModules skybox_modules{ &ins, &skybox_uniforms };
+    skybox_modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    skybox_modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    skybox_modules.assign_tex_image("cubemap_spl", "../resource/textures/");
+    modules.alloc_uniforms();
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -160,6 +168,13 @@ int main() {
     modules.create_input_descriptions();
 
     ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+
+    skybox_modules.create_descriptor_layouts();
+    skybox_modules.set_attribute_binding(0, 0);
+    skybox_modules.create_input_descriptions();
+
+    // We need another pipeline now
+    //ins.
 
     ins.create_depth_resource();
     ins.create_framebuffers();

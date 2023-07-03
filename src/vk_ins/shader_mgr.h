@@ -29,14 +29,29 @@ public:
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
     void assign_tex_image(const std::string& tex_name, const std::string& tex_path);
-    void alloc_uniforms(const texture_map& img_paths);
-    std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
+    void alloc_uniforms();
+    void generate_create_infos();
+    //std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
 
     void set_attribute_binding(uint32_t binding_idx, uint32_t attr_location);
     void create_input_descriptions();
     void create_descriptor_layouts();
     void create_descriptor_pool();
     void create_descriptor_set();
+
+    inline bool valid() {
+        return shader_types.size() > 1 &&
+            std::find(shader_types.begin(), shader_types.end(), VK_SHADER_STAGE_VERTEX_BIT) != shader_types.end() &&
+            std::find(shader_types.begin(), shader_types.end(), VK_SHADER_STAGE_FRAGMENT_BIT) != shader_type.end();
+    }
+
+    inline uint32_t get_stages_count() const {
+        return stage_create_infos.size();
+    }
+
+    inline const VkPipelineShaderStageCreateInfo* get_stages_data() const {
+        return stage_create_infos.data();
+    }
 
     inline uint32_t get_binding_description_count() const {
         return m_input_descriptions.size();
@@ -66,20 +81,21 @@ private:
     void setup_pool(const VkDescriptorType des_type, const uint32_t cnt);
     
 private:
-    VkWrappedInstance*                          instance;
-    VkDevice                                    device;
-    VkPhysicalDeviceMemoryProperties            mem_props;
-    UniformMgr*                                 uniform_mgr;
-    std::vector<VkShaderModule>                 shader_modules;
-    std::vector<VkShaderStageFlagBits>          shader_types;
+    VkWrappedInstance*                              instance;
+    VkDevice                                        device;
+    VkPhysicalDeviceMemoryProperties                mem_props;
+    UniformMgr*                                     uniform_mgr;
+    std::vector<VkShaderModule>                     shader_modules;
+    std::vector<VkShaderStageFlagBits>              shader_types;
+    std::vector<VkPipelineShaderStageCreateInfo>    stage_create_infos;
 
     std::vector<VkVertexInputBindingDescription>    m_input_descriptions;
     std::vector<VkVertexInputAttributeDescription>  m_attr_descriptions;
 
-    VkDescriptorSetLayout                       m_descriptor_layout;
-    std::vector<VkDescriptorSetLayoutBinding>   m_descriptor_layout_bindings;
-    VkDescriptorPool                            m_descriptor_pool;
-    std::vector<VkDescriptorSet>                m_descriptor_sets;
+    VkDescriptorSetLayout                           m_descriptor_layout;
+    std::vector<VkDescriptorSetLayoutBinding>       m_descriptor_layout_bindings;
+    VkDescriptorPool                                m_descriptor_pool;
+    std::vector<VkDescriptorSet>                    m_descriptor_sets;
     std::unordered_map<VkShaderStageFlagBits, spirv_cross::ShaderResources> shader_resources_map;
 
     using BufferResources = std::tuple<std::vector<VkBuffer>, std::vector<VkDeviceMemory>>;
@@ -95,16 +111,14 @@ private:
     using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
         GLSLTYPE>;
     using TexImgPairs = std::unordered_map<std::string, std::string>;
-    std::vector<BufInfoWithBinding>             m_buf_brefs;
-    std::vector<ImgInfoWithBinding>             m_img_brefs;
-    std::map<uint32_t, std::vector<uint32_t>>   m_input_brefs;
-    std::map<uint32_t, AttrInfoWithLoc>         m_attr_brefs;
-    TexImgPairs                                 m_tex_img_pairs;
+    std::vector<BufInfoWithBinding>                 m_buf_brefs;
+    std::vector<ImgInfoWithBinding>                 m_img_brefs;
+    std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
+    std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
+    TexImgPairs                                     m_tex_img_pairs;
 
-    std::vector<VkDescriptorBufferInfo>         m_buf_infos;
-    std::vector<VkDescriptorImageInfo>          m_img_infos;
-    std::vector<VkWriteDescriptorSet>           m_writes;
-    std::vector<VkDescriptorPoolSize>           m_pool_sizes;
+    std::vector<VkWriteDescriptorSet>               m_writes;
+    std::vector<VkDescriptorPoolSize>               m_pool_sizes;
 };
 
 }

@@ -74,6 +74,10 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         m_img_brefs.emplace_back(sampler.name, t, binding_idx);
     }
 
+    // Now we only handle two types of uniforms
+    uniform_info[0] = m_buf_brefs.size();
+    uniform_info[1] = m_img_brefs.size();
+
     for (auto& input : res.stage_inputs) {
         // TODO : handle the inputs properly
         auto name = comp.get_name(input.id);
@@ -90,7 +94,7 @@ void ShaderModules::assign_tex_image(const std::string& tex_name, const std::str
     m_tex_img_pairs[tex_name] = tex_path;
 }
 
-void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
+void ShaderModules::alloc_uniforms() {
     for (auto& bref : m_buf_brefs) {
         auto [name, stage, size, binding] = bref;
         uniform_mgr->add_buffer(name, stage, binding, size);
@@ -104,6 +108,18 @@ void ShaderModules::alloc_uniforms(const texture_map& img_paths) {
     }
 }
 
+void ShaderModules::generate_create_infos() {
+    for (int i = 0; i < shader_modules.size(); ++i) {
+        VkPipelineShaderStageCreateInfo create_info{};
+        create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        create_info.stage = shader_types[i];
+        create_info.module = shader_modules[i];
+        create_info.pName = "main";
+        stage_create_infos.emplace_back(std::move(create_info));
+    }
+}
+
+/*
 std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_array() const {
     std::vector<VkPipelineShaderStageCreateInfo> stage_create_infos;
     for (int i = 0; i < shader_modules.size(); ++i) {
@@ -119,6 +135,7 @@ std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_arra
 
     return stage_create_infos;
 }
+*/
 
 void ShaderModules::set_attribute_binding(uint32_t binding_idx, uint32_t attr_location) {
     if (m_input_brefs.find(binding_idx) == m_input_brefs.end())

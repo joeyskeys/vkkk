@@ -3,15 +3,19 @@
 #include <memory>
 #include <stdexcept>
 
+#include "vk_ins/vkabstraction.h"
+
 namespace vkkk
 {
 
-Mesh::Mesh(uint32_t flag, bool indexed)
-    : comp_flag(flag)
+Mesh::Mesh(VkWrappedInstance* i, uint32_t flag, bool indexed)
+    : ins(i)
+    , comp_flag(flag)
     , indexed(indexed)
 {}
 
 Mesh::Mesh(const Mesh& b) {
+    ins = b.ins;
     comp_flag = b.comp_flag;
     indexed = b.indexed;
     comp_size = b.comp_size;
@@ -21,9 +25,14 @@ Mesh::Mesh(const Mesh& b) {
     icnt = b.icnt;
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
     memcpy(ibuf.get(), b.ibuf.get(), icnt * 3 * sizeof(uint32_t));
+    loaded = b.loaded;
+    gpu_loaded = b.gpu_loaded;
+    if (gpu_loaded)
+        load_gpu();
 }
 
 Mesh::Mesh(Mesh&& b) {
+    ins = b.ins;
     comp_flag = b.comp_flag;
     indexed = b.indexed;
     comp_size = b.comp_size;
@@ -31,6 +40,21 @@ Mesh::Mesh(Mesh&& b) {
     vbuf = std::move(b.vbuf);
     icnt = b.icnt;
     ibuf = std::move(b.ibuf);
+    vbuf_gpu = b.vbuf_gpu;
+    vbuf_memo = b.vbuf_memo;
+    ibuf_gpu = b.ibuf_gpu;
+    ibuf_memo = b.ibuf_memo;
+    loaded = b.loaded;
+    gpu_loaded = b.gpu_loaded;
+    b.loaded = false;
+    b.gpu_loaded = false;
+}
+
+Mesh::~Mesh() {
+    if (loaded)
+        unload();
+    if (gpu_loaded)
+        gpu_unload();
 }
 
 void Mesh::load(aiMesh *mesh) {
@@ -78,6 +102,30 @@ void Mesh::load(aiMesh *mesh) {
         ibuf[i * 3 + 1] = mesh->mFaces[i].mIndices[1];
         ibuf[i * 3 + 2] = mesh->mFaces[i].mIndices[2];
     }
+
+    loaded = true;
+}
+
+void Mesh::unload() {
+    vcnt = icnt = 0;
+    vbuf.reset();
+    ibuf.reset();
+    loaded = false;
+}
+
+void Mesh::load_gpu() {
+    ins->create_vertex_buffer(vbuf.get(), vbuf_gpu, comp_size, vcnt);
+    // * 3 means we're dealing with triangle
+    ins->create_index_buffer(ibuf.get(), ibuf_gpu, icnt * 3);
+    gpu_loaded = true;
+}
+
+void Mesh::unload_gpu() {
+    vkDestroyBuffer(ins->get_device(), ibuf_gpu, nullptr);
+    vkFreeMemory(ins->get_device(), ibuf_memo, nullptr);
+    vkDestroyBuffer(ins->get_device(), vbuf_gpu, nullptr);
+    vkFreeMemory(ins->get_device(), vbuf_memo, nullptr);
+    gpu_loaded = false;
 }
 
 }

@@ -1224,6 +1224,26 @@ void VkWrappedInstance::create_vertex_buffer(const float *source_data, size_t co
     vertbuffer_created = true;
 }
 
+void VkWrappedInstance::create_vertex_buffer(const float *source_data, VkBuffer& buf, size_t comp_size, size_t vcnt) {
+    VkDeviceSize buf_size = comp_size * vcnt * sizeof(float);
+    VkBuffer staging_buf;
+    VkDeviceMemory staging_buf_memo;
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buf, staging_buf_memo);
+
+    void* data;
+    vkMapMemory(device, staging_buf_memo, 0, buf_size, 0, &data);
+        memcpy(data, source_data, buf_size);
+    vkUnmapMemory(device, staging_buf_memo);
+
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, vert_buffer_memo);
+
+    copy_buffer(staging_buf, buf, buf_size);
+    vkDestroyBuffer(device, staging_buf, nullptr);
+    vkFreeMemory(device, staging_buf_memo, nullptr);
+}
+
 void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, size_t idx_cnt) {
     VkDeviceSize buf_size = sizeof(uint32_t) * idx_cnt;
 
@@ -1245,6 +1265,27 @@ void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, size_t i
     vkFreeMemory(device, staging_buf_memo, nullptr);
 
     indexbuffer_created = true;
+}
+
+void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, VkBuffer& buf, size_t idx_cnt) {
+    VkDeviceSize buf_size = sizeof(uint32_t) * idx_cnt;
+
+    VkBuffer staging_buf;
+    VkDeviceMemory staging_buf_memo;
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT
+        | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging_buf, staging_buf_memo);
+    
+    void* data;
+    vkMapMemory(device, staging_buf_memo, 0, buf_size, 0, &data);
+    memcpy(data, index_data, static_cast<size_t>(buf_size));
+    vkUnmapMemory(device, staging_buf_memo);
+
+    create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, index_buffer_memo);
+    copy_buffer(staging_buf, buf, buf_size);
+
+    vkDestroyBuffer(device, staging_buf, nullptr);
+    vkFreeMemory(device, staging_buf_memo, nullptr);
 }
 
 void VkWrappedInstance::create_uniform_buffer() {

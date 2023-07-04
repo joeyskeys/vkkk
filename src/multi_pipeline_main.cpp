@@ -1,12 +1,11 @@
 #include <iostream>
-#include <array>
 
 #include <GLFW/glfw3.h>
 
-#include "gui/gui.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "concepts/camera.h"
 #include "vk_ins/vkabstraction.h"
+#include "vk_ins/pipeline_mgr.h"
 
 const static unsigned int WIDTH = 800;
 const static unsigned int HEIGHT = 600;
@@ -109,12 +108,6 @@ void mouse_pos_callback(GLFWwindow* win, double x, double y) {
     }
 }
 
-void ubo_update(vkkk::MVPBuffer *buf) {
-    buf->model = glm::mat4(1);
-    buf->view = cam.get_view_mat();
-    buf->proj = cam.get_proj_mat();
-}
-
 int main() {
     vkkk::VkWrappedInstance ins;
     ins.create_surface();
@@ -122,29 +115,21 @@ int main() {
     auto swapchain_img_cnt = ins.create_swapchain();
     ins.create_imageviews();
     ins.create_renderpass();
-
     ins.create_command_pool();
 
-    vkkk::UniformMgr uniform_mgr{ &ins };
-    vkkk::ShaderModules modules{ &ins, &uniform_mgr };
-    modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    vkkk::PipelineMgr pipeline_mgr(&ins);
+    auto pipeline_obj = pipeline_mgr.register_pipeline("object");
+    auto pipeline_sky = pipeline_mgr.register_pipeline("skybox");
 
-    // Seperation of sampler in shader and it's corresponding texture image
-    // allows a more flexible way of texture assigning
-    modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
+    pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_obj.modules.assign_tex_image("tex_sampler", "../resouce/textures/8k_moon.jpg");
+    pipeline_obj.modules.alloc_uniforms();
 
-    modules.alloc_uniforms();
-
-    /*
-    vkkk::UniformMgr skybox_uniforms{ &ins };
-    vkkk::ShaderModules skybox_modules{ &ins, &skybox_uniforms };
-    skybox_modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    skybox_modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    skybox_modules.assign_tex_image("cubemap_spl", "../resource/textures/");
-    modules.alloc_uniforms();
-    */
+    pipeline_sky.modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png");
+    pipeline_sky.modules.alloc_uniforms();
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -158,41 +143,29 @@ int main() {
         buf->proj = cam.get_proj_mat();
         uniform_mgr.update_ubos(idx);
     };
+
     ins.set_update_cbk(update_cbk);
     ins.setup_key_cbk(key_callback);
     ins.setup_mouse_btn_cbk(mouse_btn_callback);
-    ins.setup_mouse_pos_cbk(mouse_pos_callback);
+    ins.setup_mouse_btn_cbk(mouse_pos_callback);
 
-    modules.create_descriptor_layouts();
+    pipeline_mgr.create_descriptor_layouts();
 
-    modules.set_attribute_binding(0, 0);
-    modules.set_attribute_binding(0, 1);
-    modules.create_input_descriptions();
+    pipeline_obj.modules.set_attribute_binding(0, 0);
+    pipeline_obj.modules.set_attribute_binding(0, 1);
+    pipeline_sky.modules.set_attribute_binding(0, 0);
+    pipeline_mgr.create_input_descriptors();
 
-    ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
-
-    /*
-    skybox_modules.create_descriptor_layouts();
-    skybox_modules.set_attribute_binding(0, 0);
-    skybox_modules.create_input_descriptions();
-    */
-
-    // We need another pipeline now
-    //ins.
+    pipeline_mgr.create_pipelines(ins.get_renderpass());
 
     ins.create_depth_resource();
     ins.create_framebuffers();
 
-    modules.create_descriptor_pool();
-    modules.create_descriptor_set();
-    
-    auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/moon.obj", vkkk::WITH_UV);
-    const auto& mesh = mesh_mgr.meshes[0];
-    ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
-    ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);
+    pipeline_mgr.create_descriptor_pools();
+    pipeline_mgr.create_descriptor_sets();
 
-    ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
+    ins.create_commandbuffers();
+    
     ins.create_sync_objects();
 
     ins.mainloop();

@@ -9,6 +9,8 @@ namespace vkkk
 
 Pipeline::Pipeline(VkWrappedInstance* i)
     : ins(i)
+    , uniforms(i)
+    , modules(i, &uniforms)
 {}
 
 Pipeline::~Pipeline() {}
@@ -22,17 +24,25 @@ PipelineMgr::~PipelineMgr() {
         vkDestroyPipelineLayout(ins->get_device(), layout, nullptr);
 }
 
-void register_pipeline(const std::string& name) {
-    if (pipeline_map.find(name) == pipeline_map.end()) {
-        pipeline_map[name] = pipelines.size();
-        pipeline_infos.emplace_back(Pipeline(ins));
-        pipelines.emplace_back(VkPipeline{});
+Pipeline& register_pipeline(const std::string& name) {
+    auto found = pipeline_map.find(name);
+    uint32_t idx = 0;
+    if (found == pipeline_map.end()) {
+        idx = pipelines.size();
+        pipeline_map[name] = idx;
+        pipelines.emplace_back(Pipeline(ins));
+        vk_pipelines.emplace_back(VkPipeline{});
         layouts.emplace_back(VkPipelineLayout{});
-        renderpasses.emplace_back(VkRenderPass{});
+        //renderpasses.emplace_back(VkRenderPass{});
     }
+    else {
+        idx = *found;
+    }
+
+    return pipelines[idx];
 }
 
-void PipelineMgr::create_pipelines() {
+void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {
     std::vector<VkGraphicsPipelineCreateInfo> pipeline_create_infos;
     for (int i = 0; i < layouts.size(); ++i) {
         auto& pipeline_info = pipeline_infos[i];
@@ -61,7 +71,10 @@ void PipelineMgr::create_pipelines() {
         pipeline_info.pDepthStencilState = &pipeline_info.depth_stencil;
         pipeline_info.pColorBlendState = &pipeline_info.blend_state;
         pipeline_info.layout = layouts[i];
-        pipeline_info.renderPass = renderpasses[i];
+        // Renderpass is bound to framebuffer or other buffers
+        // When we're trying to render into another buffer, this code will
+        // cause problem.
+        pipeline_info.renderPass = renderpass;
         pipeline_info.subpass = 0;
         pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
 

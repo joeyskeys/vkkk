@@ -166,6 +166,8 @@ public:
     };
 };
 
+class VkWrappedInstance;
+
 // POS BIT is a "must have"
 constexpr static int UV_BIT = 1;
 constexpr static int COLOR_BIT = 1 << 1;
@@ -179,10 +181,15 @@ public:
     Mesh(uint32_t flag=ONLY_VERTEX, bool indexed=true);
     Mesh(const Mesh&);
     Mesh(Mesh&&);
+    virtual ~Mesh();
 
     void load(aiMesh *mesh);
+    void unload();
+    void load_gpu(VkWrappedInstance*);
+    void unload_gpu(VkWrappedInstance*);
 
 public:
+    VkWrappedInstance*          ins;
     uint32_t                    comp_flag = 0;
     bool                        indexed = true;
     uint32_t                    comp_size;
@@ -190,6 +197,13 @@ public:
     std::unique_ptr<float[]>    vbuf = nullptr;
     uint32_t                    icnt;
     std::unique_ptr<uint32_t[]> ibuf = nullptr;
+    bool                        loaded = false;
+
+    VkBuffer                    vbuf_gpu;
+    VkDeviceMemory              vbuf_memo;
+    VkBuffer                    ibuf_gpu;
+    VkDeviceMemory              ibuf_memo;
+    bool                        gpu_loaded = false;
 };
 
 }

@@ -14,6 +14,7 @@ class VkWrappedInstance;
 class Pipeline {
 public:
     VkWrappedInstance*                      ins;
+    UniformMgr                              uniforms;
     ShaderModules                           modules;
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;
@@ -33,17 +34,40 @@ class PipelineMgr {
 public:
     VkWrappedInstance*                      ins;
 
-    std::vector<Pipeline>                   pipeline_infos;
-    std::vector<VkPipeline>                 pipelines;
+    std::vector<Pipeline>                   pipelines;
+    std::vector<VkPipeline>                 vk_pipelines;
     std::vector<VkPipelineLayout>           layouts;
-    std::vector<VkRenderPass>               renderpasses;
+    //std::vector<VkRenderPass>               renderpasses;
     std::map<std::string, uint32_t>         pipeline_map;
 
     PipelineMgr(VkWrappedInstance*);
     virtual ~PipelineMgr();
 
-    Pipeline&   register_pipeline(const std::string&);
-    bool        create_pipelines();
+    Pipeline&       register_pipeline(const std::string&);
+    bool            create_pipelines(const VkRenderPass& renderpass);
+
+    inline void     create_descriptor_layouts() {
+        for (auto& pipeline : pipelines)
+            pipeline.modules.create_descriptor_layouts();
+    }
+
+    inline void     create_input_descriptions() {
+        for (auto& pipeline : pipelines)
+            pipeline.modules.create_input_descriptions();
+    }
+    
+    inline void     create_descriptor_pools() {
+        // Here's another possible design:
+        // Create a single pool for all modules and you will only to create
+        // the pool once
+        for (auto& pipeline : pipelines)
+            pipeline.modules.create_descriptor_pool();
+    }
+
+    inline void     create_descriptor_sets() {
+        for (auto& pipeline : pipelines)
+            pipeline.modules.create_descriptor_set();
+    }
 };
 
 }

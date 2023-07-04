@@ -138,6 +138,10 @@ public:
         return swapchain_cnt;
     }
 
+    inline auto get_renderpass() {
+        return render_pass;
+    }
+
     inline void set_uniform_cbk(UniformUpdateCBK cbk) {
         uniform_cbk = cbk;
     }
@@ -171,7 +175,9 @@ public:
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const VertexTmp *source_data, size_t vcnt);
     void create_vertex_buffer(const float *source_data, size_t comp_size, size_t vcnt);
+    void create_vertex_buffer(const float *, VkBuffer&, size_t, size_t);
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
+    void create_index_buffer(const uint32_t*, VkBuffer&, size_t);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);
     void create_depth_resource();

@@ -46,13 +46,13 @@ public:
     std::vector<VkWriteDescriptorSet>       writes;
 
 protected:
-    VkWrappedInstance*                  instance;
-    VkDevice device;
-    VkPhysicalDeviceProperties          props;
-    VkPhysicalDeviceMemoryProperties    mem_props;
-    VkCommandPool command_pool;
-    VkQueue graphic_queue;
-    uint32_t swapchain_image_cnt;
+    VkWrappedInstance*                      instance;
+    VkDevice                                device;
+    VkPhysicalDeviceProperties              props;
+    VkPhysicalDeviceMemoryProperties        mem_props;
+    VkCommandPool                           command_pool;
+    VkQueue                                 graphic_queue;
+    uint32_t                                swapchain_image_cnt;
 };
 
 }

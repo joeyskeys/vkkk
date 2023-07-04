@@ -3,14 +3,19 @@
 #include <fmt/format.h>
 
 #include "asset_mgr/mesh_mgr.h"
+#include "vk_ins/vkabstraction.h"
 
 namespace vkkk
 {
 
+MeshMgr::MeshMgr(VkWrappedInstance* i)
+    : ins(i)
+{}
+
 void MeshMgr::process_node(aiNode *node, const aiScene *scene, uint32_t flag) {
     for (int i = 0; i < node->mNumMeshes; ++i) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        Mesh m{flag};
+        Mesh m{ins, flag};
         m.load(mesh);
         meshes.emplace_back(std::move(m));
     }

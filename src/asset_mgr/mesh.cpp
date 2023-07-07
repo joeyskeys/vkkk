@@ -8,15 +8,15 @@
 namespace vkkk
 {
 
-Mesh::Mesh(VkWrappedInstance* i, uint32_t flag, bool indexed)
+Mesh::Mesh(VkWrappedInstance* i, const std::vector<VERT_COMP>& cs, bool indexed)
     : ins(i)
-    , comp_flag(flag)
+    , comps(cs)
     , indexed(indexed)
 {}
 
 Mesh::Mesh(const Mesh& b) {
     ins = b.ins;
-    comp_flag = b.comp_flag;
+    comps = b.comps;
     indexed = b.indexed;
     comp_size = b.comp_size;
     vcnt = b.vcnt;
@@ -33,7 +33,7 @@ Mesh::Mesh(const Mesh& b) {
 
 Mesh::Mesh(Mesh&& b) {
     ins = b.ins;
-    comp_flag = b.comp_flag;
+    comps = std::move(b.comps);
     indexed = b.indexed;
     comp_size = b.comp_size;
     vcnt = b.vcnt;
@@ -60,40 +60,44 @@ Mesh::~Mesh() {
 void Mesh::load(aiMesh *mesh) {
     vcnt = mesh->mNumVertices;
     icnt = mesh->mNumFaces;
-    comp_size = 3 + 3 * (comp_flag & COLOR_BIT) + 2 * (comp_flag & UV_BIT);
+    comp_size = 0;
+    for (const auto& comp : comps)
+        comp_size += comp_sizes[comp];
 
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
 
-    for (uint32_t i = 0; i < vcnt; ++i) {
-        vbuf[i * comp_size    ] = mesh->mVertices[i].x;
-        vbuf[i * comp_size + 1] = mesh->mVertices[i].y;
-        vbuf[i * comp_size + 2] = mesh->mVertices[i].z;
-    }
-
-    if (comp_flag & UV_BIT) {
-        // Assimp support multiple uv sets, but we only check for
-        // the first set
-        if (!mesh->HasTextureCoords(0))
-            throw std::runtime_error("Mesh doesn't have UVs");
-
-        for (uint32_t i = 0; i < vcnt; ++i) {
-            auto uv = mesh->mTextureCoords[0][i];
-            vbuf[i * comp_size + 3] = uv.x;
-            vbuf[i * comp_size + 4] = uv.y;
-        }
-    }
-
-    if (comp_flag & COLOR_BIT) {
-        // Also supports multiple channels of vertex colors
-        if (!mesh->HasVertexColors(0))
-            throw std::runtime_error("Mesh doesn't have Vertex Colors");
-
-        for (uint32_t i = 0; i < vcnt; ++i) {
-            auto vcolor = mesh->mColors[0][i];
-            vbuf[i * comp_size + 5] = vcolor.r;
-            vbuf[i * comp_size + 6] = vcolor.g;
-            vbuf[i * comp_size + 7] = vcolor.b;
+    uint32_t prev = 0
+    for (const auto& comp : comps) {
+        switch (comp) {
+            case VERTEX: {
+                for (int i = 0; i < vcnt; ++i) {
+                    vbuf[i * comp_size + prev    ] = mesh->mVertices[i].x;
+                    vbuf[i * comp_size + prev + 1] = mesh->mVertices[i].y;
+                    vbuf[i * comp_size + prev + 2] = mesh->mVertices[i].z;
+                }
+                prev += 3;
+                break;
+            }
+            case UV: {
+                for (int i = 0; i < vcnt; ++i) {
+                    const auto uv = mesh->mTextureCoords[0][i];
+                    vbuf[i * comp_size + prev    ] = uv.x;
+                    vbuf[i * comp_size + prev + 1] = uv.y;
+                }
+                prev += 2;
+                break;
+            }
+            case COLOR: {
+                for (int i = 0; i < vcnt; ++i) {
+                    const auto vcolor = mesh->mColors[0][i];
+                    vbuf[i * comp_size + prev    ] = vcolor.r;
+                    vbuf[i * comp_size + prev + 1] = vcolor.g;
+                    vbuf[i * comp_size + prev + 2] = vcolor.b;
+                }
+                prev += 3;
+                break;
+            }
         }
     }
 
@@ -126,6 +130,18 @@ void Mesh::unload_gpu() {
     vkDestroyBuffer(ins->get_device(), vbuf_gpu, nullptr);
     vkFreeMemory(ins->get_device(), vbuf_memo, nullptr);
     gpu_loaded = false;
+}
+
+void Mesh::emit_draw_cmd(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
+    VkDescriptorSet* desc_set)
+{
+    VkBuffer bufs[] = {vbuf_gpu};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmd_buf, 0, 1, bufs, offsets);
+    vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, ppl_layout,
+        0, 1, desc_set, 0, nullptr);
+    vkCmdBindIndexBuffer(cmd_buf, ibuf_gpu, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, icnt * 3, 1, 0, 0, 0);
 }
 
 }

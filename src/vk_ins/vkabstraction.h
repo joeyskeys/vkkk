@@ -188,6 +188,9 @@ public:
     void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
     void record_commandbuffers(VkCommandBuffer, uint32_t);
     void record_commandbuffers(VkCommandBuffer, uint32_t, VkDescriptorSet*);
+    void record_cmds(const VkPipeline pipeline,
+        std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
+        std::function<void(VkCommandBuffer, VkPipelineLayout, VkDescriptorSet*)>& emit_func);
     void create_sync_objects();
     void draw_frame();
     void mainloop();

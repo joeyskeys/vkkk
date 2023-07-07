@@ -163,6 +163,11 @@ int main() {
 
     pipeline_mgr.create_descriptor_pools();
     pipeline_mgr.create_descriptor_sets();
+    
+    auto mesh_mgr = vkkk::MeshMgr::instance();
+    mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
+    mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
+    mesh_mgr.pour_into_gpu();
 
     ins.create_commandbuffers();
     

@@ -940,31 +940,6 @@ void VkWrappedInstance::create_graphics_pipeline(
     // Vertex input
     VkPipelineVertexInputStateCreateInfo vert_input_info{};
 
-    /*
-    VkVertexInputBindingDescription binding_des{};
-    std::vector<VkVertexInputAttributeDescription> attr_des;
-    
-    if (vert_flag & UV_BIT) {
-        if (vert_flag & COLOR_BIT) {
-            binding_des = VertexUVColor::get_binding_description(0);
-            attr_des = VertexUVColor::get_attr_descriptions(0, 0, 1, 2);
-        }
-        else {
-            binding_des = VertexUV::get_binding_description(0);
-            attr_des = VertexUV::get_attr_descriptions(0, 0, 1);
-        }
-    }
-    else {
-        binding_des = Vertex::get_binding_description(0);
-        attr_des = Vertex::get_attr_descriptions(0, 0);
-    }
-
-    vert_input_info.vertexBindingDescriptionCount = 1;
-    vert_input_info.vertexAttributeDescriptionCount = attr_des.size();
-    vert_input_info.pVertexBindingDescriptions = &binding_des;
-    vert_input_info.pVertexAttributeDescriptions = attr_des.data();
-    */
-
     vert_input_info.vertexBindingDescriptionCount = modules.get_binding_description_count();
     vert_input_info.pVertexBindingDescriptions = modules.get_binding_descriptions();
     vert_input_info.vertexAttributeDescriptionCount = modules.get_attr_description_count();
@@ -1542,6 +1517,45 @@ void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t 
         throw std::runtime_error("failed to record command buffer!");
 }
 
+void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandBuffer>& cmd_bufs,
+    std::vector<VkFramebuffer>& fbs, std::function<void()>& emit_func)
+{
+    auto swapchain_cnt = get_swapchain_cnt();
+    assert(cmd_bufs.size() == swapchain_cnt);
+    assert(fbs.size() == swapchain_cnt);
+
+    for (int i = 0; i < swapchain_cnt; ++i) {
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+
+        if (vkBeginCommandBuffer(cmd_bufs[i], &begin_info) != VK_SUCCESS)
+            throw std::runtime_error("failed to begin recording command buffer");
+
+        VkRenderPassBeginInfo renderpass_info{};
+        renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderpass_info.renderPass = render_pass;
+        renderpass_info.framebuffer = fbs[i];
+        renderpass_info.renderArea.offset = { 0, 0 };
+        renderpass_info.renderArea.extent = swapchain_extent;
+
+        std::array<VkClearValue, 2> clear_values{};
+        clear_values[0].color = {{ 0.f, 0.f, 0.f, 1.f }};
+        clear_values[1].depthStencil = { 1.f, 0.f };
+        renderpass_info.clearValueCount = clear_values.size();
+        renderpass_info.pClearValues = clear_values.data();
+
+        vkCmdBeginRenderPass(cmd_bufs[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
+
+            vkCmdBindPipeline(cmd_bufs[i], VK_PIPELINE_BIND_POINT_GRAPHICS, ppl);
+            emit_func();
+
+        vkCmdEndRenderPass2(cmd_bufs[i]);        
+
+        if (vkEndCommandBuffer(cmd_bufs[i]) != VK_SUCCESS)
+            throw std::runtime_error("failed to record command buffer!");
+    }
+}
+
 void VkWrappedInstance::create_commandbuffers(
     uint32_t fb_cnt,
     ShaderModules& shader_modules,
@@ -1602,6 +1616,7 @@ void VkWrappedInstance::create_commandbuffers(
         commandbuffer_created = true;
     }
 }
+
 
 void VkWrappedInstance::create_sync_objects() {
     image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);

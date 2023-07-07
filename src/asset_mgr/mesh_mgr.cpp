@@ -12,19 +12,21 @@ MeshMgr::MeshMgr(VkWrappedInstance* i)
     : ins(i)
 {}
 
-void MeshMgr::process_node(aiNode *node, const aiScene *scene, uint32_t flag) {
+void MeshMgr::process_node(aiNode *node, const aiScene *scene,
+    const std::vector<VERT_COMP>& cs)
+{
     for (int i = 0; i < node->mNumMeshes; ++i) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-        Mesh m{ins, flag};
+        Mesh m{ins, cs};
         m.load(mesh);
         meshes.emplace_back(std::move(m));
     }
 
     for (int i = 0; i < node->mNumChildren; ++i)
-        process_node(node->mChildren[i], scene, flag);
+        process_node(node->mChildren[i], scene, cs);
 }
 
-void MeshMgr::load_file(const fs::path& path, uint32_t flag) {
+void MeshMgr::load_file(const fs::path& path, const std::vector<VERT_COMP>& cs) {
     if (!fs::exists(fs::absolute(path))) {
         std::cerr << "file : " << path << "does not exist" << std::endl;
         throw std::runtime_error("model file does not exist");
@@ -36,7 +38,7 @@ void MeshMgr::load_file(const fs::path& path, uint32_t flag) {
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         return;
 
-    process_node(scene->mRootNode, scene, flag);
+    process_node(scene->mRootNode, scene, cs);
 }
 
 }

@@ -4,6 +4,7 @@
 
 #include "asset_mgr/mesh_mgr.h"
 #include "concepts/camera.h"
+#include "vk_ins/cmd_buf.h"
 #include "vk_ins/vkabstraction.h"
 #include "vk_ins/pipeline_mgr.h"
 
@@ -147,14 +148,14 @@ int main() {
     ins.set_update_cbk(update_cbk);
     ins.setup_key_cbk(key_callback);
     ins.setup_mouse_btn_cbk(mouse_btn_callback);
-    ins.setup_mouse_btn_cbk(mouse_pos_callback);
+    ins.setup_mouse_pos_cbk(mouse_pos_callback);
 
     pipeline_mgr.create_descriptor_layouts();
 
     pipeline_obj.modules.set_attribute_binding(0, 0);
     pipeline_obj.modules.set_attribute_binding(0, 1);
     pipeline_sky.modules.set_attribute_binding(0, 0);
-    pipeline_mgr.create_input_descriptors();
+    pipeline_mgr.create_input_descriptions();
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
 
@@ -169,8 +170,23 @@ int main() {
     mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
     mesh_mgr.pour_into_gpu();
 
-    ins.create_commandbuffers();
+    //ins.create_commandbuffers();
+    vkkk::CommandBuffers cmd_bufs(&ins);
+    cmd_bufs.alloc();
     
+    auto [obj_vk_ppl, obj_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("object");
+    assert(obj_vk_ppl != nullptr);
+    ins.record_cmds(
+        obj_vk_ppl,
+        cmd_bufs.bufs,
+        ins.get_framebuffers(),
+        [&]() {
+            for (int i = 0; i < ins.get_swapchain_cnt(); ++i) {
+                mesh_mgr.emit_draw_cmds(cmd_bufs.bufs[i], obj_ppl_layout,
+                    pipeline_obj.modules.get_descriptor_set(i));
+            }
+        }
+    );
     ins.create_sync_objects();
 
     ins.mainloop();

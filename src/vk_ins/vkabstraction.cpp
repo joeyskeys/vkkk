@@ -928,7 +928,7 @@ void VkWrappedInstance::create_graphics_pipeline() {
 }
 
 void VkWrappedInstance::create_graphics_pipeline(
-    const ShaderModules &modules,
+    ShaderModules &modules,
     const uint32_t vert_flag,
     const VkPrimitiveTopology topology,
     const VkPolygonMode mode)
@@ -1408,6 +1408,21 @@ void VkWrappedInstance::create_commandbuffers() {
     commandbuffer_created = true;
 }
 
+void VkWrappedInstance::alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs) {
+    if (!commandpool_created)
+        throw std::runtime_error("command pool not created!");
+
+    VkCommandBufferAllocateInfo alloc_info{};
+    alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    alloc_info.commandPool = command_pool;
+    // Make it a parameter?
+    alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    alloc_info.commandBufferCount = bufs.size();
+
+    if (vkAllocateCommandBuffers(device, &alloc_info, bufs.data()) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate command buffers");
+}
+
 void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t img_idx) {
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1517,8 +1532,9 @@ void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t 
         throw std::runtime_error("failed to record command buffer!");
 }
 
-void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandBuffer>& cmd_bufs,
-    std::vector<VkFramebuffer>& fbs, std::function<void()>& emit_func)
+void VkWrappedInstance::record_cmds(const VkPipeline ppl,
+    std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
+    std::function<void(VkCommandBuffer, VkPipelineLayout, VkDescriptorSet*)>& emit_func)
 {
     auto swapchain_cnt = get_swapchain_cnt();
     assert(cmd_bufs.size() == swapchain_cnt);
@@ -1540,16 +1556,16 @@ void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandB
 
         std::array<VkClearValue, 2> clear_values{};
         clear_values[0].color = {{ 0.f, 0.f, 0.f, 1.f }};
-        clear_values[1].depthStencil = { 1.f, 0.f };
+        clear_values[1].depthStencil = { 1.f, 0 };
         renderpass_info.clearValueCount = clear_values.size();
         renderpass_info.pClearValues = clear_values.data();
 
         vkCmdBeginRenderPass(cmd_bufs[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
             vkCmdBindPipeline(cmd_bufs[i], VK_PIPELINE_BIND_POINT_GRAPHICS, ppl);
-            emit_func();
+            //emit_func();
 
-        vkCmdEndRenderPass2(cmd_bufs[i]);        
+        vkCmdEndRenderPass(cmd_bufs[i]);        
 
         if (vkEndCommandBuffer(cmd_bufs[i]) != VK_SUCCESS)
             throw std::runtime_error("failed to record command buffer!");

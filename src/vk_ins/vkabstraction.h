@@ -142,6 +142,14 @@ public:
         return render_pass;
     }
 
+    inline auto& get_framebuffers() {
+        return swapchain_framebuffers;
+    }
+
+    inline auto& get_command_pool() {
+        return command_pool;
+    }
+
     inline void set_uniform_cbk(UniformUpdateCBK cbk) {
         uniform_cbk = cbk;
     }
@@ -163,7 +171,7 @@ public:
 
     void create_graphics_pipeline();
     void create_graphics_pipeline(
-        const ShaderModules&,
+        ShaderModules&,
         const uint32_t,
         const VkPrimitiveTopology,
         const VkPolygonMode);
@@ -185,6 +193,7 @@ public:
     void create_descriptor_set();
     void create_descriptors(const ShaderModules& modules);
     void create_commandbuffers();
+    void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
     void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
     void record_commandbuffers(VkCommandBuffer, uint32_t);
     void record_commandbuffers(VkCommandBuffer, uint32_t, VkDescriptorSet*);

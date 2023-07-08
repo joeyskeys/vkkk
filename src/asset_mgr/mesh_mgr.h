@@ -23,8 +23,8 @@ public:
             mesh.load_gpu();
     }
 
-    inline void emit_draw_cmds(VkCommandBuffer, cmd_buf, VkPipelineLayout ppl_layout,
-        VkDescriptorSet* sets)
+    inline void emit_draw_cmds(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
+        const VkDescriptorSet* sets)
     {
         for (auto& mesh : meshes)
             mesh.emit_draw_cmd(cmd_buf, ppl_layout, sets);

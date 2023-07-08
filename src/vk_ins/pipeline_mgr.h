@@ -68,6 +68,22 @@ public:
         for (auto& pipeline : pipelines)
             pipeline.modules.create_descriptor_set();
     }
+
+    inline const VkPipeline get_vkpipeline(const std::string& name) const {
+        auto found = pipeline_map.find(name);
+        if (found == pipeline_map.end())
+            return nullptr;
+        else
+            return vk_pipelines[found->second];
+    }
+
+    inline const VkPipelineLayout get_vkpipeline_layout(const std::string& name) const {
+        auto found = pipeline_map.find(name);
+        if (found == pipeline_map.end())
+            return nullptr;
+        else
+            return layouts[found->second];
+    }
 };
 
 }

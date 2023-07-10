@@ -26,7 +26,7 @@ void MeshMgr::process_node(aiNode *node, const aiScene *scene,
         process_node(node->mChildren[i], scene, cs);
 }
 
-void MeshMgr::load_file(const fs::path& path, const std::vector<VERT_COMP>& cs) {
+Mesh* MeshMgr::load_file(const fs::path& path, const std::vector<VERT_COMP>& cs) {
     if (!fs::exists(fs::absolute(path))) {
         std::cerr << "file : " << path << "does not exist" << std::endl;
         throw std::runtime_error("model file does not exist");
@@ -36,9 +36,11 @@ void MeshMgr::load_file(const fs::path& path, const std::vector<VERT_COMP>& cs) 
     const aiScene *scene = importer.ReadFile(path.string().c_str(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
-        return;
+        return nullptr;
 
+    auto idx = meshes.size();
     process_node(scene->mRootNode, scene, cs);
+    return &meshes[idx];
 }
 
 }

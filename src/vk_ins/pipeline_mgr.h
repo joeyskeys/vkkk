@@ -45,7 +45,7 @@ public:
     PipelineMgr(VkWrappedInstance*);
     virtual ~PipelineMgr();
 
-    Pipeline&       register_pipeline(const std::string&);
+    Pipeline*       register_pipeline(const std::string&);
     void            create_pipelines(const VkRenderPass& renderpass);
 
     inline void     create_descriptor_layouts() {
@@ -87,7 +87,7 @@ public:
             return layouts[found->second];
     }
 
-    inline const auto get_vkpipeline_and_layout(const std::string& name) const {
+    inline const std::pair<VkPipeline, VkPipelineLayout> get_vkpipeline_and_layout(const std::string& name) const {
         auto found = pipeline_map.find(name);
         if (found == pipeline_map.end())
             return std::make_pair(nullptr, nullptr);

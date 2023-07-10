@@ -133,7 +133,7 @@ void Mesh::unload_gpu() {
 }
 
 void Mesh::emit_draw_cmd(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
-    VkDescriptorSet* desc_set)
+    const VkDescriptorSet* desc_set)
 {
     VkBuffer bufs[] = {vbuf_gpu};
     VkDeviceSize offsets[] = {0};

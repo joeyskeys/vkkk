@@ -1532,9 +1532,8 @@ void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t 
         throw std::runtime_error("failed to record command buffer!");
 }
 
-void VkWrappedInstance::record_cmds(const VkPipeline ppl,
-    std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
-    std::function<void(VkCommandBuffer, VkPipelineLayout, VkDescriptorSet*)>& emit_func)
+void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandBuffer>& cmd_bufs,
+    std::vector<VkFramebuffer>& fbs, const std::function<void()>& emit_func)
 {
     auto swapchain_cnt = get_swapchain_cnt();
     assert(cmd_bufs.size() == swapchain_cnt);

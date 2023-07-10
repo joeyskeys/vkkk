@@ -16,7 +16,7 @@ class MeshMgr : public Singleton<MeshMgr> {
 public:
     MeshMgr();
 
-    void load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
+    Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
     void add_box(const void *min, const void *max);
 
     inline void init(VkWrappedInstance* i) {
@@ -29,7 +29,7 @@ public:
     }
 
     inline void emit_draw_cmds(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
-        VkDescriptorSet* sets)
+        const VkDescriptorSet* sets)
     {
         for (auto& mesh : meshes)
             mesh.emit_draw_cmd(cmd_buf, ppl_layout, sets);

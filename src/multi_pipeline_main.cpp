@@ -119,22 +119,23 @@ int main() {
     ins.create_command_pool();
 
     vkkk::PipelineMgr pipeline_mgr(&ins);
-    auto& pipeline_obj = pipeline_mgr.register_pipeline("object");
-    auto& pipeline_sky = pipeline_mgr.register_pipeline("skybox");
+    auto pipeline_obj = pipeline_mgr.register_pipeline("object");
+    auto pipeline_sky = pipeline_mgr.register_pipeline("skybox");
 
-    pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_obj.modules.assign_tex_image("tex_sampler", "../resouce/textures/8k_moon.jpg");
-    pipeline_obj.modules.alloc_uniforms();
+    pipeline_obj->modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_obj->modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_obj->modules.assign_tex_image("tex_sampler", "../resouce/textures/8k_moon.jpg");
+    pipeline_obj->modules.alloc_uniforms();
 
-    pipeline_sky.modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png");
-    pipeline_sky.modules.alloc_uniforms();
+    pipeline_sky->modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_sky->modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_sky->modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png");
+    pipeline_sky->modules.alloc_uniforms();
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
         cam.update_orientation();
+        /*
         auto ubo_ptr = uniform_mgr.find_ubo("ubo");
         if (!ubo_ptr)
             return;
@@ -143,6 +144,7 @@ int main() {
         buf->view = cam.get_view_mat();
         buf->proj = cam.get_proj_mat();
         uniform_mgr.update_ubos(idx);
+        */
     };
 
     ins.set_update_cbk(update_cbk);
@@ -152,9 +154,9 @@ int main() {
 
     pipeline_mgr.create_descriptor_layouts();
 
-    pipeline_obj.modules.set_attribute_binding(0, 0);
-    pipeline_obj.modules.set_attribute_binding(0, 1);
-    pipeline_sky.modules.set_attribute_binding(0, 0);
+    pipeline_obj->modules.set_attribute_binding(0, 0);
+    pipeline_obj->modules.set_attribute_binding(0, 1);
+    pipeline_sky->modules.set_attribute_binding(0, 0);
     pipeline_mgr.create_input_descriptions();
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
@@ -166,8 +168,8 @@ int main() {
     pipeline_mgr.create_descriptor_sets();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
-    mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
+    auto moon_obj = mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
+    auto skybox_obj = mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
     mesh_mgr.pour_into_gpu();
 
     //ins.create_commandbuffers();
@@ -175,6 +177,7 @@ int main() {
     cmd_bufs.alloc();
     
     auto [obj_vk_ppl, obj_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("object");
+    auto [box_vk_ppl, box_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("skybox");
     assert(obj_vk_ppl != nullptr);
     ins.record_cmds(
         obj_vk_ppl,
@@ -182,8 +185,10 @@ int main() {
         ins.get_framebuffers(),
         [&]() {
             for (int i = 0; i < ins.get_swapchain_cnt(); ++i) {
-                mesh_mgr.emit_draw_cmds(cmd_bufs.bufs[i], obj_ppl_layout,
-                    pipeline_obj.modules.get_descriptor_set(i));
+                moon_obj->emit_draw_cmd(cmd_bufs.bufs[i], obj_ppl_layout,
+                    pipeline_obj->modules.get_descriptor_set(i));
+                skybox_obj->emit_draw_cmd(cmd_bufs.bufs[i], box_ppl_layout,
+                    pipeline_sky->modules.get_descriptor_set(i));
             }
         }
     );

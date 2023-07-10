@@ -45,7 +45,7 @@ public:
     void load_gpu();
     void unload_gpu();
 
-    void emit_draw_cmd(VkCommandBuffer, VkPipelineLayout, VkDescriptorSet*);
+    void emit_draw_cmd(VkCommandBuffer, VkPipelineLayout, const VkDescriptorSet*);
 
 public:
     VkWrappedInstance*          ins;

@@ -119,24 +119,6 @@ void ShaderModules::generate_create_infos() {
     }
 }
 
-/*
-std::vector<VkPipelineShaderStageCreateInfo> ShaderModules::get_create_info_array() const {
-    std::vector<VkPipelineShaderStageCreateInfo> stage_create_infos;
-    for (int i = 0; i < shader_modules.size(); ++i) {
-        VkPipelineShaderStageCreateInfo stage_create_info{};
-        stage_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stage_create_info.stage = shader_types[i];
-        stage_create_info.module = shader_modules[i];
-        // For now we follow the common convention of main as the entry
-        stage_create_info.pName = "main";
-
-        stage_create_infos.emplace_back(std::move(stage_create_info));
-    }
-
-    return stage_create_infos;
-}
-*/
-
 void ShaderModules::set_attribute_binding(uint32_t binding_idx, uint32_t attr_location) {
     if (m_input_brefs.find(binding_idx) == m_input_brefs.end())
         m_input_brefs[binding_idx] = std::vector<uint32_t>({attr_location});

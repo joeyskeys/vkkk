@@ -26,7 +26,7 @@ PipelineMgr::PipelineMgr(VkWrappedInstance* i)
 
 PipelineMgr::~PipelineMgr() {}
 
-Pipeline& PipelineMgr::register_pipeline(const std::string& name) {
+Pipeline* PipelineMgr::register_pipeline(const std::string& name) {
     auto found = pipeline_map.find(name);
     uint32_t idx = 0;
     if (found == pipeline_map.end()) {
@@ -42,7 +42,7 @@ Pipeline& PipelineMgr::register_pipeline(const std::string& name) {
         idx = found->second;
     }
 
-    return pipelines[idx];
+    return &pipelines[idx];
 }
 
 void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {

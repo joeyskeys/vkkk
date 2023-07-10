@@ -75,8 +75,8 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     }
 
     // Now we only handle two types of uniforms
-    uniform_info[0] = m_buf_brefs.size();
-    uniform_info[1] = m_img_brefs.size();
+    //uniform_info[0] = m_buf_brefs.size();
+    //uniform_info[1] = m_img_brefs.size();
 
     for (auto& input : res.stage_inputs) {
         // TODO : handle the inputs properly

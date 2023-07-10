@@ -35,15 +35,15 @@ static std::array<uint32_t, 3> comp_sizes = {
 
 class Mesh {
 public:
-    Mesh(uint32_t flag=ONLY_VERTEX, bool indexed=true);
+    Mesh(VkWrappedInstance*, const std::vector<VERT_COMP>&, bool indexed=true);
     Mesh(const Mesh&);
     Mesh(Mesh&&);
     virtual ~Mesh();
 
     void load(aiMesh *mesh);
     void unload();
-    void load_gpu(VkWrappedInstance*);
-    void unload_gpu(VkWrappedInstance*);
+    void load_gpu();
+    void unload_gpu();
 
     void emit_draw_cmd(VkCommandBuffer, VkPipelineLayout, VkDescriptorSet*);
 

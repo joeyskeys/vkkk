@@ -119,8 +119,8 @@ int main() {
     ins.create_command_pool();
 
     vkkk::PipelineMgr pipeline_mgr(&ins);
-    auto pipeline_obj = pipeline_mgr.register_pipeline("object");
-    auto pipeline_sky = pipeline_mgr.register_pipeline("skybox");
+    auto& pipeline_obj = pipeline_mgr.register_pipeline("object");
+    auto& pipeline_sky = pipeline_mgr.register_pipeline("skybox");
 
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);

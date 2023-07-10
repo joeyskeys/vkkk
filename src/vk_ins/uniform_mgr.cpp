@@ -13,11 +13,26 @@ UniformMgr::UniformMgr(VkWrappedInstance* ins)
     : instance(ins)
     , graphic_queue(ins->get_graphic_queue())
     , swapchain_image_cnt(ins->get_swapchain_cnt())
+    , ubos()
+    , textures()
 {
     device = ins->get_device();
     //uniform_bufs.resize(swapchain_image_cnt);
     //uniform_buf_mems.resize(swapchain_image_cnt);
 }
+
+UniformMgr::UniformMgr(UniformMgr&& rhs)
+    : instance(rhs.instance)
+    , device(rhs.device)
+    , props(rhs.props)
+    , mem_props(rhs.mem_props)
+    , command_pool(rhs.command_pool)
+    , graphic_queue(rhs.graphic_queue)
+    , swapchain_image_cnt(rhs.swapchain_image_cnt)
+    , ubos(std::move(rhs.ubos))
+    , textures(std::move(rhs.textures))
+    , writes(std::move(rhs.writes))
+{}
 
 UniformMgr::~UniformMgr()
 {}

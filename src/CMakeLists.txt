@@ -6,7 +6,9 @@ set(HEADERS
     utils/common.h
     utils/io.h
     utils/singleton.h
+    vk_ins/cmd_buf.h
     vk_ins/misc.h
+    vk_ins/pipeline_mgr.h
     vk_ins/shader_mgr.h
     vk_ins/uniform_mgr.h
     vk_ins/vkabstraction.h
@@ -18,7 +20,9 @@ set(SRCS
     asset_mgr/mesh_mgr.cpp
     concepts/camera.cpp
     gui/gui.cpp
+    vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
+    vk_ins/pipeline_mgr.cpp
     vk_ins/shader_mgr.cpp
     vk_ins/uniform_mgr.cpp
     vk_ins/vkabstraction.cpp
@@ -48,3 +52,8 @@ add_executable(vktutor tutor_main.cpp)
 target_link_libraries(vktutor
     vkkk
     ${OIIO_LIBRARIES})
+
+add_executable(vkmulti multi_pipeline_main.cpp)
+target_link_libraries(vkmulti
+    vkkk
+    ${OIIO_LIBRARIES})   

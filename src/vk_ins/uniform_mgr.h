@@ -20,6 +20,7 @@ class VkWrappedInstance;
 class UniformMgr {
 public:
     UniformMgr(VkWrappedInstance* ins);
+    UniformMgr(UniformMgr&& rhs);
     virtual ~UniformMgr();
 
     bool add_buffer(const std::string& name, VkShaderStageFlagBits t,
@@ -41,10 +42,6 @@ public:
             ubo.update(idx);
     }
 
-    std::unordered_map<std::string, UBO>    ubos;
-    std::vector<Texture>                    textures;
-    std::vector<VkWriteDescriptorSet>       writes;
-
 protected:
     VkWrappedInstance*                      instance;
     VkDevice                                device;
@@ -53,6 +50,11 @@ protected:
     VkCommandPool                           command_pool;
     VkQueue                                 graphic_queue;
     uint32_t                                swapchain_image_cnt;
+
+public:
+    std::unordered_map<std::string, UBO>    ubos;
+    std::vector<Texture>                    textures;
+    std::vector<VkWriteDescriptorSet>       writes;
 };
 
 }

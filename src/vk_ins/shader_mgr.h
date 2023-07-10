@@ -42,7 +42,7 @@ public:
     inline bool valid() {
         return shader_types.size() > 1 &&
             std::find(shader_types.begin(), shader_types.end(), VK_SHADER_STAGE_VERTEX_BIT) != shader_types.end() &&
-            std::find(shader_types.begin(), shader_types.end(), VK_SHADER_STAGE_FRAGMENT_BIT) != shader_type.end();
+            std::find(shader_types.begin(), shader_types.end(), VK_SHADER_STAGE_FRAGMENT_BIT) != shader_types.end();
     }
 
     inline uint32_t get_stages_count() const {

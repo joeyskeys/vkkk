@@ -13,7 +13,7 @@ class CommandBuffers {
 public:
     CommandBuffers(VkWrappedInstance*);
 
-    bool alloc();
+    void alloc();
 
     std::vector<VkCommandBuffer> bufs;
 

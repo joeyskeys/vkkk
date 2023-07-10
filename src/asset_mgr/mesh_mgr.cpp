@@ -8,8 +8,8 @@
 namespace vkkk
 {
 
-MeshMgr::MeshMgr(VkWrappedInstance* i)
-    : ins(i)
+MeshMgr::MeshMgr()
+    : ins(nullptr)
 {}
 
 void MeshMgr::process_node(aiNode *node, const aiScene *scene,

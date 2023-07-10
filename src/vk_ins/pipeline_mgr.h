@@ -19,14 +19,16 @@ public:
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;
     VkViewport                              viewport;
+    VkPipelineViewportStateCreateInfo       vp_state_info;
     VkRect2D                                scissor;
     VkPipelineRasterizationStateCreateInfo  rasterizer;
     VkPipelineMultisampleStateCreateInfo    multisampling;
-    VkPipelineDepthStencilStateCreateInfo   dpeth_stencil;
+    VkPipelineDepthStencilStateCreateInfo   depth_stencil;
     VkPipelineColorBlendAttachmentState     blend_attachement;
     VkPipelineColorBlendStateCreateInfo     blend_state;
     
     Pipeline(VkWrappedInstance* i);
+    Pipeline(Pipeline&& rhs);
     virtual ~Pipeline();
 };
 
@@ -44,7 +46,7 @@ public:
     virtual ~PipelineMgr();
 
     Pipeline&       register_pipeline(const std::string&);
-    bool            create_pipelines(const VkRenderPass& renderpass);
+    void            create_pipelines(const VkRenderPass& renderpass);
 
     inline void     create_descriptor_layouts() {
         for (auto& pipeline : pipelines)

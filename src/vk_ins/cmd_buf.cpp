@@ -11,7 +11,7 @@ CommandBuffers::CommandBuffers(VkWrappedInstance* i)
     bufs.resize(ins->get_swapchain_cnt());
 }
 
-bool CommandBuffers::alloc() {
+void CommandBuffers::alloc() {
     // This design is weird...
     ins->alloc_commandbuffers(bufs);
 }

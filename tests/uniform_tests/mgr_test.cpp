@@ -26,7 +26,7 @@ TEST_CASE("Shader Manager test", "[single_file]") {
     vkkk::ShaderModules module(&ins, &umgr);
     module.add_module("D:/repo/floss/vkkk/resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     module.add_module("D:/repo/floss/vkkk/resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    module.alloc_uniforms(vkkk::texture_map());
+    module.alloc_uniforms();
 
     REQUIRE(true);
 }

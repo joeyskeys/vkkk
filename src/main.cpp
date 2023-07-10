@@ -169,7 +169,8 @@ int main() {
     modules.set_attribute_binding(0, 1);
     modules.create_input_descriptions();
 
-    ins.create_graphics_pipeline(modules, vkkk::WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+#define WITH_UV 1
+    ins.create_graphics_pipeline(modules, WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
 
     /*
     skybox_modules.create_descriptor_layouts();
@@ -187,7 +188,8 @@ int main() {
     modules.create_descriptor_set();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.load_file("../resource/models/moon.obj", vkkk::WITH_UV);
+    mesh_mgr.init(&ins);
+    mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
     const auto& mesh = mesh_mgr.meshes[0];
     ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
     ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);

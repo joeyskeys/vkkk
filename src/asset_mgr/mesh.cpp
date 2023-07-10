@@ -54,7 +54,7 @@ Mesh::~Mesh() {
     if (loaded)
         unload();
     if (gpu_loaded)
-        gpu_unload();
+        unload_gpu();
 }
 
 void Mesh::load(aiMesh *mesh) {
@@ -67,7 +67,7 @@ void Mesh::load(aiMesh *mesh) {
     vbuf = std::make_unique<float[]>(vcnt * comp_size);
     ibuf = std::make_unique<uint32_t[]>(icnt * 3);
 
-    uint32_t prev = 0
+    uint32_t prev = 0;
     for (const auto& comp : comps) {
         switch (comp) {
             case VERTEX: {

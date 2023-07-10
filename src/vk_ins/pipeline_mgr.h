@@ -84,6 +84,14 @@ public:
         else
             return layouts[found->second];
     }
+
+    inline const auto get_vkpipeline_and_layout(const std::string& name) const {
+        auto found = pipeline_map.find(name);
+        if (found == pipeline_map.end())
+            return std::make_pair(nullptr, nullptr);
+        else
+            return std::make_pair(vk_pipelines[found->second], layouts[found->second]);
+    }
 };
 
 }

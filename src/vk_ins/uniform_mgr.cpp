@@ -13,8 +13,6 @@ UniformMgr::UniformMgr(VkWrappedInstance* ins)
     : instance(ins)
     , graphic_queue(ins->get_graphic_queue())
     , swapchain_image_cnt(ins->get_swapchain_cnt())
-    , ubos()
-    , textures()
 {
     device = ins->get_device();
     //uniform_bufs.resize(swapchain_image_cnt);

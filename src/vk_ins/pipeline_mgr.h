@@ -14,7 +14,7 @@ class VkWrappedInstance;
 class Pipeline {
 public:
     VkWrappedInstance*                      ins;
-    UniformMgr                              uniforms;
+    std::shared_ptr<UniformMgr>             uniforms;
     ShaderModules                           modules;
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;
@@ -45,7 +45,7 @@ public:
     PipelineMgr(VkWrappedInstance*);
     virtual ~PipelineMgr();
 
-    Pipeline*       register_pipeline(const std::string&);
+    void            register_pipeline(const std::string&);
     void            create_pipelines(const VkRenderPass& renderpass);
 
     inline void     create_descriptor_layouts() {
@@ -69,6 +69,15 @@ public:
     inline void     create_descriptor_sets() {
         for (auto& pipeline : pipelines)
             pipeline.modules.create_descriptor_set();
+    }
+
+    inline Pipeline& get_pipeline(const uint32_t idx) {
+        return pipelines.at(idx);
+    }
+
+    inline Pipeline& get_pipeline(const std::string& name) {
+        auto idx = pipeline_map[name];
+        return pipelines.at(idx);
     }
 
     inline const VkPipeline get_vkpipeline(const std::string& name) const {

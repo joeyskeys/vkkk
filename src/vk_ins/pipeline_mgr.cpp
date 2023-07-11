@@ -8,8 +8,8 @@ namespace vkkk
 
 Pipeline::Pipeline(VkWrappedInstance* i)
     : ins(i)
-    , uniforms(i)
-    , modules(i, &uniforms)
+    , uniforms(std::make_shared<UniformMgr>(i))
+    , modules(i, uniforms.get())
 {}
 
 Pipeline::Pipeline(Pipeline&& rhs)
@@ -26,7 +26,7 @@ PipelineMgr::PipelineMgr(VkWrappedInstance* i)
 
 PipelineMgr::~PipelineMgr() {}
 
-Pipeline* PipelineMgr::register_pipeline(const std::string& name) {
+void PipelineMgr::register_pipeline(const std::string& name) {
     auto found = pipeline_map.find(name);
     uint32_t idx = 0;
     if (found == pipeline_map.end()) {
@@ -38,11 +38,8 @@ Pipeline* PipelineMgr::register_pipeline(const std::string& name) {
         layouts.emplace_back(VkPipelineLayout{});
         //renderpasses.emplace_back(VkRenderPass{});
     }
-    else {
-        idx = found->second;
-    }
-
-    return &pipelines[idx];
+    // return reference or pointer to pipelines element here directly
+    // will give a incorrect result, look into it later
 }
 
 void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {
@@ -84,8 +81,11 @@ void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {
         pipeline_create_infos.emplace_back(pipeline_create_info);
     }
 
-    if (vkCreateGraphicsPipelines(ins->get_device(), VK_NULL_HANDLE, 1, pipeline_create_infos.data(), nullptr, vk_pipelines.data()) != VK_SUCCESS)
+    if (vkCreateGraphicsPipelines(ins->get_device(), VK_NULL_HANDLE, pipeline_create_infos.size(),
+        pipeline_create_infos.data(), nullptr, vk_pipelines.data()) != VK_SUCCESS)
+    {
         throw std::runtime_error("pipelines creation failed");
+    }
 }
 
 }

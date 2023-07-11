@@ -11,7 +11,8 @@ std::vector<char> load_file(const fs::path& path) {
     }
 
     size_t file_size = fs::file_size(path);
-    std::vector<char> buffer(file_size);
+    std::vector<char> buffer;
+    buffer.resize(file_size);
     file.seekg(0);
     file.read(buffer.data(), file_size);
     file.close();

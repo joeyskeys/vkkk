@@ -1199,7 +1199,7 @@ void VkWrappedInstance::create_vertex_buffer(const float *source_data, size_t co
     vertbuffer_created = true;
 }
 
-void VkWrappedInstance::create_vertex_buffer(const float *source_data, VkBuffer& buf, size_t comp_size, size_t vcnt) {
+void VkWrappedInstance::create_vertex_buffer(const float *source_data, VkBuffer& buf, VkDeviceMemory& memo, size_t comp_size, size_t vcnt) {
     VkDeviceSize buf_size = comp_size * vcnt * sizeof(float);
     VkBuffer staging_buf;
     VkDeviceMemory staging_buf_memo;
@@ -1212,7 +1212,7 @@ void VkWrappedInstance::create_vertex_buffer(const float *source_data, VkBuffer&
     vkUnmapMemory(device, staging_buf_memo);
 
     create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, vert_buffer_memo);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, memo);
 
     copy_buffer(staging_buf, buf, buf_size);
     vkDestroyBuffer(device, staging_buf, nullptr);
@@ -1242,7 +1242,7 @@ void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, size_t i
     indexbuffer_created = true;
 }
 
-void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, VkBuffer& buf, size_t idx_cnt) {
+void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, VkBuffer& buf, VkDeviceMemory& memo, size_t idx_cnt) {
     VkDeviceSize buf_size = sizeof(uint32_t) * idx_cnt;
 
     VkBuffer staging_buf;
@@ -1256,7 +1256,7 @@ void VkWrappedInstance::create_index_buffer(const uint32_t* index_data, VkBuffer
     vkUnmapMemory(device, staging_buf_memo);
 
     create_buffer(buf_size, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, index_buffer_memo);
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, buf, memo);
     copy_buffer(staging_buf, buf, buf_size);
 
     vkDestroyBuffer(device, staging_buf, nullptr);
@@ -1562,7 +1562,7 @@ void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandB
         vkCmdBeginRenderPass(cmd_bufs[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
             vkCmdBindPipeline(cmd_bufs[i], VK_PIPELINE_BIND_POINT_GRAPHICS, ppl);
-            //emit_func();
+            emit_func();
 
         vkCmdEndRenderPass(cmd_bufs[i]);        
 
@@ -1728,10 +1728,91 @@ void VkWrappedInstance::draw_frame() {
     current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+void VkWrappedInstance::draw_frame(const CommandBuffers& cmd_bufs) {
+    vkWaitForFences(device, 1, &in_flight_fences[current_frame], VK_TRUE, UINT64_MAX);
+
+    uint32_t image_idx;
+    auto result = vkAcquireNextImageKHR(device, swapchain, UINT64_MAX,
+        image_available_semaphores[current_frame], VK_NULL_HANDLE, &image_idx);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+        recreate_swapchain();
+        return;
+    }
+    else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR)
+        throw std::runtime_error("failed to acquire swap chain image!");
+
+    if (images_in_flight[image_idx] != VK_NULL_HANDLE)
+        vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
+    images_in_flight[image_idx] = in_flight_fences[current_frame];
+
+    auto now = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - time);
+    time = now;
+
+    //update_uniform_buffer(image_idx);
+    if (update_cbk)
+        update_cbk(image_idx, duration.count());
+
+    vkResetFences(device, 1, &in_flight_fences[current_frame]);
+
+    VkSubmitInfo submit_info{};
+    submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+
+    VkSemaphore wait_semaphores[] = { image_available_semaphores[current_frame] };
+    VkPipelineStageFlags wait_stages[] = { VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+    submit_info.waitSemaphoreCount = 1;
+    submit_info.pWaitSemaphores = wait_semaphores;
+    submit_info.pWaitDstStageMask = wait_stages;
+
+    // Multiple cmds, possible usage?
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &cmd_bufs.bufs[image_idx];
+
+    VkSemaphore signal_semaphores[] = { render_finished_semaphores[current_frame] };
+    submit_info.signalSemaphoreCount = 1;
+    submit_info.pSignalSemaphores = signal_semaphores;
+
+    if (vkQueueSubmit(graphic_queue, 1, &submit_info, in_flight_fences[current_frame]) != VK_SUCCESS)
+        throw std::runtime_error("failed to submit draw command buffer!");
+
+    VkPresentInfoKHR present_info{};
+    present_info.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+
+    present_info.waitSemaphoreCount = 1;
+    present_info.pWaitSemaphores = signal_semaphores;
+
+    VkSwapchainKHR swapchains_for_present[] = { swapchain };
+    present_info.swapchainCount = 1;
+    present_info.pSwapchains = swapchains_for_present;
+
+    present_info.pImageIndices = &image_idx;
+
+    result = vkQueuePresentKHR(present_queue, &present_info);
+
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebuffer_resized) {
+        framebuffer_resized = false;
+        recreate_swapchain();
+    }
+    else if (result != VK_SUCCESS)
+        throw std::runtime_error("failed to present swap chain image!");
+
+    current_frame = (current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
+}
+
 void VkWrappedInstance::mainloop() {
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         draw_frame();
+    }
+
+    vkDeviceWaitIdle(device);
+}
+
+void VkWrappedInstance::mainloop(const CommandBuffers& cmd_bufs) {
+    while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        draw_frame(cmd_bufs);
     }
 
     vkDeviceWaitIdle(device);

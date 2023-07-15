@@ -30,6 +30,9 @@ public:
 
     void update_descriptor();
     void update(uint32_t idx);
+
+private:
+    bool                                    loaded = false;
 };
 
 }

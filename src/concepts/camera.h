@@ -22,6 +22,10 @@ public:
     double prev_y = 0.f;
     glm::quat rotation;
 
+    inline glm::mat4 get_trans_mat() const {
+        return glm::translate(glm::mat4(), pos);
+    }
+
     inline glm::mat4 get_view_mat() const {
         return glm::lookAt(pos, pos + front, up);
     }

@@ -24,7 +24,7 @@ public:
     VkPipelineRasterizationStateCreateInfo  rasterizer;
     VkPipelineMultisampleStateCreateInfo    multisampling;
     VkPipelineDepthStencilStateCreateInfo   depth_stencil;
-    VkPipelineColorBlendAttachmentState     blend_attachement;
+    VkPipelineColorBlendAttachmentState     blend_attachment;
     VkPipelineColorBlendStateCreateInfo     blend_state;
     
     Pipeline(VkWrappedInstance* i);

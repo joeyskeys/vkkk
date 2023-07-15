@@ -3,8 +3,9 @@
 layout (location = 0) in vec3 inPos;
 
 layout (binding = 0) uniform UBO {
-    mat4 proj;
     mat4 model;
+    mat4 view;
+    mat4 proj;
 } ubo;
 
 layout (location = 0) out vec3 outUVW;

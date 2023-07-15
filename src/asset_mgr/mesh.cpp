@@ -118,9 +118,9 @@ void Mesh::unload() {
 }
 
 void Mesh::load_gpu() {
-    ins->create_vertex_buffer(vbuf.get(), vbuf_gpu, comp_size, vcnt);
+    ins->create_vertex_buffer(vbuf.get(), vbuf_gpu, vbuf_memo, comp_size, vcnt);
     // * 3 means we're dealing with triangle
-    ins->create_index_buffer(ibuf.get(), ibuf_gpu, icnt * 3);
+    ins->create_index_buffer(ibuf.get(), ibuf_gpu, ibuf_memo, icnt * 3);
     gpu_loaded = true;
 }
 

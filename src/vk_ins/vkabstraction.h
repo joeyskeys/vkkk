@@ -18,6 +18,7 @@
 
 #include "asset_mgr/mesh.h"
 #include "asset_mgr/mesh_mgr.h"
+#include "vk_ins/cmd_buf.h"
 #include "vk_ins/shader_mgr.h"
 
 namespace fs = std::filesystem;
@@ -150,6 +151,10 @@ public:
         return command_pool;
     }
 
+    inline auto& get_swapchain_extent() {
+        return swapchain_extent;
+    }
+
     inline void set_uniform_cbk(UniformUpdateCBK cbk) {
         uniform_cbk = cbk;
     }
@@ -183,9 +188,9 @@ public:
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const VertexTmp *source_data, size_t vcnt);
     void create_vertex_buffer(const float *source_data, size_t comp_size, size_t vcnt);
-    void create_vertex_buffer(const float *, VkBuffer&, size_t, size_t);
+    void create_vertex_buffer(const float *, VkBuffer&, VkDeviceMemory&, size_t, size_t);
     void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
-    void create_index_buffer(const uint32_t*, VkBuffer&, size_t);
+    void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);
     void create_depth_resource();
@@ -201,7 +206,9 @@ public:
         std::vector<VkFramebuffer>& fbs, const std::function<void()>& emit_func);
     void create_sync_objects();
     void draw_frame();
+    void draw_frame(const CommandBuffers&);
     void mainloop();
+    void mainloop(const CommandBuffers&);
 
     using KeyCBK = void(*)(GLFWwindow*, int, int, int, int);
     void setup_key_cbk(KeyCBK);

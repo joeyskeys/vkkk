@@ -122,7 +122,6 @@ int main() {
     auto swapchain_img_cnt = ins.create_swapchain();
     ins.create_imageviews();
     ins.create_renderpass();
-
     ins.create_command_pool();
 
     vkkk::UniformMgr uniform_mgr{ &ins };

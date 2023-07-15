@@ -137,16 +137,24 @@ int main() {
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
         cam.update_orientation();
-        /*
-        auto ubo_ptr = uniform_mgr.find_ubo("ubo");
-        if (!ubo_ptr)
+
+        auto obj_ubo_ptr = pipeline_obj.uniforms->find_ubo("ubo");
+        if (!obj_ubo_ptr)
             return;
-        auto buf = reinterpret_cast<vkkk::MVPBuffer*>(ubo_ptr->cpu_buf.get());
-        buf->model = glm::mat4(1);
-        buf->view = cam.get_view_mat();
-        buf->proj = cam.get_proj_mat();
-        uniform_mgr.update_ubos(idx);
-        */
+        auto obj_buf = reinterpret_cast<vkkk::MVPBuffer*>(obj_ubo_ptr->cpu_buf.get());
+        obj_buf->model = glm::mat4(1);
+        obj_buf->view = cam.get_view_mat();
+        obj_buf->proj = cam.get_proj_mat();
+        pipeline_obj.uniforms->update_ubos(idx);
+
+        auto sky_ubo_ptr = pipeline_sky.uniforms->find_ubo("ubo");
+        if (!sky_ubo_ptr)
+            return;
+        auto sky_buf = reinterpret_cast<vkkk::MVPBuffer*>(sky_ubo_ptr->cpu_buf.get());
+        sky_buf->model = cam.get_trans_mat();
+        sky_buf->view = glm::mat4(1);
+        sky_buf->proj = cam.get_proj_mat();
+        pipeline_sky.uniforms->update_ubos(idx);
     };
 
     ins.set_update_cbk(update_cbk);
@@ -170,11 +178,13 @@ int main() {
     pipeline_mgr.create_descriptor_sets();
     
     auto mesh_mgr = vkkk::MeshMgr::instance();
-    auto moon_obj = mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
-    auto skybox_obj = mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
+    mesh_mgr.init(&ins);
+    mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
+    mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
+    auto moon_obj = &mesh_mgr.meshes[0];
+    auto skybox_obj = &mesh_mgr.meshes[1];
     mesh_mgr.pour_into_gpu();
 
-    //ins.create_commandbuffers();
     vkkk::CommandBuffers cmd_bufs(&ins);
     cmd_bufs.alloc();
     
@@ -189,14 +199,16 @@ int main() {
             for (int i = 0; i < ins.get_swapchain_cnt(); ++i) {
                 moon_obj->emit_draw_cmd(cmd_bufs.bufs[i], obj_ppl_layout,
                     pipeline_obj.modules.get_descriptor_set(i));
+                /*
                 skybox_obj->emit_draw_cmd(cmd_bufs.bufs[i], box_ppl_layout,
                     pipeline_sky.modules.get_descriptor_set(i));
+                */
             }
         }
     );
     ins.create_sync_objects();
 
-    ins.mainloop();
+    ins.mainloop(cmd_bufs);
 
     return 0;
 }

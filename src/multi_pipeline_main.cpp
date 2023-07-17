@@ -21,31 +21,6 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
-bool check_validation_layer_support() {
-    uint32_t layer_cnt;
-    vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layer_cnt);
-    vkEnumerateInstanceLayerProperties(&layer_cnt, availableLayers.data());
-
-    for (const char* layerName : validationLayers) {
-        bool layerFound = false;
-
-        for (const auto& layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
 Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
@@ -151,8 +126,8 @@ int main() {
         if (!sky_ubo_ptr)
             return;
         auto sky_buf = reinterpret_cast<vkkk::MVPBuffer*>(sky_ubo_ptr->cpu_buf.get());
-        sky_buf->model = cam.get_trans_mat();
-        sky_buf->view = glm::mat4(1);
+        sky_buf->model = glm::mat4(1);
+        sky_buf->view = cam.get_view_mat();
         sky_buf->proj = cam.get_proj_mat();
         pipeline_sky.uniforms->update_ubos(idx);
     };
@@ -197,11 +172,11 @@ int main() {
         ins.get_framebuffers(),
         [&]() {
             for (int i = 0; i < ins.get_swapchain_cnt(); ++i) {
-                moon_obj->emit_draw_cmd(cmd_bufs.bufs[i], obj_ppl_layout,
-                    pipeline_obj.modules.get_descriptor_set(i));
-                /*
                 skybox_obj->emit_draw_cmd(cmd_bufs.bufs[i], box_ppl_layout,
                     pipeline_sky.modules.get_descriptor_set(i));
+                /*
+                moon_obj->emit_draw_cmd(cmd_bufs.bufs[i], obj_ppl_layout,
+                    pipeline_obj.modules.get_descriptor_set(i));
                 */
             }
         }

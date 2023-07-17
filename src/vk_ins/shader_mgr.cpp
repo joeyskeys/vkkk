@@ -19,6 +19,7 @@ ShaderModules::ShaderModules(VkWrappedInstance *ins,
 ShaderModules::~ShaderModules() {
     for (const auto &shader_module : shader_modules)
         vkDestroyShaderModule(device, shader_module, nullptr);
+    shader_modules.clear();
 }
 
 static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {

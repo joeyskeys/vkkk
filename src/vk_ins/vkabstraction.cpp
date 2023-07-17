@@ -190,8 +190,9 @@ void VkWrappedInstance::end_single_time_commands(VkCommandBuffer cmd_buf) {
 }
 
 void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
-    const VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo)
+    const uint32_t layers, const VkFormat format, VkImageTiling tiling,
+    VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+    VkImage& image, VkDeviceMemory& image_memo)
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -200,7 +201,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     image_info.extent.height = h;
     image_info.extent.depth = 1;
     image_info.mipLevels = 1;
-    image_info.arrayLayers = 1;
+    image_info.arrayLayers = layers;
     image_info.format = format;
     image_info.tiling = tiling;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -387,7 +388,7 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
 
     //VkImage img;
     //VkDeviceMemory img_memo;
-    create_vk_image(w, h, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+    create_vk_image(w, h, 1, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
 
@@ -1316,7 +1317,7 @@ VkFormat VkWrappedInstance::find_supported_format(const std::vector<VkFormat>& c
 void VkWrappedInstance::create_depth_resource() {
     VkFormat depth_format = find_depth_format();
 
-    create_vk_image(swapchain_extent.width, swapchain_extent.height, depth_format,
+    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, depth_format,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img, depth_img_memo);
     depth_img_view = create_imageview(depth_img, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
@@ -1826,6 +1827,8 @@ std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {
     if (enable_validation_layers)
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
+    //extensions.push_back("VK_LAYER_KHRONOS_validation");
+    
     return extensions;
 }
 

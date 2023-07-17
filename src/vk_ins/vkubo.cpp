@@ -32,12 +32,16 @@ UBO::~UBO() {
             vkDestroyBuffer(instance->get_device(), gpu_buf, nullptr);
         for (auto& memo : memos)
             vkFreeMemory(instance->get_device(), memo, nullptr);
+        if (cpu_buf)
+            cpu_buf.reset();
+        loaded = false;
     }
 }
 
 UBO::UBO(UBO&& rhs)
     : instance(rhs.instance)
     , stage(rhs.stage)
+    , name(rhs.name)
     , size(rhs.size)
     , vecsize(rhs.vecsize)
     , binding(rhs.binding)

@@ -99,6 +99,15 @@ public:
     VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename);
     ~VkWrappedInstance();
 
+    static inline void print_validation_layer_supports() {
+        uint32_t layer_cnt;
+        vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
+        std::vector<VkLayerProperties> layers(layer_cnt);
+        vkEnumerateInstanceLayerProperties(&layer_cnt, layers.data());
+        for (const auto& layer : layers)
+            std::cout << layer.layerName << std::endl;
+    }
+
     inline void setup_window(GLFWwindow* win) {
         window = win;
     }
@@ -106,9 +115,9 @@ public:
     VkCommandBuffer begin_single_time_commands();
     void end_single_time_commands(VkCommandBuffer cmd_buf);
 
-    void create_vk_image(const uint32_t w, const uint32_t h, const VkFormat format,
-        VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
-        VkImage& image, VkDeviceMemory& image_memo);
+    void create_vk_image(const uint32_t w, const uint32_t h, const uint32_t layers,
+        const VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo);
     void transition_image_layout(VkImage image, VkFormat format,
         VkImageLayout old_layout, VkImageLayout new_layout);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,

@@ -91,8 +91,8 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     return true;
 }
 
-void ShaderModules::assign_tex_image(const std::string& tex_name, const std::string& tex_path) {
-    m_tex_img_pairs[tex_name] = tex_path;
+void ShaderModules::assign_tex_image(const std::string& tex_name, const std::string& tex_path, bool is_cubemap) {
+    m_tex_img_pairs[tex_name] = std::make_pair(tex_path, is_cubemap);
 }
 
 void ShaderModules::alloc_uniforms() {
@@ -102,10 +102,14 @@ void ShaderModules::alloc_uniforms() {
     }
     for (auto& bref : m_img_brefs) {
         auto [name, stage, binding] = bref;
-        auto path = m_tex_img_pairs.find(name);
-        if (path == m_tex_img_pairs.end())
+        const auto& path_n_qmap = m_tex_img_pairs.find(name);
+        if (path_n_qmap == m_tex_img_pairs.end())
             throw std::runtime_error(fmt::format("texure image for sampler {} not assigned", name));
-        uniform_mgr->add_texture(name, stage, binding, path->second);
+        auto& [path, is_cubemap] = path_n_qmap->second;
+        if (!is_cubemap)
+            uniform_mgr->add_texture(name, stage, binding, path);
+        else
+            uniform_mgr->add_cubemap(name, stage, binding, path);
     }
 }
 

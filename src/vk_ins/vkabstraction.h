@@ -117,11 +117,11 @@ public:
 
     void create_vk_image(const uint32_t w, const uint32_t h, const uint32_t layers,
         const VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo);
+        VkImageCreateFlags flags, VkMemoryPropertyFlags properties, VkImage& image,
+        VkDeviceMemory& image_memo);
     void transition_image_layout(VkImage image, VkFormat format,
-        VkImageLayout old_layout, VkImageLayout new_layout);
-    void copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
-        uint32_t h);
+        VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange sub_range);
+    void copy_buffer_to_image(VkBuffer buf, VkImage image, const std::vector<VkBufferImageCopy>& regions);
     void create_texture_imageviews();
     void create_texture_sampler();
     bool load_texture(const fs::path& path);
@@ -211,8 +211,8 @@ public:
     void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
     void record_commandbuffers(VkCommandBuffer, uint32_t);
     void record_commandbuffers(VkCommandBuffer, uint32_t, VkDescriptorSet*);
-    void record_cmds(const VkPipeline pipeline, std::vector<VkCommandBuffer>& cmd_bufs,
-        std::vector<VkFramebuffer>& fbs, const std::function<void()>& emit_func);
+    void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
+        const std::function<void(uint32_t)>& emit_func);
     void create_sync_objects();
     void draw_frame();
     void draw_frame(const CommandBuffers&);

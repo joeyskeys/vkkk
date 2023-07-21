@@ -191,7 +191,7 @@ void VkWrappedInstance::end_single_time_commands(VkCommandBuffer cmd_buf) {
 
 void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     const uint32_t layers, const VkFormat format, VkImageTiling tiling,
-    VkImageUsageFlags usage, VkMemoryPropertyFlags properties,
+    VkImageUsageFlags usage, VkImageCreateFlags flags, VkMemoryPropertyFlags properties,
     VkImage& image, VkDeviceMemory& image_memo)
 {
     VkImageCreateInfo image_info{};
@@ -208,6 +208,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     image_info.usage = usage;
     image_info.samples = VK_SAMPLE_COUNT_1_BIT;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    image_info.flags = flags;
 
     if (vkCreateImage(device, &image_info, nullptr, &image) != VK_SUCCESS)
         throw std::runtime_error("failed to create image");
@@ -227,7 +228,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
 }
 
 void VkWrappedInstance::transition_image_layout(VkImage image, VkFormat format,
-    VkImageLayout old_layout, VkImageLayout new_layout)
+    VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange sub_range)
 {
     VkCommandBuffer cmd_buf = begin_single_time_commands();
 
@@ -238,11 +239,14 @@ void VkWrappedInstance::transition_image_layout(VkImage image, VkFormat format,
     barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = image;
+    /*
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
     barrier.subresourceRange.levelCount = 1;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
+    */
+    barrier.subresourceRange = sub_range;
 
     VkPipelineStageFlags src_stage;
     VkPipelineStageFlags dst_stage;
@@ -275,23 +279,12 @@ void VkWrappedInstance::transition_image_layout(VkImage image, VkFormat format,
     end_single_time_commands(cmd_buf);
 }
 
-void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, uint32_t w,
-    uint32_t h)
+void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, const std::vector<VkBufferImageCopy>& regions)
 {
     VkCommandBuffer cmd_buf = begin_single_time_commands();
 
-    VkBufferImageCopy region{};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {w, h, 1};
-
-    vkCmdCopyBufferToImage(cmd_buf, buf, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+    vkCmdCopyBufferToImage(cmd_buf, buf, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        regions.size(), regions.data());
 
     end_single_time_commands(cmd_buf);
 }
@@ -389,18 +382,33 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
     //VkImage img;
     //VkDeviceMemory img_memo;
     create_vk_image(w, h, 1, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 0,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
 
-    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copy_buffer_to_image(staging_buf, tex_img, static_cast<uint32_t>(w), static_cast<uint32_t>(h));
-    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = 1;
+    range.baseArrayLayer = 0;
+    range.layerCount = 1;
+
+    std::vector<VkBufferImageCopy> regions;
+    VkBufferImageCopy region{};
+    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.baseArrayLayer = 0;
+    region.imageSubresource.layerCount = 1;
+    region.imageExtent = { width, height, 1 };
+    region.imageOffset = {0, 0, 0};
+    region.bufferOffset = width * height * sizeof(Pixel);
+    regions.push_back(region);
+
+    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+        copy_buffer_to_image(staging_buf, tex_img, regions);
+    transition_image_layout(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
     vkDestroyBuffer(device, staging_buf, nullptr);
     vkFreeMemory(device, staging_buf_memo, nullptr);
-
-    //vk_images.emplace_back(img);
-    //vk_image_memos.emplace_back(img_memo);
 
     return true;
 }
@@ -1319,7 +1327,7 @@ void VkWrappedInstance::create_depth_resource() {
 
     create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, depth_format,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img, depth_img_memo);
+        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img, depth_img_memo);
     depth_img_view = create_imageview(depth_img, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     depth_created = true;
@@ -1533,8 +1541,8 @@ void VkWrappedInstance::record_commandbuffers(VkCommandBuffer cmd_buf, uint32_t 
         throw std::runtime_error("failed to record command buffer!");
 }
 
-void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandBuffer>& cmd_bufs,
-    std::vector<VkFramebuffer>& fbs, const std::function<void()>& emit_func)
+void VkWrappedInstance::record_cmds(std::vector<VkCommandBuffer>& cmd_bufs,
+    std::vector<VkFramebuffer>& fbs, const std::function<void(uint32_t)>& emit_func)
 {
     auto swapchain_cnt = get_swapchain_cnt();
     assert(cmd_bufs.size() == swapchain_cnt);
@@ -1562,8 +1570,7 @@ void VkWrappedInstance::record_cmds(const VkPipeline ppl, std::vector<VkCommandB
 
         vkCmdBeginRenderPass(cmd_bufs[i], &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
 
-            vkCmdBindPipeline(cmd_bufs[i], VK_PIPELINE_BIND_POINT_GRAPHICS, ppl);
-            emit_func();
+            emit_func(i);
 
         vkCmdEndRenderPass(cmd_bufs[i]);        
 

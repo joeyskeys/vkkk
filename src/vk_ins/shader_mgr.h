@@ -28,7 +28,7 @@ public:
     virtual ~ShaderModules();
 
     bool add_module(fs::path path, VkShaderStageFlagBits t);
-    void assign_tex_image(const std::string& tex_name, const std::string& tex_path);
+    void assign_tex_image(const std::string& tex_name, const std::string& tex_path, bool is_cubemap=false);
     void alloc_uniforms();
     void generate_create_infos();
     //std::vector<VkPipelineShaderStageCreateInfo> get_create_info_array() const;
@@ -110,7 +110,7 @@ private:
         uint32_t>;
     using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
         GLSLTYPE>;
-    using TexImgPairs = std::unordered_map<std::string, std::string>;
+    using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
     std::vector<BufInfoWithBinding>                 m_buf_brefs;
     std::vector<ImgInfoWithBinding>                 m_img_brefs;
     std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;

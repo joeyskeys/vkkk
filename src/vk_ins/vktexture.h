@@ -21,11 +21,11 @@ public:
     VkImage                             image;
     VkImageLayout                       image_layout;
     VkDeviceMemory                      memory;
-    std::vector<VkImageView>            views;
+    VkImageView                         view;
     uint32_t                            width, height;
     uint32_t                            mipmap_lv;
     uint32_t                            layout_cnt;
-    std::vector<VkDescriptorImageInfo>  descriptors;
+    VkDescriptorImageInfo               descriptor;
     VkSampler                           sampler;
     bool                                loaded = false;
 

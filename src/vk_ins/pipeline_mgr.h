@@ -103,6 +103,14 @@ public:
         else
             return std::make_pair(vk_pipelines[found->second], layouts[found->second]);
     }
+
+    inline void bind(const std::string& name, VkCommandBuffer buf) {
+        auto found = pipeline_map.find(name);
+        if (found == pipeline_map.end())
+            return;
+        else
+            vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipelines[found->second]);
+    }
 };
 
 }

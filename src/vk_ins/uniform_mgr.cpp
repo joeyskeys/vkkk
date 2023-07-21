@@ -55,6 +55,17 @@ bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t,
     return true;
 }
 
+bool UniformMgr::add_cubemap(const std::string& name, VkShaderStageFlagBits t,
+    uint32_t binding, const std::string& path)
+{
+    auto tex = Texture(instance, name, t, binding);
+    if (!tex.load_cubemap(path))
+        return false;
+
+    textures.emplace_back(std::move(tex));
+    return true;
+}
+
 void UniformMgr::generate_writes() {
 
 }

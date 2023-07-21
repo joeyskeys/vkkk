@@ -18,20 +18,12 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
+#include "vk_ins/types.h"
+
 namespace vkkk
 {
 
 class VkWrappedInstance;
-
-enum VERT_COMP {
-    VERTEX,
-    UV,
-    COLOR
-};
-
-static std::array<uint32_t, 3> comp_sizes = {
-    3, 2, 3
-};
 
 class Mesh {
 public:

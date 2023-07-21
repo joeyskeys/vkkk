@@ -1,3 +1,5 @@
+#pragma once
+
 #include <array>
 
 #include <vulkan/vulkan.h>
@@ -23,6 +25,16 @@ constexpr static std::array<VkFormat, 7> glsl_type_macro = {
     VK_FORMAT_R32_SFLOAT,
     VK_FORMAT_R32G32_SFLOAT, VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT,
     VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT, VK_FORMAT_R32G32B32A32_SINT
+};
+
+enum VERT_COMP {
+    VERTEX,
+    UV,
+    COLOR
+};
+
+static std::array<uint32_t, 3> comp_sizes = {
+    3, 2, 3
 };
 
 }

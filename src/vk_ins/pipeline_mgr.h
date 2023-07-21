@@ -53,9 +53,9 @@ public:
             pipeline.modules.create_descriptor_layouts();
     }
 
-    inline void     create_input_descriptions() {
+    inline void     create_input_descriptions(const std::vector<VERT_COMP>& comps) {
         for (auto& pipeline : pipelines)
-            pipeline.modules.create_input_descriptions();
+            pipeline.modules.create_input_descriptions(comps);
     }
     
     inline void     create_descriptor_pools() {

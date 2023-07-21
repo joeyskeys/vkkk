@@ -131,11 +131,11 @@ void ShaderModules::set_attribute_binding(uint32_t binding_idx, uint32_t attr_lo
         m_input_brefs[binding_idx].push_back(attr_location);
 }
 
-void ShaderModules::create_input_descriptions() {
+void ShaderModules::create_input_descriptions(const std::vector<VERT_COMP>& comps) {
     for (auto& [b_idx, attrs] : m_input_brefs) {
         VkVertexInputBindingDescription input_des{};
         input_des.binding = b_idx;
-        uint32_t stride = 0;
+        uint32_t offset = 0;
         for (const auto& attr_loc : attrs) {
             const auto& attr_bref = m_attr_brefs[attr_loc];
             VkVertexInputAttributeDescription attr_des{};
@@ -143,11 +143,17 @@ void ShaderModules::create_input_descriptions() {
             attr_des.location = attr_loc;
             auto glsl_type = std::get<2>(attr_bref);
             attr_des.format = glsl_type_macro[glsl_type];
-            attr_des.offset = stride;
-            stride += glsl_type_sizes[glsl_type];
+            attr_des.offset = offset;
+            offset += glsl_type_sizes[glsl_type];
             m_attr_descriptions.emplace_back(std::move(attr_des));
         }
+
+        uint32_t stride = 0;
+        for (const auto& c : comps) {
+            stride += comp_sizes[c] * sizeof(float);
+        }
         input_des.stride = stride;
+
         // Fixed for now, maybe make it a parameter when we're going to
         // do instanced drawing
         input_des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;

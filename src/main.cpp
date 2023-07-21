@@ -166,7 +166,7 @@ int main() {
 
     modules.set_attribute_binding(0, 0);
     modules.set_attribute_binding(0, 1);
-    modules.create_input_descriptions();
+    modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
 
 #define WITH_UV 1
     ins.create_graphics_pipeline(modules, WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);

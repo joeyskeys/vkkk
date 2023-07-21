@@ -99,6 +99,8 @@ int main() {
     auto& pipeline_obj = pipeline_mgr.get_pipeline("object");
     auto& pipeline_sky = pipeline_mgr.get_pipeline("skybox");
 
+    pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     pipeline_obj.modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
@@ -106,7 +108,7 @@ int main() {
 
     pipeline_sky.modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png");
+    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png", true);
     pipeline_sky.modules.alloc_uniforms();
 
     auto update_cbk = [&](uint32_t idx, float duration) {
@@ -128,7 +130,7 @@ int main() {
         auto sky_buf = reinterpret_cast<vkkk::MVPBuffer*>(sky_ubo_ptr->cpu_buf.get());
         sky_buf->model = glm::mat4(1);
         sky_buf->view = cam.get_view_mat();
-        //sky_buf->view[3] = glm::vec4(0.f, 0.f, 0.f, 1.f);
+        sky_buf->view[3] = glm::vec4(0.f, 0.f, 0.f, 1.f);
         sky_buf->proj = cam.get_proj_mat();
         pipeline_sky.uniforms->update_ubos(idx);
     };
@@ -143,7 +145,7 @@ int main() {
     pipeline_obj.modules.set_attribute_binding(0, 0);
     pipeline_obj.modules.set_attribute_binding(0, 1);
     pipeline_sky.modules.set_attribute_binding(0, 0);
-    pipeline_mgr.create_input_descriptions();
+    pipeline_mgr.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
 

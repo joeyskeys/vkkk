@@ -227,6 +227,7 @@ bool Texture::load_cubemap(const fs::path& path) {
     range.baseArrayLayer = 0;
     range.layerCount = 6;
 
+    size_t offset = 0;
     std::vector<VkBufferImageCopy> regions;
     for (int i = 0; i < 6; ++i) {
         VkBufferImageCopy region{};
@@ -236,7 +237,8 @@ bool Texture::load_cubemap(const fs::path& path) {
         region.imageSubresource.layerCount = 1;
         region.imageOffset = {0, 0, 0};
         region.imageExtent = {size, size, 1};
-        region.bufferOffset = size * size * sizeof(Pixel);
+        region.bufferOffset = offset;
+        offset += size * size * sizeof(Pixel);
         regions.push_back(region);
     }
 

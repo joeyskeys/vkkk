@@ -108,7 +108,7 @@ int main() {
 
     pipeline_sky.modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox2.png", true);
+    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png", true);
     pipeline_sky.modules.alloc_uniforms();
 
     auto update_cbk = [&](uint32_t idx, float duration) {

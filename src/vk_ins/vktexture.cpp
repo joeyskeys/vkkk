@@ -192,7 +192,11 @@ bool Texture::load_cubemap(const fs::path& path) {
     VkDeviceSize image_size = size * size * sizeof(Pixel) * 6;
 
     for (auto& buf : bufs) {
-        buf = OIIO::ImageBufAlgo::flip(buf);
+        /*
+        // Interestingly, cubemap doesn't need to do any flipping
+        if (reorient_funcs[i])
+            buf = reorient_funcs[i](buf, OIIO::ROI{}, 0);
+        */
         int ch_ords[] = {0, 1, 2, -1};
         float ch_vals[] = {0, 0, 0, 1.f};
         std::string ch_names[] = {"R", "G", "B", "A"};

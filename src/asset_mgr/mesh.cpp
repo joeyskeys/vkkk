@@ -79,6 +79,13 @@ void Mesh::load(aiMesh *mesh) {
                 prev += 3;
                 break;
             }
+            case NORMAL: {
+                for (int i = 0; i < vcnt; ++i) {
+                    vbuf[i * comp_size + prev    ] = mesh->mNormals[i].x;
+                    vbuf[i * comp_size + prev + 1] = mesh->mNormals[i].y;
+                    vbuf[i * comp_size + prev + 2] = mesh->mNormals[i].z;
+                }
+            }
             case UV: {
                 for (int i = 0; i < vcnt; ++i) {
                     const auto uv = mesh->mTextureCoords[0][i];

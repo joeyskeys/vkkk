@@ -4,6 +4,7 @@
 
 #include "asset_mgr/mesh_mgr.h"
 #include "concepts/camera.h"
+#include "concepts/lights.h"
 #include "vk_ins/cmd_buf.h"
 #include "vk_ins/vkabstraction.h"
 #include "vk_ins/pipeline_mgr.h"
@@ -96,8 +97,10 @@ int main() {
     vkkk::PipelineMgr pipeline_mgr(&ins);
     pipeline_mgr.register_pipeline("object");
     pipeline_mgr.register_pipeline("skybox");
+    pipeline_mgr.register_pipeline("forward");
     auto& pipeline_obj = pipeline_mgr.get_pipeline("object");
     auto& pipeline_sky = pipeline_mgr.get_pipeline("skybox");
+    auto& pipeline_for = pipeline_mgr.get_pipeline("forward");
 
     pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
@@ -110,6 +113,13 @@ int main() {
     pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png", true);
     pipeline_sky.modules.alloc_uniforms();
+
+    pipeline_for.modules.add_module("../resource/shaders/basic_lighting_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_for.modules.add_module("../resource/shaders/basic_lighting_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_for.modules.alloc_uniforms();
+
+    // We need a concept of a complete scene now..
+    PointLight pt_light{ glm::vec3(0, 0, 10), glm::vec3(1, 1, 0), false };
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -133,6 +143,28 @@ int main() {
         sky_buf->view[3] = glm::vec4(0.f, 0.f, 0.f, 1.f);
         sky_buf->proj = cam.get_proj_mat();
         pipeline_sky.uniforms->update_ubos(idx);
+
+        auto xforms_ptr = pipeline_for.uniforms->find_ubo("xforms");
+        if (!xforms_ptr)
+            return;
+        auto xforms_buf = reinterpret_cast<glm::mat4*>(xforms_ptr->cpu_buf.get());
+        xforms_buf[0] = cam.get_proj_mat() * cam.get_view_mat() * glm::translate(glm::mat4(1), glm::vec3(5, 0, 0));
+        xforms_buf[1] = glm::transpose(glm::inverse(xforms_buf[0]));
+
+        auto datas_ptr = pipeline_for.uniforms->find_ubo("datas");
+        if (!datas_ptr)
+            return;
+        auto cnt_buf = reinterpret_cast<uint32_t*>(datas_ptr->cpu_buf.get());
+        cnt_buf[0] = 1;
+        cnt_buf[1] = 0;
+        cnt_buf[2] = 0;
+
+        // Uniform of array type...
+        auto pt_lights_ptr = pipeline_for.uniforms->find_ubo("point_lights");
+        if (!pt_lights_ptr)
+            return;
+        auto pt_lights_buf = reinterpret_cast<float*>(pt_lights_ptr->cpu_buf.get());
+        memcpy(pt_lights_buf, &pt_light, sizeof(float) * 6);
     };
 
     ins.set_update_cbk(update_cbk);
@@ -159,8 +191,10 @@ int main() {
     mesh_mgr.init(&ins);
     mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
     mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
+    mesh_mgr.load_file("../resource/models/sphere.obj", {vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
     auto moon_obj = &mesh_mgr.meshes[0];
     auto skybox_obj = &mesh_mgr.meshes[1];
+    auto sphere_obj = &mesh_mgr.meshes[2];
     mesh_mgr.pour_into_gpu();
 
     vkkk::CommandBuffers cmd_bufs(&ins);
@@ -168,6 +202,7 @@ int main() {
     
     auto [obj_vk_ppl, obj_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("object");
     auto [box_vk_ppl, box_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("skybox");
+    auto [for_vk_ppl, for_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("forward");
     assert(obj_vk_ppl != nullptr);
     assert(box_vk_ppl != nullptr);
 
@@ -181,6 +216,9 @@ int main() {
             pipeline_mgr.bind("object", cmd_bufs.bufs[idx]);
             moon_obj->emit_draw_cmd(cmd_bufs.bufs[idx], obj_ppl_layout,
                 pipeline_obj.modules.get_descriptor_set(idx));
+            pipeline_mgr.bind("forward", cmd_bufs.bufs[idx]);
+            sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], for_ppl_layout,
+                pipeline_for.modules.get_descriptor_set(idx));
         }
     );
     ins.create_sync_objects();

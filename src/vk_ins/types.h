@@ -29,12 +29,13 @@ constexpr static std::array<VkFormat, 7> glsl_type_macro = {
 
 enum VERT_COMP {
     VERTEX,
+    NORMAL,
     UV,
     COLOR
 };
 
-static std::array<uint32_t, 3> comp_sizes = {
-    3, 2, 3
+static std::array<uint32_t, 4> comp_sizes = {
+    3, 3, 2, 3
 };
 
 }

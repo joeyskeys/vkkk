@@ -2,34 +2,30 @@
 
 #include "utils/macros.h"
 
-#if HOST_CODE
 #include <cstring>
 #include <glm/glm.hpp>
-using namespace glm;
-#endif
+
+// Code here cannot be reused in glsl shader file by including.
+// Vulkan shader cannot separate struct definition and its declaration.
 
 struct PointLight {
-    vec3   pos;
-    vec3   color;
-#if HOST_CODE
+    glm::vec3   pos;
+    glm::vec3   color;
     bool   falloff;
-#endif
 };
 
 struct DirectionalLight {
-    vec3   direction;
-    vec3   color;
+    glm::vec3   direction;
+    glm::vec3   color;
 };
 
 struct SpotLight {
-    vec3   pos;
-    vec3   direction;
-    vec3   color;
+    glm::vec3   pos;
+    glm::vec3   direction;
+    glm::vec3   color;
     float  angle;
 };
 
-#if HOST_CODE
 inline void update_uniform(void* data, void* light_obj, uint32_t n) {
     memcpy(data, light_obj, n);
 }
-#endif

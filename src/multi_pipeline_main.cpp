@@ -81,7 +81,7 @@ void mouse_pos_callback(GLFWwindow* win, double x, double y) {
         cam.prev_x = x;
         cam.prev_y = y;
         cam.rotation = glm::angleAxis(delta_x, glm::vec3(0, 1, 0));
-        cam.rotation = glm::angleAxis(-delta_y, glm::vec3(1, 0, 0)) * cam.rotation;
+        cam.rotation = glm::angleAxis(delta_y, glm::vec3(1, 0, 0)) * cam.rotation;
     }
 }
 
@@ -98,9 +98,11 @@ int main() {
     pipeline_mgr.register_pipeline("object");
     pipeline_mgr.register_pipeline("skybox");
     pipeline_mgr.register_pipeline("forward");
+    pipeline_mgr.register_pipeline("matte");
     auto& pipeline_obj = pipeline_mgr.get_pipeline("object");
     auto& pipeline_sky = pipeline_mgr.get_pipeline("skybox");
     auto& pipeline_for = pipeline_mgr.get_pipeline("forward");
+    auto& pipeline_mat = pipeline_mgr.get_pipeline("matte");
 
     pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
 
@@ -118,8 +120,12 @@ int main() {
     pipeline_for.modules.add_module("../resource/shaders/basic_lighting_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
     pipeline_for.modules.alloc_uniforms();
 
+    pipeline_mat.modules.add_module("../resource/shaders/matte_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_mat.modules.add_module("../resource/shaders/matte_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_mat.modules.alloc_uniforms();
+
     // We need a concept of a complete scene now..
-    PointLight pt_light{ glm::vec3(0, 0, 10), glm::vec3(1, 1, 0), false };
+    PointLight pt_light{ glm::vec3(0, 10, 0), glm::vec3(1, 1, 0), false };
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -148,8 +154,18 @@ int main() {
         if (!xforms_ptr)
             return;
         auto xforms_buf = reinterpret_cast<glm::mat4*>(xforms_ptr->cpu_buf.get());
-        xforms_buf[0] = cam.get_proj_mat() * cam.get_view_mat() * glm::translate(glm::mat4(1), glm::vec3(5, 0, 0));
-        xforms_buf[1] = glm::transpose(glm::inverse(xforms_buf[0]));
+        xforms_buf[0] = cam.get_proj_mat() * cam.get_view_mat();
+        //xforms_buf[1] = glm::transpose(glm::inverse(xforms_buf[0]));
+
+        /*
+        auto for_ubo_ptr = pipeline_for.uniforms->find_ubo("ubo");
+        if (!for_ubo_ptr)
+            return;
+        auto for_buf = reinterpret_cast<vkkk::MVPBuffer*>(for_ubo_ptr->cpu_buf.get());
+        for_buf->model = glm::mat4(1);
+        for_buf->view = cam.get_view_mat();
+        for_buf->proj = cam.get_proj_mat();
+        */
 
         auto datas_ptr = pipeline_for.uniforms->find_ubo("datas");
         if (!datas_ptr)
@@ -158,6 +174,8 @@ int main() {
         cnt_buf[0] = 1;
         cnt_buf[1] = 0;
         cnt_buf[2] = 0;
+        auto normal_xform_buf = reinterpret_cast<glm::mat4*>(cnt_buf + 3);
+        *normal_xform_buf = glm::mat4(1);
 
         // Uniform of array type...
         auto pt_lights_ptr = pipeline_for.uniforms->find_ubo("point_lights");
@@ -165,6 +183,23 @@ int main() {
             return;
         auto pt_lights_buf = reinterpret_cast<float*>(pt_lights_ptr->cpu_buf.get());
         memcpy(pt_lights_buf, &pt_light, sizeof(float) * 6);
+
+        pipeline_for.uniforms->update_ubos(idx);
+
+        auto mat_ubo_ptr = pipeline_mat.uniforms->find_ubo("ubo");
+        if (!mat_ubo_ptr)
+            return;
+        auto mat_buf = reinterpret_cast<vkkk::MVPBuffer*>(mat_ubo_ptr->cpu_buf.get());
+        mat_buf->model = glm::mat4(1);
+        mat_buf->view = cam.get_view_mat();
+        mat_buf->proj = cam.get_proj_mat();
+
+        auto mat_color_ptr = pipeline_mat.uniforms->find_ubo("datas");
+        if (!mat_color_ptr)
+            return;
+        auto color_buf = reinterpret_cast<glm::vec3*>(mat_color_ptr->cpu_buf.get());
+        *color_buf = glm::vec3(0.4, 0.6, 0.6);
+        pipeline_mat.uniforms->update_ubos(idx);
     };
 
     ins.set_update_cbk(update_cbk);
@@ -176,8 +211,20 @@ int main() {
 
     pipeline_obj.modules.set_attribute_binding(0, 0);
     pipeline_obj.modules.set_attribute_binding(0, 1);
+    pipeline_obj.modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+
     pipeline_sky.modules.set_attribute_binding(0, 0);
-    pipeline_mgr.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+    pipeline_sky.modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+
+    pipeline_for.modules.set_attribute_binding(0, 0);
+    pipeline_for.modules.set_attribute_binding(0, 1);
+    pipeline_for.modules.set_attribute_binding(0, 2);
+    pipeline_for.modules.create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
+
+    pipeline_mat.modules.set_attribute_binding(0, 0);
+    pipeline_mat.modules.set_attribute_binding(0, 1);
+    pipeline_mat.modules.set_attribute_binding(0, 2);
+    pipeline_mat.modules.create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
 
@@ -203,6 +250,7 @@ int main() {
     auto [obj_vk_ppl, obj_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("object");
     auto [box_vk_ppl, box_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("skybox");
     auto [for_vk_ppl, for_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("forward");
+    auto [mat_vk_ppl, mat_ppl_layout] = pipeline_mgr.get_vkpipeline_and_layout("matte");
     assert(obj_vk_ppl != nullptr);
     assert(box_vk_ppl != nullptr);
 
@@ -213,12 +261,19 @@ int main() {
             pipeline_mgr.bind("skybox", cmd_bufs.bufs[idx]);
             skybox_obj->emit_draw_cmd(cmd_bufs.bufs[idx], box_ppl_layout,
                 pipeline_sky.modules.get_descriptor_set(idx));
+            /*
             pipeline_mgr.bind("object", cmd_bufs.bufs[idx]);
             moon_obj->emit_draw_cmd(cmd_bufs.bufs[idx], obj_ppl_layout,
                 pipeline_obj.modules.get_descriptor_set(idx));
+            */
             pipeline_mgr.bind("forward", cmd_bufs.bufs[idx]);
             sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], for_ppl_layout,
                 pipeline_for.modules.get_descriptor_set(idx));
+            /*
+            pipeline_mgr.bind("matte", cmd_bufs.bufs[idx]);
+            sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], mat_ppl_layout,
+                pipeline_mat.modules.get_descriptor_set(idx));
+            */
         }
     );
     ins.create_sync_objects();

@@ -31,6 +31,12 @@ public:
     }
 
     inline glm::mat4 get_proj_mat() const {
+        // How to properly solve the upside down problem?
+        /*
+        auto persp_mat = glm::perspective(glm::radians(fov), ratio, near, far);
+        persp_mat[1][1] *= -1;
+        return persp_mat;
+        */
         return glm::perspective(glm::radians(fov), ratio, near, far);
     }
 

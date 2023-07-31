@@ -85,6 +85,8 @@ void Mesh::load(aiMesh *mesh) {
                     vbuf[i * comp_size + prev + 1] = mesh->mNormals[i].y;
                     vbuf[i * comp_size + prev + 2] = mesh->mNormals[i].z;
                 }
+                prev += 3;
+                break;
             }
             case UV: {
                 for (int i = 0; i < vcnt; ++i) {

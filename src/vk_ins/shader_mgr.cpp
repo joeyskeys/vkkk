@@ -79,13 +79,17 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     //uniform_info[0] = m_buf_brefs.size();
     //uniform_info[1] = m_img_brefs.size();
 
-    for (auto& input : res.stage_inputs) {
-        // TODO : handle the inputs properly
-        auto name = comp.get_name(input.id);
-        type_info = comp.get_type(input.base_type_id);
-        auto vectype = find_vec_type(type_info);
-        location_idx = comp.get_decoration(input.id, spv::DecorationLocation);
-        m_attr_brefs.emplace(location_idx, std::make_tuple(name, t, vectype));
+    // All the inputs after vertex stage comes from vertex stage in the
+    // begining, skip them
+    if (t == VK_SHADER_STAGE_VERTEX_BIT) {
+        for (auto& input : res.stage_inputs) {
+            // TODO : handle the inputs properly
+            auto name = comp.get_name(input.id);
+            type_info = comp.get_type(input.base_type_id);
+            auto vectype = find_vec_type(type_info);
+            location_idx = comp.get_decoration(input.id, spv::DecorationLocation);
+            m_attr_brefs.emplace(location_idx, std::make_tuple(name, t, vectype));
+        }
     }
 
     return true;
@@ -166,7 +170,7 @@ void ShaderModules::create_descriptor_layouts() {
     uint32_t binding_cnt = 0;
     auto setup_binding = [&](const auto& des, const VkDescriptorType des_type) {
         VkDescriptorSetLayoutBinding binding{};
-        binding.binding = binding_cnt++;
+        binding.binding = des.binding;
         binding.descriptorType = des_type;
         binding.descriptorCount = des.vecsize;
         binding.pImmutableSamplers = nullptr;

@@ -27,6 +27,7 @@ public:
     UBO(VkWrappedInstance*, const VkShaderStageFlagBits, uint32_t, size_t, size_t vs=1);
     ~UBO();
     UBO(UBO&& rhs);
+    UBO(const UBO& rhs) = delete;
 
     void update_descriptor();
     void update(uint32_t idx);

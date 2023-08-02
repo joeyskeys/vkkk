@@ -40,7 +40,6 @@ bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
 {
     auto ubo = UBO(instance, t, binding, size, vecsize);
     ubo.name = name;
-    //ubos.emplace_back(std::move(ubo));
     ubos.emplace(name, std::move(ubo));
     return true;
 }

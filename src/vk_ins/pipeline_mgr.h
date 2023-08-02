@@ -14,7 +14,7 @@ class VkWrappedInstance;
 class Pipeline {
 public:
     VkWrappedInstance*                      ins;
-    std::shared_ptr<UniformMgr>             uniforms;
+    std::unique_ptr<UniformMgr>             uniforms;
     ShaderModules                           modules;
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;

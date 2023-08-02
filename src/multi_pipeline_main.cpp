@@ -22,6 +22,10 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
+struct LightInfo {
+    PointLight pt_lights[MAX_POINT_LIGHTS];
+};
+
 Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
@@ -126,7 +130,9 @@ int main() {
     pipeline_mat.modules.alloc_uniforms();
 
     // We need a concept of a complete scene now..
-    PointLight pt_light{ glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1) };
+    LightInfo light_info;
+    light_info.pt_lights[0] = { glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1) };
+    light_info.pt_lights[1] = { glm::vec4(10, 10, 5, 1), glm::vec4(1, 0, 0, 1) };
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -156,35 +162,11 @@ int main() {
             return;
         auto xforms_buf = reinterpret_cast<glm::mat4*>(xforms_ptr->cpu_buf.get());
         xforms_buf[0] = cam.get_proj_mat() * cam.get_view_mat();
-        //xforms_buf[1] = glm::transpose(glm::inverse(xforms_buf[0]));
 
-        /*
-        auto for_ubo_ptr = pipeline_for.uniforms->find_ubo("ubo");
-        if (!for_ubo_ptr)
+        auto light_info_ptr = pipeline_for.uniforms->find_ubo("light_info");
+        if (!light_info_ptr)
             return;
-        auto for_buf = reinterpret_cast<vkkk::MVPBuffer*>(for_ubo_ptr->cpu_buf.get());
-        for_buf->model = glm::mat4(1);
-        for_buf->view = cam.get_view_mat();
-        for_buf->proj = cam.get_proj_mat();
-        */
-
-        auto datas_ptr = pipeline_for.uniforms->find_ubo("datas");
-        if (!datas_ptr)
-            return;
-        auto cnt_buf = reinterpret_cast<uint32_t*>(datas_ptr->cpu_buf.get());
-        cnt_buf[0] = 1;
-        cnt_buf[1] = 0;
-        cnt_buf[2] = 0;
-        auto normal_xform_buf = reinterpret_cast<glm::mat4*>(cnt_buf + 3);
-        *normal_xform_buf = glm::mat4(1);
-
-        // Uniform of array type...
-        auto pt_lights_ptr = pipeline_for.uniforms->find_ubo("point_lights");
-        if (!pt_lights_ptr)
-            return;
-        auto pt_lights_buf = reinterpret_cast<float*>(pt_lights_ptr->cpu_buf.get());
-        memcpy(pt_lights_buf, &pt_light, sizeof(float) * 6);
-
+        memcpy(light_info_ptr->cpu_buf.get(), &light_info, sizeof(LightInfo));
         pipeline_for.uniforms->update_ubos(idx);
 
         auto mat_ubo_ptr = pipeline_mat.uniforms->find_ubo("ubo");

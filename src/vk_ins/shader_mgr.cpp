@@ -59,15 +59,17 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     spirv_cross::CompilerGLSL comp(std::move(spirv_code));
     auto res = comp.get_shader_resources();
     shader_resources_map[t] = res;
-    spirv_cross::SPIRType type_info;
     uint32_t binding_idx, location_idx;
 
     for (auto& ubo : res.uniform_buffers) {
         auto name = comp.get_name(ubo.id);
-        type_info = comp.get_type(ubo.base_type_id);
+        auto type_info = comp.get_type(ubo.type_id);
+        auto base_type_info = comp.get_type(ubo.base_type_id);
         binding_idx = comp.get_decoration(ubo.id, spv::DecorationBinding);
-        m_buf_brefs.emplace_back(name, t, comp.get_declared_struct_size(type_info),
-            binding_idx);
+        // This code is problematic, we're assuming the array always be 1 dimension
+        auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
+        m_buf_brefs.emplace_back(name, t, comp.get_declared_struct_size(base_type_info),
+            array_size, binding_idx);
     }
 
     for (auto& sampler : res.sampled_images) {
@@ -85,7 +87,7 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         for (auto& input : res.stage_inputs) {
             // TODO : handle the inputs properly
             auto name = comp.get_name(input.id);
-            type_info = comp.get_type(input.base_type_id);
+            auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             location_idx = comp.get_decoration(input.id, spv::DecorationLocation);
             m_attr_brefs.emplace(location_idx, std::make_tuple(name, t, vectype));
@@ -101,8 +103,8 @@ void ShaderModules::assign_tex_image(const std::string& tex_name, const std::str
 
 void ShaderModules::alloc_uniforms() {
     for (auto& bref : m_buf_brefs) {
-        auto [name, stage, size, binding] = bref;
-        uniform_mgr->add_buffer(name, stage, binding, size);
+        auto [name, stage, size, vecsize, binding] = bref;
+        uniform_mgr->add_buffer(name, stage, binding, size, vecsize);
     }
     for (auto& bref : m_img_brefs) {
         auto [name, stage, binding] = bref;

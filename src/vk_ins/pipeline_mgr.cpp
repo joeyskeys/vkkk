@@ -8,7 +8,7 @@ namespace vkkk
 
 Pipeline::Pipeline(VkWrappedInstance* i)
     : ins(i)
-    , uniforms(std::make_shared<UniformMgr>(i))
+    , uniforms(std::make_unique<UniformMgr>(i))
     , modules(i, uniforms.get())
     , input_info()
     , input_assembly()

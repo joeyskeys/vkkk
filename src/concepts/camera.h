@@ -23,7 +23,9 @@ public:
     glm::quat rotation;
 
     inline glm::mat4 get_trans_mat() const {
-        return glm::translate(glm::mat4(), pos);
+        auto flipped = pos;
+        flipped[1] *= -1;
+        return glm::translate(glm::mat4(), flipped);
     }
 
     inline glm::mat4 get_view_mat() const {
@@ -32,12 +34,10 @@ public:
 
     inline glm::mat4 get_proj_mat() const {
         // How to properly solve the upside down problem?
-        /*
         auto persp_mat = glm::perspective(glm::radians(fov), ratio, near, far);
         persp_mat[1][1] *= -1;
         return persp_mat;
-        */
-        return glm::perspective(glm::radians(fov), ratio, near, far);
+        //return glm::perspective(glm::radians(fov), ratio, near, far);
     }
 
     void update_position(float duration);

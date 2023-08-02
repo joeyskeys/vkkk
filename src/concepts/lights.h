@@ -9,9 +9,9 @@
 // Vulkan shader cannot separate struct definition and its declaration.
 
 struct PointLight {
-    glm::vec3   pos;
-    glm::vec3   color;
-    bool   falloff;
+    glm::vec4   pos;
+    glm::vec4   color;
+    //bool   falloff;
 };
 
 struct DirectionalLight {

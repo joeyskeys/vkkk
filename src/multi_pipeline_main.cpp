@@ -105,6 +105,7 @@ int main() {
     auto& pipeline_mat = pipeline_mgr.get_pipeline("matte");
 
     pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    pipeline_sky.rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
 
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -125,7 +126,7 @@ int main() {
     pipeline_mat.modules.alloc_uniforms();
 
     // We need a concept of a complete scene now..
-    PointLight pt_light{ glm::vec3(0, 10, 0), glm::vec3(1, 1, 0), false };
+    PointLight pt_light{ glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1) };
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);

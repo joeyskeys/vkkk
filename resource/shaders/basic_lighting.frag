@@ -13,8 +13,8 @@ layout (binding = 1) uniform Datas {
 } datas;
 
 layout (binding = 2) uniform PointLight {
-    vec3 pos;
-    vec3 color;
+    vec4 pos;
+    vec4 color;
 } point_lights;
 //layout (binding = 2) uniform DirectionalLight dir_lights[MAX_DIRECTIONAL_LIGHTS];
 //layout (binding = 3) uniform SpotLight spot_lights[MAX_SPOT_LIGHTS];
@@ -29,6 +29,6 @@ void main() {
         out_color += vec4(vec3(1) * max(0, dot(light_dir, world_normal)), 1);
     }
     */
-    vec3 light_dir = normalize(point_lights.pos - pos);
-    out_color = vec4(vec3(1) * max(0, dot(light_dir, world_normal)), 1);
+    vec3 light_dir = normalize(point_lights.pos.xyz - pos);
+    out_color = vec4(point_lights.color.xyz * max(dot(light_dir, normal), 0), 1);
 }

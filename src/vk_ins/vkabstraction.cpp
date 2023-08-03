@@ -90,6 +90,8 @@ VkWrappedInstance::VkWrappedInstance()
         physical_device = physical_devices[0];
         vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
     }
+
+    vkGetPhysicalDeviceProperties(physical_device, &physical_device_props);
 }
 
 VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename)
@@ -190,9 +192,9 @@ void VkWrappedInstance::end_single_time_commands(VkCommandBuffer cmd_buf) {
 }
 
 void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
-    const uint32_t layers, const VkFormat format, VkImageTiling tiling,
-    VkImageUsageFlags usage, VkImageCreateFlags flags, VkMemoryPropertyFlags properties,
-    VkImage& image, VkDeviceMemory& image_memo)
+    const uint32_t layers, const VkSampleCountFlagBits n, const VkFormat format,
+    VkImageTiling tiling, VkImageUsageFlags usage, VkImageCreateFlags flags,
+    VkMemoryPropertyFlags properties, VkImage& image, VkDeviceMemory& image_memo)
 {
     VkImageCreateInfo image_info{};
     image_info.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -206,7 +208,7 @@ void VkWrappedInstance::create_vk_image(const uint32_t w, const uint32_t h,
     image_info.tiling = tiling;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage = usage;
-    image_info.samples = VK_SAMPLE_COUNT_1_BIT;
+    image_info.samples = n;
     image_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     image_info.flags = flags;
 
@@ -381,9 +383,9 @@ bool VkWrappedInstance::load_texture(const fs::path& path) {
 
     //VkImage img;
     //VkDeviceMemory img_memo;
-    create_vk_image(w, h, 1, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, 0,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
+    create_vk_image(w, h, 1, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex_img, tex_img_memo);
 
     VkImageSubresourceRange range{};
     range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -417,6 +419,25 @@ void VkWrappedInstance::create_surface() {
     assert(window != nullptr);
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
         throw std::runtime_error("failed to create window surface!");
+}
+
+VkSampleCountFlagBits VkWrappedInstance::get_max_usable_sample_cnt() const {
+    VkSampleCountFlags cnts = physical_device_props.limits.framebufferColorSampleCounts
+        & physical_device_props.limits.framebufferDepthSampleCounts;
+
+    if (cnts & VK_SAMPLE_COUNT_64_BIT)
+        return VK_SAMPLE_COUNT_64_BIT;
+    if (cnts & VK_SAMPLE_COUNT_32_BIT)
+        return VK_SAMPLE_COUNT_32_BIT;
+    if (cnts & VK_SAMPLE_COUNT_16_BIT)
+        return VK_SAMPLE_COUNT_16_BIT;
+    if (cnts & VK_SAMPLE_COUNT_8_BIT)
+        return VK_SAMPLE_COUNT_8_BIT;
+    if (cnts & VK_SAMPLE_COUNT_4_BIT)
+        return VK_SAMPLE_COUNT_4_BIT;
+    if (cnts & VK_SAMPLE_COUNT_2_BIT)
+        return VK_SAMPLE_COUNT_2_BIT;
+    return VK_SAMPLE_COUNT_1_BIT;
 }
 
 bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
@@ -587,6 +608,11 @@ uint32_t VkWrappedInstance::create_swapchain() {
 }
 
 void VkWrappedInstance::cleanup_swapchain() {
+    if (color_created) {
+        vkDestroyImageView(device, color_img_view, nullptr);
+        vkDestroyImage(device, color_img, nullptr);
+        vkFreeMemory(device, color_img_memo, nullptr);
+    }
     if (depth_created) {
         vkDestroyImageView(device, depth_img_view, nullptr);
         vkDestroyImage(device, depth_img, nullptr);
@@ -643,6 +669,7 @@ void VkWrappedInstance::recreate_swapchain() {
     create_imageviews();
     create_renderpass();
     create_graphics_pipeline();
+    create_color_resource();
     create_depth_resource();
     create_framebuffers();
     create_uniform_buffer();
@@ -709,17 +736,28 @@ static std::vector<char> load_file(const fs::path& filepath) {
 void VkWrappedInstance::create_renderpass() {
     VkAttachmentDescription attachment{};
     attachment.format = swapchain_surface_format.format;
-    attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    attachment.samples = nsample;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    attachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
+    // Final representation attachment remains 1 sample
+    VkAttachmentDescription resolve_attachment{};
+    resolve_attachment.format = swapchain_surface_format.format;
+    resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
+    resolve_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    resolve_attachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    resolve_attachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    resolve_attachment.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     
     VkAttachmentDescription depth_attach{};
     depth_attach.format = find_depth_format();
-    depth_attach.samples = VK_SAMPLE_COUNT_1_BIT;
+    depth_attach.samples = nsample;
     depth_attach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attach.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -731,6 +769,10 @@ void VkWrappedInstance::create_renderpass() {
     attachment_ref.attachment = 0;
     attachment_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    VkAttachmentReference resolve_ref{};
+    resolve_ref.attachment = 2;
+    resolve_ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkAttachmentReference depth_attach_ref{};
     depth_attach_ref.attachment = 1;
     depth_attach_ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
@@ -739,6 +781,7 @@ void VkWrappedInstance::create_renderpass() {
     subpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass.colorAttachmentCount = 1;
     subpass.pColorAttachments = &attachment_ref;
+    subpass.pResolveAttachments = &resolve_ref;
     subpass.pDepthStencilAttachment = &depth_attach_ref;
 
     VkSubpassDependency dependency{};
@@ -749,7 +792,7 @@ void VkWrappedInstance::create_renderpass() {
     dependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
     dependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
-    std::array<VkAttachmentDescription, 2> attachments = {attachment, depth_attach};
+    std::array<VkAttachmentDescription, 3> attachments = {attachment, depth_attach, resolve_attachment};
     VkRenderPassCreateInfo pass_info{};
     pass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
     pass_info.attachmentCount = attachments.size();
@@ -1062,9 +1105,10 @@ void VkWrappedInstance::create_framebuffers() {
     swapchain_framebuffers.resize(swapchain_imageviews.size());
 
     for (int i = 0; i < swapchain_imageviews.size(); ++i) {
-        std::array<VkImageView, 2> attachments = {
+        std::array<VkImageView, 3> attachments = {
+            color_img_view,
+            depth_img_view,
             swapchain_imageviews[i],
-            depth_img_view
         };
 
         VkFramebufferCreateInfo framebuffer_info{};
@@ -1322,11 +1366,21 @@ VkFormat VkWrappedInstance::find_supported_format(const std::vector<VkFormat>& c
     throw std::runtime_error("failed to find supported format");
 }
 
+void VkWrappedInstance::create_color_resource() {
+    VkFormat format = swapchain_surface_format.format;
+    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1,
+        nsample, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, color_img, color_img_memo);
+    color_img_view = create_imageview(color_img, format, VK_IMAGE_ASPECT_COLOR_BIT);
+
+    color_created = true;
+}
+
 void VkWrappedInstance::create_depth_resource() {
     VkFormat depth_format = find_depth_format();
 
-    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, depth_format,
-        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, nsample,
+        depth_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
         0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img, depth_img_memo);
     depth_img_view = create_imageview(depth_img, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 

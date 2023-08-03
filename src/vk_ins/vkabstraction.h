@@ -116,9 +116,9 @@ public:
     void end_single_time_commands(VkCommandBuffer cmd_buf);
 
     void create_vk_image(const uint32_t w, const uint32_t h, const uint32_t layers,
-        const VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage,
-        VkImageCreateFlags flags, VkMemoryPropertyFlags properties, VkImage& image,
-        VkDeviceMemory& image_memo);
+        const VkSampleCountFlagBits n, const VkFormat format, VkImageTiling tiling,
+        VkImageUsageFlags usage, VkImageCreateFlags flags, VkMemoryPropertyFlags properties,
+        VkImage& image, VkDeviceMemory& image_memo);
     void transition_image_layout(VkImage image, VkFormat format,
         VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange sub_range);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, const std::vector<VkBufferImageCopy>& regions);
@@ -127,6 +127,7 @@ public:
     bool load_texture(const fs::path& path);
     
     void create_surface();
+    VkSampleCountFlagBits get_max_usable_sample_cnt() const;
 
     inline std::vector<VkPhysicalDevice> get_physical_devices() {
         return physical_devices;
@@ -202,6 +203,7 @@ public:
     void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
     void create_uniform_buffer();
     void update_uniform_buffer(uint32_t idx);
+    void create_color_resource();
     void create_depth_resource();
     void create_descriptor_pool();
     void create_descriptor_set();
@@ -294,6 +296,7 @@ private:
     // Currently only use one physical card and one logical device
     std::vector<VkPhysicalDevice> physical_devices;
     VkPhysicalDevice physical_device = VK_NULL_HANDLE;
+    VkPhysicalDeviceProperties physical_device_props;
     VkPhysicalDeviceMemoryProperties mem_props;
     VkDevice device;
 
@@ -373,6 +376,12 @@ private:
     std::vector<VkDeviceMemory>     uniform_buffer_memos;
     bool                            uniform_buffer_created = false;
 
+    // Color resource
+    VkImage                         color_img;
+    VkDeviceMemory                  color_img_memo;
+    VkImageView                     color_img_view;
+    bool                            color_created = false;
+
     // Depth Buffer
     VkImage                         depth_img;
     VkDeviceMemory                  depth_img_memo;
@@ -385,6 +394,7 @@ private:
 
 public:
     std::vector<VkBuffer>           uniform_buffers;
+    VkSampleCountFlagBits           nsample = VK_SAMPLE_COUNT_1_BIT;
 };
 
 }

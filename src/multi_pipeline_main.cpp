@@ -95,7 +95,10 @@ int main() {
     ins.create_logical_device();
     auto swapchain_img_cnt = ins.create_swapchain();
     ins.create_imageviews();
+
+    ins.nsample = VK_SAMPLE_COUNT_8_BIT;
     ins.create_renderpass();
+
     ins.create_command_pool();
 
     vkkk::PipelineMgr pipeline_mgr(&ins);
@@ -110,6 +113,9 @@ int main() {
 
     pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     pipeline_sky.rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    pipeline_sky.multisampling.rasterizationSamples = ins.nsample;
+    //pipeline_for.multisampling.sampleShadingEnable = VK_TRUE;
+    pipeline_for.multisampling.rasterizationSamples = ins.nsample;
 
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -211,6 +217,7 @@ int main() {
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
 
+    ins.create_color_resource();
     ins.create_depth_resource();
     ins.create_framebuffers();
 

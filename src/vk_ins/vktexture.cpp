@@ -98,8 +98,8 @@ bool Texture::load_image(const fs::path& path) {
         memcpy(data, pixels.data(), static_cast<size_t>(image_size));
     vkUnmapMemory(instance->get_device(), staging_buf_memo);
 
-    instance->create_vk_image(width, height, 1, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
+    instance->create_vk_image(width, height, 1, VK_SAMPLE_COUNT_1_BIT,
+        VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 
@@ -220,7 +220,7 @@ bool Texture::load_cubemap(const fs::path& path) {
         memcpy(data, pixel_pool.data(), static_cast<size_t>(image_size));
     vkUnmapMemory(instance->get_device(), staging_buf_memo);
 
-    instance->create_vk_image(size, size, 6, VK_FORMAT_R8G8B8A8_SRGB,
+    instance->create_vk_image(size, size, 6, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, image, memory);
 

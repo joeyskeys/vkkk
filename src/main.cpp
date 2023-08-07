@@ -46,7 +46,7 @@ bool check_validation_layer_support() {
     return true;
 }
 
-Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
+CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {

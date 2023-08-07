@@ -4,7 +4,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
-class Camera {
+namespace vkkk
+{
+
+#ifndef GL_core_profile
+class CameraDeprecated {
 public:
     glm::vec3 pos;
     glm::vec3 front;
@@ -43,3 +47,25 @@ public:
     void update_position(float duration);
     void update_orientation();
 };
+#endif
+
+struct Camera {
+    glm::mat4 view;
+    glm::mat4 proj;
+
+#ifndef GL_core_profile
+    inline void look_at(const glm::vec3& pos, const glm::vec3& fr, const glm::vec3& up) {
+        view = glm::lookAt(pos, pos + fr, up);
+    }
+    void perspective(const float fov, const float ratio, const float near, const float far) {
+        proj = glm::perspective(glm::radians(fov), ratio, near, far);
+        proj[1][1] *= -1;
+    }
+
+    inline void update_uniform(void* data, uint32_t n) {
+        memcpy(data, this, n);
+    }
+#endif
+};
+
+}

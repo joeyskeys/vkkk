@@ -26,7 +26,7 @@ struct LightInfo {
     PointLight pt_lights[MAX_POINT_LIGHTS];
 };
 
-Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
+CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {
@@ -113,8 +113,11 @@ int main() {
 
     pipeline_sky.depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
     pipeline_sky.rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    pipeline_sky.multisampling.sampleShadingEnable = VK_TRUE;
+    // pipeline rasterization sample should be unified or the result will
+    // be wrong
     pipeline_sky.multisampling.rasterizationSamples = ins.nsample;
-    //pipeline_for.multisampling.sampleShadingEnable = VK_TRUE;
+    pipeline_for.multisampling.sampleShadingEnable = VK_TRUE;
     pipeline_for.multisampling.rasterizationSamples = ins.nsample;
 
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);

@@ -8,6 +8,9 @@
 using namespace glm;
 #endif
 
+namespace vkkk
+{
+
 struct PointLight {
     vec4   pos;
     vec4   color;
@@ -30,3 +33,5 @@ inline void update_uniform(void* data, void* light_obj, uint32_t n) {
     memcpy(data, light_obj, n);
 }
 #endif
+
+}

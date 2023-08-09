@@ -1,3 +1,6 @@
 [submodule "thirdparty/stb"]
 	path = thirdparty/stb
 	url = https://github.com/nothings/stb.git
+[submodule "thirdparty/nanobind"]
+	path = thirdparty/nanobind
+	url = https://github.com/wjakob/nanobind

@@ -85,5 +85,6 @@ include_directories(${SPIRVCROSS_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
+add_subdirectory(thirdparty/nanobind)
 add_subdirectory(src)
 add_subdirectory(tests)

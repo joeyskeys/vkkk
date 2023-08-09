@@ -34,6 +34,7 @@ public:
 
     void load(aiMesh *mesh);
     void unload();
+    void set_view(uint32_t v, void* vview, uint32_t i, void* iview);
     void load_gpu();
     void unload_gpu();
 
@@ -45,9 +46,9 @@ public:
     bool                        indexed = true;
     uint32_t                    comp_size;
     uint32_t                    vcnt;
-    std::unique_ptr<float[]>    vbuf = nullptr;
+    float*                      vbuf = nullptr;
     uint32_t                    icnt;
-    std::unique_ptr<uint32_t[]> ibuf = nullptr;
+    uint32_t*                   ibuf = nullptr;
     bool                        loaded = false;
 
     VkBuffer                    vbuf_gpu;

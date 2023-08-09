@@ -20,10 +20,10 @@ Mesh::Mesh(const Mesh& b) {
     indexed = b.indexed;
     comp_size = b.comp_size;
     vcnt = b.vcnt;
-    vbuf = std::make_unique<float[]>(vcnt * comp_size);
+    vbuf = new float[vcnt * comp_size];
     memcpy(vbuf.get(), b.vbuf.get(), vcnt * comp_size * sizeof(float));
     icnt = b.icnt;
-    ibuf = std::make_unique<uint32_t[]>(icnt * 3);
+    ibuf = new uint32_t[icnt * 3];
     memcpy(ibuf.get(), b.ibuf.get(), icnt * 3 * sizeof(uint32_t));
     loaded = b.loaded;
     gpu_loaded = b.gpu_loaded;
@@ -37,9 +37,9 @@ Mesh::Mesh(Mesh&& b) {
     indexed = b.indexed;
     comp_size = b.comp_size;
     vcnt = b.vcnt;
-    vbuf = std::move(b.vbuf);
+    vbuf = b.vbuf;
     icnt = b.icnt;
-    ibuf = std::move(b.ibuf);
+    ibuf = b.ibuf;
     vbuf_gpu = b.vbuf_gpu;
     vbuf_memo = b.vbuf_memo;
     ibuf_gpu = b.ibuf_gpu;
@@ -64,8 +64,8 @@ void Mesh::load(aiMesh *mesh) {
     for (const auto& comp : comps)
         comp_size += comp_sizes[comp];
 
-    vbuf = std::make_unique<float[]>(vcnt * comp_size);
-    ibuf = std::make_unique<uint32_t[]>(icnt * 3);
+    vbuf = new float[vcnt * comp_size];
+    ibuf = new uint32_t[icnt * 3];
 
     uint32_t prev = 0;
     for (const auto& comp : comps) {
@@ -121,15 +121,23 @@ void Mesh::load(aiMesh *mesh) {
 
 void Mesh::unload() {
     vcnt = icnt = 0;
-    vbuf.reset();
-    ibuf.reset();
+    delete [] vbuf;
+    delete [] ibuf;
     loaded = false;
 }
 
+void Mesh::set_view(uint32_t v, void* vview, uint32_t i, void* iview) {
+    // Do not owning the data
+    vcnt = v;
+    vbuf = vview;
+    icnt = i;
+    ibuf = iview;
+}
+
 void Mesh::load_gpu() {
-    ins->create_vertex_buffer(vbuf.get(), vbuf_gpu, vbuf_memo, comp_size, vcnt);
+    ins->create_vertex_buffer(vbuf, vbuf_gpu, vbuf_memo, comp_size, vcnt);
     // * 3 means we're dealing with triangle
-    ins->create_index_buffer(ibuf.get(), ibuf_gpu, ibuf_memo, icnt * 3);
+    ins->create_index_buffer(ibuf, ibuf_gpu, ibuf_memo, icnt * 3);
     gpu_loaded = true;
 }
 

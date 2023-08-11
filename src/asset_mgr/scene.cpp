@@ -2,6 +2,7 @@
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "asset_mgr/scene.h"
+#include "vk_ins/pipeline_mgr.h"
 
 namespace vkkk
 {

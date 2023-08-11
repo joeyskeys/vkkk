@@ -56,4 +56,6 @@ target_link_libraries(vktutor
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti
     vkkk
-    ${OIIO_LIBRARIES})   
+    ${OIIO_LIBRARIES})
+
+add_subdirectory(binding)

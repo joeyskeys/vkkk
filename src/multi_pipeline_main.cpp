@@ -23,10 +23,10 @@ const bool enableValidationLayers = true;
 #endif
 
 struct LightInfo {
-    PointLight pt_lights[MAX_POINT_LIGHTS];
+    vkkk::PointLight pt_lights[MAX_POINT_LIGHTS];
 };
 
-CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
+vkkk::CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {

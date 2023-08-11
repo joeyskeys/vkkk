@@ -46,7 +46,7 @@ bool check_validation_layer_support() {
     return true;
 }
 
-CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
+vkkk::CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {
@@ -190,8 +190,8 @@ int main() {
     mesh_mgr.init(&ins);
     mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
     const auto& mesh = mesh_mgr.meshes[0];
-    ins.create_vertex_buffer(mesh.vbuf.get(), mesh.comp_size, mesh.vcnt);
-    ins.create_index_buffer(mesh.ibuf.get(), mesh.icnt * 3);
+    ins.create_vertex_buffer(mesh.vbuf, mesh.comp_size, mesh.vcnt);
+    ins.create_index_buffer(mesh.ibuf, mesh.icnt * 3);
 
     ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
     ins.create_sync_objects();

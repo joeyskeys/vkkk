@@ -1,11 +1,15 @@
 #pragma once
 
+#ifndef GL_core_profile
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
+#include <cstring>
+
 namespace vkkk
 {
+#endif
 
 #ifndef GL_core_profile
 class CameraDeprecated {
@@ -68,4 +72,6 @@ struct Camera {
 #endif
 };
 
+#ifndef GL_core_profile
 }
+#endif

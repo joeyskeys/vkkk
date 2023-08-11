@@ -39,7 +39,6 @@ public:
     std::vector<Pipeline>                   pipelines;
     std::vector<VkPipeline>                 vk_pipelines;
     std::vector<VkPipelineLayout>           layouts;
-    //std::vector<VkRenderPass>               renderpasses;
     std::map<std::string, uint32_t>         pipeline_map;
 
     PipelineMgr(VkWrappedInstance*);

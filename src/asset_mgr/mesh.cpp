@@ -21,10 +21,10 @@ Mesh::Mesh(const Mesh& b) {
     comp_size = b.comp_size;
     vcnt = b.vcnt;
     vbuf = new float[vcnt * comp_size];
-    memcpy(vbuf.get(), b.vbuf.get(), vcnt * comp_size * sizeof(float));
+    memcpy(vbuf, b.vbuf, vcnt * comp_size * sizeof(float));
     icnt = b.icnt;
     ibuf = new uint32_t[icnt * 3];
-    memcpy(ibuf.get(), b.ibuf.get(), icnt * 3 * sizeof(uint32_t));
+    memcpy(ibuf, b.ibuf, icnt * 3 * sizeof(uint32_t));
     loaded = b.loaded;
     gpu_loaded = b.gpu_loaded;
     if (gpu_loaded)
@@ -129,9 +129,9 @@ void Mesh::unload() {
 void Mesh::set_view(uint32_t v, void* vview, uint32_t i, void* iview) {
     // Do not owning the data
     vcnt = v;
-    vbuf = vview;
+    vbuf = reinterpret_cast<float*>(vview);
     icnt = i;
-    ibuf = iview;
+    ibuf = reinterpret_cast<uint32_t*>(iview);
 }
 
 void Mesh::load_gpu() {

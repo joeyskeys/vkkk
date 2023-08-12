@@ -12,7 +12,7 @@ layout(location = 1) in vec2 uv;
 layout(location = 0) out vec2 out_uv;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * vec4(inPosition, 1.0);
-    //gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+    //gl_Position = ubo.proj * ubo.view * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
     out_uv = uv;
 }

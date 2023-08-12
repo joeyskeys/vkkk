@@ -26,20 +26,26 @@ void LightMgr::update_uniform(void* data) const {
     }
     */
 
-    char* dest = data;
+    char* dest = reinterpret_cast<char*>(data);
     uint32_t cnt = pt_lights.size() < MAX_POINT_LIGHTS ? pt_lights.size() : MAX_POINT_LIGHTS;
-    uint32_t size = cnt * sizeof(PointLight);
-    memcpy(dest, pt_lights.data(), size);
+    if (cnt > 0) {
+        uint32_t size = cnt * sizeof(PointLight);
+        memcpy(dest, pt_lights.data(), size);
+    }
 
     dest += MAX_POINT_LIGHTS * sizeof(PointLight);
     cnt = dir_lights.size() < MAX_DIRECTIONAL_LIGHTS ? dir_lights.size() : MAX_DIRECTIONAL_LIGHTS;
-    size = cnt * sizeof(DirectionalLight);
-    memcpy(dest, dir_lights.data(), size);
+    if (cnt > 0) {
+        uint32_t size = cnt * sizeof(DirectionalLight);
+        memcpy(dest, dir_lights.data(), size);
+    }
 
     dest += MAX_DIRECTIONAL_LIGHTS * sizeof(DirectionalLight);
     cnt = spot_lights.size() < MAX_SPOT_LIGHTS ? spot_lights.size() : MAX_SPOT_LIGHTS;
-    size = cnt * sizeof(SpotLight);
-    memcpy(dest, spot_lights.data(), size);
+    if (cnt > 0) {
+        uint32_t size = cnt * sizeof(SpotLight);
+        memcpy(dest, spot_lights.data(), size);
+    }
 }
 
 }

@@ -10,7 +10,7 @@ namespace vkkk
 
 class LightMgr : public Singleton<LightMgr> {
 public:
-    LightMgr();
+    LightMgr() {}
 
     inline void add_pt_light(const glm::vec4& pos, const glm::vec4& color) {
         pt_lights.emplace_back(pos, color);
@@ -21,12 +21,12 @@ public:
     }
 
     inline void add_spot_light(const glm::vec4& pos,
-        const glm::vec4& dir, const glm::vec4& color, const float angle)
+        const glm::vec4& dir, const glm::vec3& color, const float angle)
     {
         spot_lights.emplace_back(pos, dir, color, angle);
     }
 
-    void update_uniform(void* data, uint32_t n) const;
+    void update_uniform(void* data) const;
 
 private:
     // since the lights.h header is shared for shader code, we cannot

@@ -2,6 +2,7 @@
 
 #include <GLFW/glfw3.h>
 
+#include "asset_mgr/light_mgr.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "concepts/camera.h"
 #include "concepts/lights.h"
@@ -21,10 +22,6 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
-
-struct LightInfo {
-    vkkk::PointLight pt_lights[MAX_POINT_LIGHTS];
-};
 
 vkkk::CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
@@ -119,6 +116,10 @@ int main() {
     pipeline_sky.multisampling.rasterizationSamples = ins.nsample;
     pipeline_for.multisampling.sampleShadingEnable = VK_TRUE;
     pipeline_for.multisampling.rasterizationSamples = ins.nsample;
+    pipeline_obj.multisampling.sampleShadingEnable = VK_TRUE;
+    pipeline_obj.multisampling.rasterizationSamples = ins.nsample;
+    pipeline_mat.multisampling.sampleShadingEnable = VK_TRUE;
+    pipeline_mat.multisampling.rasterizationSamples = ins.nsample;
 
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
@@ -139,9 +140,10 @@ int main() {
     pipeline_mat.modules.alloc_uniforms();
 
     // We need a concept of a complete scene now..
-    LightInfo light_info;
-    light_info.pt_lights[0] = { glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1) };
-    light_info.pt_lights[1] = { glm::vec4(10, 10, 5, 1), glm::vec4(1, 0, 0, 1) };
+    auto light_mgr = vkkk::LightMgr::instance();
+    light_mgr.add_pt_light(glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1));
+    light_mgr.add_dir_light(glm::vec4(1, 0, 0, 0), glm::vec4(0.5, 0.1, 0.1, 1));
+    light_mgr.add_spot_light(glm::vec4(0, 4, 0, 1), glm::vec4(0, -1, 0, 0), glm::vec3(0, 0, 0.7), 5.f);
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -151,7 +153,7 @@ int main() {
         if (!obj_ubo_ptr)
             return;
         auto obj_buf = reinterpret_cast<vkkk::MVPBuffer*>(obj_ubo_ptr->cpu_buf.get());
-        obj_buf->model = glm::mat4(1);
+        obj_buf->model = glm::translate(glm::mat4(1), glm::vec3(3, 0, 0));
         obj_buf->view = cam.get_view_mat();
         obj_buf->proj = cam.get_proj_mat();
         pipeline_obj.uniforms->update_ubos(idx);
@@ -172,10 +174,11 @@ int main() {
         auto xforms_buf = reinterpret_cast<glm::mat4*>(xforms_ptr->cpu_buf.get());
         xforms_buf[0] = cam.get_proj_mat() * cam.get_view_mat();
 
-        auto light_info_ptr = pipeline_for.uniforms->find_ubo("light_info");
+        auto light_info_ptr = pipeline_for.uniforms->find_ubo("infos");
         if (!light_info_ptr)
             return;
-        memcpy(light_info_ptr->cpu_buf.get(), &light_info, sizeof(LightInfo));
+        auto light_infos_buf = reinterpret_cast<void*>(light_info_ptr->cpu_buf.get());
+        light_mgr.update_uniform(light_infos_buf);
         pipeline_for.uniforms->update_ubos(idx);
 
         auto mat_ubo_ptr = pipeline_mat.uniforms->find_ubo("ubo");
@@ -254,11 +257,9 @@ int main() {
             pipeline_mgr.bind("skybox", cmd_bufs.bufs[idx]);
             skybox_obj->emit_draw_cmd(cmd_bufs.bufs[idx], box_ppl_layout,
                 pipeline_sky.modules.get_descriptor_set(idx));
-            /*
             pipeline_mgr.bind("object", cmd_bufs.bufs[idx]);
             moon_obj->emit_draw_cmd(cmd_bufs.bufs[idx], obj_ppl_layout,
                 pipeline_obj.modules.get_descriptor_set(idx));
-            */
             pipeline_mgr.bind("forward", cmd_bufs.bufs[idx]);
             sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], for_ppl_layout,
                 pipeline_for.modules.get_descriptor_set(idx));

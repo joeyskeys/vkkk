@@ -123,8 +123,8 @@ public:
         VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange sub_range);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, const std::vector<VkBufferImageCopy>& regions);
     void create_texture_imageviews();
-    void create_texture_sampler();
-    bool load_texture(const fs::path& path);
+    //void create_texture_sampler();
+    //bool load_texture(const fs::path& path);
     
     void create_surface();
     VkSampleCountFlagBits get_max_usable_sample_cnt() const;
@@ -181,10 +181,7 @@ public:
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
     void create_renderpass();
-    VkShaderModule create_shader_module(std::vector<char>&);
-    void create_descriptor_set_layout();
 
-    void create_graphics_pipeline();
     void create_graphics_pipeline(
         ShaderModules&,
         const uint32_t,
@@ -196,29 +193,16 @@ public:
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags props, VkBuffer &buf, VkDeviceMemory& buf_memo);
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
-    void create_vertex_buffer(const VertexTmp *source_data, size_t vcnt);
-    void create_vertex_buffer(const float *source_data, size_t comp_size, size_t vcnt);
     void create_vertex_buffer(const float *, VkBuffer&, VkDeviceMemory&, size_t, size_t);
-    void create_index_buffer(const uint32_t* index_data, size_t idx_cnt);
     void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
-    void create_uniform_buffer();
-    void update_uniform_buffer(uint32_t idx);
     void create_color_resource();
     void create_depth_resource();
-    void create_descriptor_pool();
-    void create_descriptor_set();
     void create_descriptors(const ShaderModules& modules);
-    void create_commandbuffers();
     void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
-    void create_commandbuffers(uint32_t, ShaderModules&, MeshMgr&);
-    void record_commandbuffers(VkCommandBuffer, uint32_t);
-    void record_commandbuffers(VkCommandBuffer, uint32_t, VkDescriptorSet*);
     void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
         const std::function<void(uint32_t)>& emit_func);
     void create_sync_objects();
-    void draw_frame();
     void draw_frame(const CommandBuffers&);
-    void mainloop();
     void mainloop(const CommandBuffers&);
 
     using KeyCBK = void(*)(GLFWwindow*, int, int, int, int);
@@ -339,11 +323,6 @@ private:
     bool                            pipeline_created = false;
     VkRenderPass                    render_pass;
     bool                            render_pass_created = false;
-    VkDescriptorSetLayout           descriptor_layout;
-    bool                            descriptor_layout_created = false;
-    VkDescriptorPool                descriptor_pool;
-    bool                            descriptor_pool_created = false;
-    std::vector<VkDescriptorSet>    descriptor_sets;
 
     // Buffers
     std::vector<VkFramebuffer>      swapchain_framebuffers;
@@ -365,16 +344,14 @@ private:
     // Frame related
     size_t                          current_frame = 0;
 
+    // Cannot delete the two field here for now or it will cause a weird
+    // render bug, I believe it's relavent to data padding since these two
+    // field are not used any where and I can use any field that have equal
+    // length here
     // Vertex Buffer
-    VkBuffer                        vert_buffer;
-    VkDeviceMemory                  vert_buffer_memo;
-    bool                            vertbuffer_created = false;
-    VkBuffer                        index_buffer;
-    VkDeviceMemory                  index_buffer_memo;
-    bool                            indexbuffer_created = false;
-    //std::vector<VkBuffer>           uniform_buffers;
-    std::vector<VkDeviceMemory>     uniform_buffer_memos;
-    bool                            uniform_buffer_created = false;
+    //VkBuffer                        index_buffer;
+    //VkDeviceMemory                  index_buffer_memo;
+    double                          padding[2];
 
     // Color resource
     VkImage                         color_img;
@@ -393,7 +370,6 @@ private:
     std::chrono::time_point<std::chrono::system_clock>  time;
 
 public:
-    std::vector<VkBuffer>           uniform_buffers;
     VkSampleCountFlagBits           nsample = VK_SAMPLE_COUNT_1_BIT;
 };
 

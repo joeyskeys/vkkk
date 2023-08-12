@@ -1,3 +1,4 @@
+/*
 #include <iostream>
 #include <array>
 
@@ -72,3 +73,4 @@ int main() {
     ins.mainloop();
     return 0;
 }
+*/

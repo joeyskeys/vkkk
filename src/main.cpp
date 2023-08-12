@@ -1,3 +1,4 @@
+/*
 #include <iostream>
 #include <array>
 
@@ -135,7 +136,6 @@ int main() {
 
     modules.alloc_uniforms();
 
-    /*
     vkkk::UniformMgr skybox_uniforms{ &ins };
     vkkk::ShaderModules skybox_modules{ &ins, &skybox_uniforms };
     skybox_modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
@@ -143,7 +143,6 @@ int main() {
 
     skybox_modules.assign_tex_image("cubemap_spl", "../resource/textures/");
     modules.alloc_uniforms();
-    */
 
     auto update_cbk = [&](uint32_t idx, float duration) {
         cam.update_position(duration);
@@ -171,11 +170,9 @@ int main() {
 #define WITH_UV 1
     ins.create_graphics_pipeline(modules, WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
 
-    /*
     skybox_modules.create_descriptor_layouts();
     skybox_modules.set_attribute_binding(0, 0);
     skybox_modules.create_input_descriptions();
-    */
 
     // We need another pipeline now
     //ins.
@@ -200,3 +197,4 @@ int main() {
 
     return 0;
 }
+*/

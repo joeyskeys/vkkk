@@ -6,10 +6,10 @@
 #include <cstring>
 #include <glm/glm.hpp>
 using namespace glm;
-#endif
 
 namespace vkkk
 {
+#endif
 
 struct PointLight {
     vec4   pos;
@@ -32,6 +32,6 @@ struct SpotLight {
 inline void update_uniform(void* data, void* light_obj, uint32_t n) {
     memcpy(data, light_obj, n);
 }
-#endif
 
 }
+#endif

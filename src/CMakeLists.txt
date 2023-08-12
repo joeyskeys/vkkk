@@ -1,4 +1,5 @@
 set(HEADERS
+    asset_mgr/light_mgr.h
     asset_mgr/mesh.h
     asset_mgr/mesh_mgr.h
     concepts/camera.h
@@ -16,6 +17,7 @@ set(HEADERS
     vk_ins/vkubo.h)
 
 set(SRCS
+    asset_mgr/light_mgr.cpp
     asset_mgr/mesh.cpp
     asset_mgr/mesh_mgr.cpp
     concepts/camera.cpp
@@ -42,16 +44,6 @@ target_link_libraries(vkkk
     ${ASSIMP_LIBRARIES}
     ${SPIRVCROSS_LIBRARIES}
     ${PLATFORM_RELATED_LIBS})
-
-add_executable(vktest main.cpp)
-target_link_libraries(vktest
-    vkkk
-    ${OIIO_LIBRARIES})
-
-add_executable(vktutor tutor_main.cpp)
-target_link_libraries(vktutor
-    vkkk
-    ${OIIO_LIBRARIES})
 
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti

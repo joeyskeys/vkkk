@@ -48,49 +48,6 @@ struct Pixel {
     char a;
 };
 
-struct VertexTmp {
-    glm::vec3 pos;
-    glm::vec3 color;
-    glm::vec2 uv;
-
-    static VkVertexInputBindingDescription get_binding_description() {
-        VkVertexInputBindingDescription des{};
-        des.binding = 0;
-        des.stride = sizeof(VertexTmp);
-        des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-
-        return des;
-    }
-
-    static auto get_attr_descriptions() {
-        std::array<VkVertexInputAttributeDescription, 3> des{};
-
-        des[0].binding = 0;
-        des[0].location = 0;
-        des[0].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[0].offset = offsetof(VertexTmp, pos);
-
-        des[1].binding = 0;
-        des[1].location = 1;
-        des[1].format = VK_FORMAT_R32G32B32_SFLOAT;
-        des[1].offset = offsetof(VertexTmp, color);
-
-        des[2].binding = 0;
-        des[2].location = 2;
-        des[2].format = VK_FORMAT_R32G32_SFLOAT;
-        des[2].offset = offsetof(VertexTmp, uv);
-
-        return des;
-    }
-};
-
-struct MVPBuffer {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
-};
-
-using UniformUpdateCBK = std::function<void(MVPBuffer*)>;
 using UpdateCBK = std::function<void(uint32_t, float)>;
 
 class VkWrappedInstance {
@@ -122,9 +79,6 @@ public:
     void transition_image_layout(VkImage image, VkFormat format,
         VkImageLayout old_layout, VkImageLayout new_layout, VkImageSubresourceRange sub_range);
     void copy_buffer_to_image(VkBuffer buf, VkImage image, const std::vector<VkBufferImageCopy>& regions);
-    void create_texture_imageviews();
-    //void create_texture_sampler();
-    //bool load_texture(const fs::path& path);
     
     void create_surface();
     VkSampleCountFlagBits get_max_usable_sample_cnt() const;
@@ -165,10 +119,6 @@ public:
         return swapchain_extent;
     }
 
-    inline void set_uniform_cbk(UniformUpdateCBK cbk) {
-        uniform_cbk = cbk;
-    }
-
     inline void set_update_cbk(UpdateCBK cbk) {
         update_cbk = cbk;
     }
@@ -181,12 +131,6 @@ public:
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
     void create_renderpass();
-
-    void create_graphics_pipeline(
-        ShaderModules&,
-        const uint32_t,
-        const VkPrimitiveTopology,
-        const VkPolygonMode);
 
     void create_framebuffers();
     void create_command_pool();
@@ -274,7 +218,6 @@ private:
     QueueFamilyIndex queue_family_idx;
 
     // Uniform update callback
-    UniformUpdateCBK    uniform_cbk;
     UpdateCBK           update_cbk;
 
     // Currently only use one physical card and one logical device
@@ -283,18 +226,6 @@ private:
     VkPhysicalDeviceProperties physical_device_props;
     VkPhysicalDeviceMemoryProperties mem_props;
     VkDevice device;
-
-    // Textures
-    std::vector<std::vector<Pixel>> texture_bufs;
-    std::vector<VkImage>            vk_images;
-    std::vector<VkDeviceMemory>     vk_image_memos;
-    std::vector<VkImageView>        texture_views;
-    VkImage                         tex_img;
-    VkImageLayout                   tex_layout;
-    VkDeviceMemory                  tex_img_memo;
-    VkImageView                     tex_view;
-    VkSampler                       texture_sampler;
-    bool                            sampler_created = false;
 
     // Surface
     VkSurfaceKHR surface;
@@ -318,9 +249,6 @@ private:
     bool                            imageviews_created = false;
 
     // Pipeline related
-    VkPipelineLayout                pipeline_layout;
-    VkPipeline                      pipeline;
-    bool                            pipeline_created = false;
     VkRenderPass                    render_pass;
     bool                            render_pass_created = false;
 

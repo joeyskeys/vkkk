@@ -258,10 +258,6 @@ void VkWrappedInstance::copy_buffer_to_image(VkBuffer buf, VkImage image, const 
     end_single_time_commands(cmd_buf);
 }
 
-void VkWrappedInstance::create_texture_imageviews() {
-    tex_view = create_imageview(tex_img, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_ASPECT_COLOR_BIT);
-}
-
 void VkWrappedInstance::create_surface() {
     assert(window != nullptr);
     if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS)
@@ -633,127 +629,6 @@ void VkWrappedInstance::create_renderpass() {
         throw std::runtime_error("failed to create render pass!");
 
     render_pass_created = true;
-}
-
-void VkWrappedInstance::create_graphics_pipeline(
-    ShaderModules &modules,
-    const uint32_t vert_flag,
-    const VkPrimitiveTopology topology,
-    const VkPolygonMode mode)
-{
-    // Shader stage contents
-    modules.generate_create_infos();
-
-    // Vertex input
-    VkPipelineVertexInputStateCreateInfo vert_input_info{};
-
-    vert_input_info.vertexBindingDescriptionCount = modules.get_binding_description_count();
-    vert_input_info.pVertexBindingDescriptions = modules.get_binding_descriptions();
-    vert_input_info.vertexAttributeDescriptionCount = modules.get_attr_description_count();
-    vert_input_info.pVertexAttributeDescriptions = modules.get_attr_descriptions();
-
-    // Input assembly, a.k.a drawing type
-    VkPipelineInputAssemblyStateCreateInfo input_assembly{};
-    input_assembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    input_assembly.topology = topology;
-    input_assembly.primitiveRestartEnable = VK_FALSE;
-
-    // Viewport info
-    VkViewport viewport{};
-    viewport.x = 0.f;
-    viewport.y = 0.f;
-    viewport.width = swapchain_extent.width;
-    viewport.height = swapchain_extent.height;
-    viewport.minDepth = 0.f;
-    viewport.maxDepth = 1.f;
-
-    // Scissor rect
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = swapchain_extent;
-
-    VkPipelineViewportStateCreateInfo viewport_info{};
-    viewport_info.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
-    viewport_info.viewportCount = 1;
-    viewport_info.pViewports = &viewport;
-    viewport_info.scissorCount = 1;
-    viewport_info.pScissors = &scissor;
-
-    // Rasterizer info
-    VkPipelineRasterizationStateCreateInfo rasterizer_info{};
-    rasterizer_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-    rasterizer_info.depthClampEnable = VK_FALSE;
-    rasterizer_info.rasterizerDiscardEnable = VK_FALSE;
-    rasterizer_info.polygonMode = mode;
-    rasterizer_info.lineWidth = 1.f;
-    rasterizer_info.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer_info.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-    rasterizer_info.depthBiasEnable = VK_FALSE;
-
-    // Multi sampling info
-    VkPipelineMultisampleStateCreateInfo multisampling{};
-    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-    multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-    // Depth stencil state info
-    VkPipelineDepthStencilStateCreateInfo depth_stencil{};
-    depth_stencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-    depth_stencil.depthTestEnable = VK_TRUE;
-    depth_stencil.depthWriteEnable = VK_TRUE;
-    depth_stencil.depthCompareOp = VK_COMPARE_OP_LESS;
-    depth_stencil.depthBoundsTestEnable = VK_FALSE;
-    depth_stencil.stencilTestEnable = VK_FALSE;
-
-    // Blend state info
-    VkPipelineColorBlendAttachmentState blend_attachment{};
-    blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT |
-        VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
-        VK_COLOR_COMPONENT_A_BIT;
-    blend_attachment.blendEnable = VK_FALSE;
-
-    VkPipelineColorBlendStateCreateInfo blend_state{};
-    blend_state.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-    blend_state.logicOpEnable = VK_FALSE;
-    blend_state.logicOp = VK_LOGIC_OP_COPY;
-    blend_state.attachmentCount = 1;
-    blend_state.pAttachments = &blend_attachment;
-    blend_state.blendConstants[0] = 0.f;
-    blend_state.blendConstants[1] = 0.f;
-    blend_state.blendConstants[2] = 0.f;
-    blend_state.blendConstants[3] = 0.f;
-
-    // Pipeline layout info
-    VkPipelineLayoutCreateInfo pipeline_layout_info{};
-    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = 1;
-    //pipeline_layout_info.pSetLayouts = &descriptor_layout;
-    pipeline_layout_info.pSetLayouts = modules.get_descriptor_set_layout();
-
-    if (vkCreatePipelineLayout(device, &pipeline_layout_info, nullptr, &pipeline_layout) != VK_SUCCESS)
-        throw std::runtime_error("failed to create pipeline layout!");
-
-    // The final pipeline info
-    VkGraphicsPipelineCreateInfo pipeline_info{};
-    pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-    pipeline_info.stageCount = modules.get_stages_count();
-    pipeline_info.pStages = modules.get_stages_data();
-    pipeline_info.pVertexInputState = &vert_input_info;
-    pipeline_info.pInputAssemblyState = &input_assembly;
-    pipeline_info.pViewportState = &viewport_info;
-    pipeline_info.pRasterizationState = &rasterizer_info;
-    pipeline_info.pMultisampleState = &multisampling;
-    pipeline_info.pDepthStencilState = &depth_stencil;
-    pipeline_info.pColorBlendState = &blend_state;
-    pipeline_info.layout = pipeline_layout;
-    pipeline_info.renderPass = render_pass;
-    pipeline_info.subpass = 0;
-    pipeline_info.basePipelineHandle = VK_NULL_HANDLE;
-
-    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &pipeline) != VK_SUCCESS)
-        throw std::runtime_error("failed to create graphics pipeline !");
-
-    pipeline_created = true;
 }
 
 void VkWrappedInstance::create_framebuffers() {

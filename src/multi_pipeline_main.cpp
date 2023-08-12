@@ -152,20 +152,20 @@ int main() {
         auto obj_ubo_ptr = pipeline_obj.uniforms->find_ubo("ubo");
         if (!obj_ubo_ptr)
             return;
-        auto obj_buf = reinterpret_cast<vkkk::MVPBuffer*>(obj_ubo_ptr->cpu_buf.get());
-        obj_buf->model = glm::translate(glm::mat4(1), glm::vec3(3, 0, 0));
-        obj_buf->view = cam.get_view_mat();
-        obj_buf->proj = cam.get_proj_mat();
+        auto obj_buf = reinterpret_cast<glm::mat4*>(obj_ubo_ptr->cpu_buf.get());
+        obj_buf[0] = glm::translate(glm::mat4(1), glm::vec3(3, 0, 0));
+        obj_buf[1] = cam.get_view_mat();
+        obj_buf[2] = cam.get_proj_mat();
         pipeline_obj.uniforms->update_ubos(idx);
 
         auto sky_ubo_ptr = pipeline_sky.uniforms->find_ubo("ubo");
         if (!sky_ubo_ptr)
             return;
-        auto sky_buf = reinterpret_cast<vkkk::MVPBuffer*>(sky_ubo_ptr->cpu_buf.get());
-        sky_buf->model = glm::mat4(1);
-        sky_buf->view = cam.get_view_mat();
-        sky_buf->view[3] = glm::vec4(0.f, 0.f, 0.f, 1.f);
-        sky_buf->proj = cam.get_proj_mat();
+        auto sky_buf = reinterpret_cast<glm::mat4*>(sky_ubo_ptr->cpu_buf.get());
+        sky_buf[0] = glm::mat4(1);
+        sky_buf[1] = cam.get_view_mat();
+        sky_buf[1][3] = glm::vec4(0.f, 0.f, 0.f, 1.f);
+        sky_buf[2] = cam.get_proj_mat();
         pipeline_sky.uniforms->update_ubos(idx);
 
         auto xforms_ptr = pipeline_for.uniforms->find_ubo("xforms");
@@ -184,10 +184,10 @@ int main() {
         auto mat_ubo_ptr = pipeline_mat.uniforms->find_ubo("ubo");
         if (!mat_ubo_ptr)
             return;
-        auto mat_buf = reinterpret_cast<vkkk::MVPBuffer*>(mat_ubo_ptr->cpu_buf.get());
-        mat_buf->model = glm::mat4(1);
-        mat_buf->view = cam.get_view_mat();
-        mat_buf->proj = cam.get_proj_mat();
+        auto mat_buf = reinterpret_cast<glm::mat4*>(mat_ubo_ptr->cpu_buf.get());
+        mat_buf[0] = glm::mat4(1);
+        mat_buf[1] = cam.get_view_mat();
+        mat_buf[2] = cam.get_proj_mat();
 
         auto mat_color_ptr = pipeline_mat.uniforms->find_ubo("datas");
         if (!mat_color_ptr)

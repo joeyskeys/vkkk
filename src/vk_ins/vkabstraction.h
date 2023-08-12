@@ -65,6 +65,9 @@ public:
             std::cout << layer.layerName << std::endl;
     }
 
+    void list_physical_devices() const;
+    void choose_device(uint32_t i);
+
     inline void setup_window(GLFWwindow* win) {
         window = win;
     }

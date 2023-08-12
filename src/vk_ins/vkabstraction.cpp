@@ -90,6 +90,9 @@ VkWrappedInstance::VkWrappedInstance()
         physical_device = physical_devices[0];
         vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
     }
+    else {
+        throw std::runtime_error("No physical device available for vulkan");
+    }
 
     vkGetPhysicalDeviceProperties(physical_device, &physical_device_props);
 }
@@ -125,6 +128,24 @@ VkWrappedInstance::~VkWrappedInstance() {
 
     glfwDestroyWindow(window);
     glfwTerminate();
+}
+
+void VkWrappedInstance::list_physical_devices() const {
+    VkPhysicalDeviceProperties props;
+    std::cout << "Devices available:" << std::endl;
+    for (int i = 0; i < physical_devices.size(); ++i) {
+        vkGetPhysicalDeviceProperties(physical_devices[i], &props);
+        std::cout << i + 1 << ". " << props.deviceName << std::endl;
+    }
+}
+
+void VkWrappedInstance::choose_device(uint32_t i) {
+    --i;
+    if (i < 0 || i >= physical_devices.size())
+        std::cout << "Physical device index out of range, list the devices to checkout" << std::endl;
+
+    physical_device = physical_devices[i];
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
 }
 
 VkCommandBuffer VkWrappedInstance::begin_single_time_commands() {

@@ -88,6 +88,7 @@ void mouse_pos_callback(GLFWwindow* win, double x, double y) {
 
 int main() {
     vkkk::VkWrappedInstance ins;
+    ins.list_physical_devices();
     ins.create_surface();
     ins.create_logical_device();
     auto swapchain_img_cnt = ins.create_swapchain();

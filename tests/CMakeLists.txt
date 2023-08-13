@@ -17,3 +17,9 @@ target_link_libraries(mgr_test
     PRIVATE
         Catch2::Catch2WithMain
         vkkk)
+
+add_executable(singleton_test language_tests/singleton_test.cpp)
+target_link_libraries(singleton_test
+    PRIVATE
+        Catch2::Catch2WithMain
+        vkkk)

@@ -13,9 +13,12 @@ namespace vkkk
 class VkWrappedInstance;
 
 class MeshMgr : public Singleton<MeshMgr> {
-public:
+private:
     MeshMgr();
+    MeshMgr(const MeshMgr&) = delete;
+    MeshMgr& operator= (const MeshMgr&) = delete;
 
+public:
     Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
     void add_box(const void *min, const void *max);
 

@@ -88,18 +88,13 @@ void mouse_pos_callback(GLFWwindow* win, double x, double y) {
 
 int main() {
     vkkk::VkWrappedInstance ins;
+    ins.init_glfw();
+    ins.init();
     ins.list_physical_devices();
-    ins.create_surface();
-    ins.create_logical_device();
-    auto swapchain_img_cnt = ins.create_swapchain();
-    ins.create_imageviews();
-
-    ins.nsample = VK_SAMPLE_COUNT_8_BIT;
-    ins.create_renderpass();
-
-    ins.create_command_pool();
+    ins.create_resources(VK_SAMPLE_COUNT_8_BIT);
 
     vkkk::PipelineMgr pipeline_mgr(&ins);
+    //auto& pipeline_mgr = vkkk::PipelineMgr::instance(&ins);
     pipeline_mgr.register_pipeline("object");
     pipeline_mgr.register_pipeline("skybox");
     pipeline_mgr.register_pipeline("forward");
@@ -141,7 +136,7 @@ int main() {
     pipeline_mat.modules.alloc_uniforms();
 
     // We need a concept of a complete scene now..
-    auto light_mgr = vkkk::LightMgr::instance();
+    auto& light_mgr = vkkk::LightMgr::instance();
     light_mgr.add_pt_light(glm::vec4(0, 10, 10, 1), glm::vec4(1, 1, 0, 1));
     light_mgr.add_dir_light(glm::vec4(1, 0, 0, 0), glm::vec4(0.5, 0.1, 0.1, 1));
     light_mgr.add_spot_light(glm::vec4(0, 4, 0, 1), glm::vec4(0, -1, 0, 0), glm::vec3(0, 0, 0.7), 5.f);
@@ -223,10 +218,6 @@ int main() {
     pipeline_mat.modules.create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
 
     pipeline_mgr.create_pipelines(ins.get_renderpass());
-
-    ins.create_color_resource();
-    ins.create_depth_resource();
-    ins.create_framebuffers();
 
     pipeline_mgr.create_descriptor_pools();
     pipeline_mgr.create_descriptor_sets();

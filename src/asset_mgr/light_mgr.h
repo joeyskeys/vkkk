@@ -9,9 +9,13 @@ namespace vkkk
 {
 
 class LightMgr : public Singleton<LightMgr> {
-public:
+private:
     LightMgr() {}
+    friend class Singleton<LightMgr>;
+    LightMgr(const LightMgr&) = delete;
+    LightMgr& operator= (const LightMgr&) = delete;
 
+public:
     inline void add_pt_light(const glm::vec4& pos, const glm::vec4& color) {
         pt_lights.emplace_back(pos, color);
     }

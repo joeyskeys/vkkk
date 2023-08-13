@@ -103,10 +103,6 @@ Pipeline::Pipeline(Pipeline&& rhs)
 
 Pipeline::~Pipeline() {}
 
-PipelineMgr::PipelineMgr(VkWrappedInstance* i)
-    : ins(i)
-{}
-
 PipelineMgr::~PipelineMgr() {}
 
 void PipelineMgr::register_pipeline(const std::string& name) {

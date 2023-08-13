@@ -23,7 +23,72 @@ inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
 VkWrappedInstance::VkWrappedInstance()
     : window(nullptr)
-{
+{}
+
+VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename)
+    : width(w)
+    , height(h)
+    , app_name(appname)
+    , engine_name(enginename)
+{}
+
+VkWrappedInstance::~VkWrappedInstance() {
+    cleanup_swapchain();
+
+    if (syncobj_created) {
+        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
+            vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
+            vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
+            vkDestroyFence(device, in_flight_fences[i], nullptr);
+        }
+    }
+
+    vkDestroyDevice(device, nullptr);
+
+    if (enable_validation_layers) {
+        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
+        if (func != nullptr)
+            func(instance, debug_messenger, nullptr);
+    }
+
+    vkDestroySurfaceKHR(instance, surface, nullptr);
+    vkDestroyInstance(instance, nullptr);
+
+    glfwDestroyWindow(window);
+    glfwTerminate();
+}
+
+void VkWrappedInstance::list_physical_devices() const {
+    VkPhysicalDeviceProperties props;
+    if (physical_devices.size() > 0) {
+        std::cout << "Devices available:" << std::endl;
+        for (int i = 0; i < physical_devices.size(); ++i) {
+            vkGetPhysicalDeviceProperties(physical_devices[i], &props);
+            std::cout << i + 1 << ". " << props.deviceName << std::endl;
+        }
+    }
+    else
+        std::cout << "No physical devices stored in the list.." << std::endl;
+}
+
+void VkWrappedInstance::choose_device(uint32_t i) {
+    --i;
+    if (i < 0 || i >= physical_devices.size()) {
+        std::cout << "Physical device index out of range, list the devices to checkout" << std::endl;
+        return;
+    }
+
+    if (physical_devices.size() == 1) {
+        std::cout << "Only one device available, default to it.." << std::endl;
+        return;
+    }
+
+    physical_device = physical_devices[i];
+    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
+    std::cout << "Using device " << i + 1 << std::endl;
+}
+
+void VkWrappedInstance::init_glfw() {
     // Gui bounded to Vk for now
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
@@ -31,7 +96,9 @@ VkWrappedInstance::VkWrappedInstance()
     window = glfwCreateWindow(width, height, app_name.c_str(), nullptr, nullptr);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, default_resize_callback);
+}
 
+void VkWrappedInstance::init() {
     // Init vulkan
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -95,57 +162,6 @@ VkWrappedInstance::VkWrappedInstance()
     }
 
     vkGetPhysicalDeviceProperties(physical_device, &physical_device_props);
-}
-
-VkWrappedInstance::VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename)
-    : width(w)
-    , height(h)
-    , app_name(appname)
-    , engine_name(enginename)
-{}
-
-VkWrappedInstance::~VkWrappedInstance() {
-    cleanup_swapchain();
-
-    if (syncobj_created) {
-        for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
-            vkDestroySemaphore(device, render_finished_semaphores[i], nullptr);
-            vkDestroySemaphore(device, image_available_semaphores[i], nullptr);
-            vkDestroyFence(device, in_flight_fences[i], nullptr);
-        }
-    }
-
-    vkDestroyDevice(device, nullptr);
-
-    if (enable_validation_layers) {
-        auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(instance, "vkDestroyDebugUtilsMessengerEXT");
-        if (func != nullptr)
-            func(instance, debug_messenger, nullptr);
-    }
-
-    vkDestroySurfaceKHR(instance, surface, nullptr);
-    vkDestroyInstance(instance, nullptr);
-
-    glfwDestroyWindow(window);
-    glfwTerminate();
-}
-
-void VkWrappedInstance::list_physical_devices() const {
-    VkPhysicalDeviceProperties props;
-    std::cout << "Devices available:" << std::endl;
-    for (int i = 0; i < physical_devices.size(); ++i) {
-        vkGetPhysicalDeviceProperties(physical_devices[i], &props);
-        std::cout << i + 1 << ". " << props.deviceName << std::endl;
-    }
-}
-
-void VkWrappedInstance::choose_device(uint32_t i) {
-    --i;
-    if (i < 0 || i >= physical_devices.size())
-        std::cout << "Physical device index out of range, list the devices to checkout" << std::endl;
-
-    physical_device = physical_devices[i];
-    vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_props);
 }
 
 VkCommandBuffer VkWrappedInstance::begin_single_time_commands() {

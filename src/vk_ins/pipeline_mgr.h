@@ -4,6 +4,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include "utils/singleton.h"
 #include "vk_ins/shader_mgr.h"
 
 namespace vkkk
@@ -28,11 +29,25 @@ public:
     VkPipelineColorBlendStateCreateInfo     blend_state;
     
     Pipeline(VkWrappedInstance* i);
+    //Pipeline(const Pipeline& rhs);
     Pipeline(Pipeline&& rhs);
     virtual ~Pipeline();
 };
 
+//class PipelineMgr : public Singleton<PipelineMgr> {
 class PipelineMgr {
+/*
+private:
+    // For singleton pattern
+    PipelineMgr(VkWrappedInstance* i) : ins(i) {}
+    friend class Singleton<PipelineMgr>;
+
+    PipelineMgr(const Pipeline& rhs) = delete;
+    PipelineMgr& operator= (const Pipeline& rhs) = delete;
+*/
+public:
+    PipelineMgr(VkWrappedInstance* i) : ins(i) {}
+    
 public:
     VkWrappedInstance*                      ins;
 
@@ -41,7 +56,6 @@ public:
     std::vector<VkPipelineLayout>           layouts;
     std::map<std::string, uint32_t>         pipeline_map;
 
-    PipelineMgr(VkWrappedInstance*);
     virtual ~PipelineMgr();
 
     void            register_pipeline(const std::string&);

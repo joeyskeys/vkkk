@@ -68,6 +68,9 @@ public:
     void list_physical_devices() const;
     void choose_device(uint32_t i);
 
+    void init_glfw();
+    void init();
+
     inline void setup_window(GLFWwindow* win) {
         window = win;
     }
@@ -134,9 +137,9 @@ public:
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
     void create_renderpass();
-
     void create_framebuffers();
     void create_command_pool();
+    
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
         VkMemoryPropertyFlags props, VkBuffer &buf, VkDeviceMemory& buf_memo);
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
@@ -144,6 +147,20 @@ public:
     void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
     void create_color_resource();
     void create_depth_resource();
+
+    inline void create_resources(VkSampleCountFlagBits ns) {
+        create_surface();
+        create_logical_device();
+        create_swapchain();
+        create_imageviews();
+        nsample = ns;
+        create_renderpass();
+        create_command_pool();
+        create_color_resource();
+        create_depth_resource();
+        create_framebuffers();
+    }
+
     void create_descriptors(const ShaderModules& modules);
     void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
     void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,

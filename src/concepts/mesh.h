@@ -25,6 +25,16 @@ namespace vkkk
 
 class VkWrappedInstance;
 
+class Vert {
+public:
+    union {
+        struct {
+            float x, y, z;
+        };
+        std::array<float, 3> arr;
+    };
+};
+
 class Mesh {
 public:
     Mesh(VkWrappedInstance*, const std::vector<VERT_COMP>&, bool indexed=true);

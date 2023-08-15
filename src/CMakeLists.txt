@@ -1,8 +1,8 @@
 set(HEADERS
     asset_mgr/light_mgr.h
-    asset_mgr/mesh.h
     asset_mgr/mesh_mgr.h
     concepts/camera.h
+    concepts/mesh.h
     gui/gui.h
     utils/common.h
     utils/io.h
@@ -18,9 +18,9 @@ set(HEADERS
 
 set(SRCS
     asset_mgr/light_mgr.cpp
-    asset_mgr/mesh.cpp
     asset_mgr/mesh_mgr.cpp
     concepts/camera.cpp
+    concepts/mesh.cpp
     gui/gui.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp

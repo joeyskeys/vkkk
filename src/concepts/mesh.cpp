@@ -53,8 +53,8 @@ Mesh::Mesh(Mesh&& b) {
 Mesh::~Mesh() {
     if (loaded)
         unload();
-    if (gpu_loaded)
-        unload_gpu();
+    //if (gpu_loaded)
+        //unload_gpu();
 }
 
 void Mesh::load(aiMesh *mesh) {

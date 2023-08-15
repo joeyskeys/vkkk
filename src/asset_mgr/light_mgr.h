@@ -14,6 +14,7 @@ private:
     friend class Singleton<LightMgr>;
     LightMgr(const LightMgr&) = delete;
     LightMgr& operator= (const LightMgr&) = delete;
+    friend class Singleton<LightMgr>;
 
 public:
     inline void add_pt_light(const glm::vec4& pos, const glm::vec4& color) {

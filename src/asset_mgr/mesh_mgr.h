@@ -2,7 +2,7 @@
 
 #include <filesystem>
 
-#include "asset_mgr/mesh.h"
+#include "concepts/mesh.h"
 #include "utils/singleton.h"
 
 namespace fs=std::filesystem;
@@ -14,9 +14,10 @@ class VkWrappedInstance;
 
 class MeshMgr : public Singleton<MeshMgr> {
 private:
-    MeshMgr();
+    MeshMgr(VkWrappedInstance* i);
     MeshMgr(const MeshMgr&) = delete;
     MeshMgr& operator= (const MeshMgr&) = delete;
+    friend class Singleton<MeshMgr>;
 
 public:
     Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
@@ -29,6 +30,12 @@ public:
     inline void pour_into_gpu() {
         for (auto& mesh : meshes)
             mesh.load_gpu();
+    }
+
+    inline void free_gpu_resources() {
+        for (auto& mesh : meshes)
+            if (mesh.gpu_loaded)
+                mesh.unload_gpu();
     }
 
     inline void emit_draw_cmds(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,

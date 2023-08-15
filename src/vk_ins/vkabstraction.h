@@ -16,7 +16,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include "asset_mgr/mesh.h"
+#include "concepts/mesh.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "vk_ins/cmd_buf.h"
 #include "vk_ins/shader_mgr.h"

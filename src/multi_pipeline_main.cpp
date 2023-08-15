@@ -222,8 +222,8 @@ int main() {
     pipeline_mgr.create_descriptor_pools();
     pipeline_mgr.create_descriptor_sets();
     
-    auto mesh_mgr = vkkk::MeshMgr::instance();
-    mesh_mgr.init(&ins);
+    auto& mesh_mgr = vkkk::MeshMgr::instance(&ins);
+    //mesh_mgr.init(&ins);
     mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
     mesh_mgr.load_file("../resource/models/skybox.obj", {vkkk::VERTEX, vkkk::UV});
     mesh_mgr.load_file("../resource/models/sphere.obj", {vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
@@ -265,6 +265,12 @@ int main() {
     ins.create_sync_objects();
 
     ins.mainloop(cmd_bufs);
+
+    // GPU resources need to be explicitly freed since the object
+    // dtor calling sequence is not fixed when relying on RAII,
+    // instance may get freed before calling other resources' dtor.
+    // Guess it's same issue for the pipeline.
+    mesh_mgr.free_gpu_resources();
 
     return 0;
 }

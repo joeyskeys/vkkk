@@ -33,7 +33,9 @@ void bind_types(nb::module_& m) {
 
     mecl.def(nb::init<VkWrappedInstance*, const std::vector<VERT_COMP>&, bool>())
         .def(nb::init<const Mesh&>())
-        //.def("load", )
+        .def("load", [](Mesh& m, uint32_t v, nb::bytes& vbuf, uint32_t i, nb::bytes& ibuf) {
+            m.load(v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+        })
         .def("unload", &Mesh::unload)
         .def("set_view", &Mesh::set_view)
         .def("load_gpu", &Mesh::load_gpu)

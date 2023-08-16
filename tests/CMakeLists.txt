@@ -1,11 +1,5 @@
 find_package(Catch2 REQUIRED)
 
-add_executable(vertex_test concept_tests/vertex_test.cpp)
-target_link_libraries(vertex_test
-    PRIVATE
-        Catch2::Catch2WithMain
-        vkkk)
-
 add_executable(resource_test cross_tests/resource_test.cpp)
 target_link_libraries(resource_test
     PRIVATE

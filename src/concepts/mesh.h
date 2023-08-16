@@ -25,16 +25,6 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class Vert {
-public:
-    union {
-        struct {
-            float x, y, z;
-        };
-        std::array<float, 3> arr;
-    };
-};
-
 class Mesh {
 public:
     Mesh(VkWrappedInstance*, const std::vector<VERT_COMP>&, bool indexed=true);
@@ -43,6 +33,7 @@ public:
     virtual ~Mesh();
 
     void load(aiMesh *mesh);
+    void load(uint32_t, const char*, uint32_t, uint32_t, const char*, uint32_t);
     void unload();
     void set_view(uint32_t v, void* vview, uint32_t i, void* iview);
     void load_gpu();

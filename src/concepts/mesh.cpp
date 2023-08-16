@@ -1,8 +1,10 @@
-#include "mesh.h"
 
 #include <memory>
 #include <stdexcept>
 
+#include <fmt/format.h>
+
+#include "concepts/mesh.h"
 #include "vk_ins/vkabstraction.h"
 
 namespace vkkk
@@ -12,7 +14,11 @@ Mesh::Mesh(VkWrappedInstance* i, const std::vector<VERT_COMP>& cs, bool indexed)
     : ins(i)
     , comps(cs)
     , indexed(indexed)
-{}
+{
+    comp_size = 0;
+    for (const auto& comp : comps)
+        comp_size += comp_sizes[comp];
+}
 
 Mesh::Mesh(const Mesh& b) {
     ins = b.ins;
@@ -60,9 +66,11 @@ Mesh::~Mesh() {
 void Mesh::load(aiMesh *mesh) {
     vcnt = mesh->mNumVertices;
     icnt = mesh->mNumFaces;
+    /*
     comp_size = 0;
     for (const auto& comp : comps)
         comp_size += comp_sizes[comp];
+    */
 
     vbuf = new float[vcnt * comp_size];
     ibuf = new uint32_t[icnt * 3];
@@ -115,6 +123,32 @@ void Mesh::load(aiMesh *mesh) {
         ibuf[i * 3 + 1] = mesh->mFaces[i].mIndices[1];
         ibuf[i * 3 + 2] = mesh->mFaces[i].mIndices[2];
     }
+
+    loaded = true;
+}
+
+void Mesh::load(uint32_t v, const char* vdata, uint32_t vsize,
+    uint32_t i, const char* idata, uint32_t isize)
+{
+    const auto vbuf_size = v * comp_size * sizeof(float);
+    const auto ibuf_size = i * 3 * sizeof(uint32_t);
+
+    if (vbuf_size != vsize) {
+        throw std::length_error(fmt::format("Required vbuf size : {}, actual : {}",
+            vbuf_size, vsize));
+    }
+    if (ibuf_size != isize) {
+        throw std::length_error(fmt::format("Required ibuf size : {}, actual : {}",
+            ibuf_size, isize));
+    }
+
+    vcnt = v;
+    vbuf = new float[vcnt * comp_size];
+    memcpy(vbuf, vdata, vbuf_size);
+
+    icnt = i;
+    ibuf = new uint32_t[icnt * 3];
+    memcpy(ibuf, idata, ibuf_size);
 
     loaded = true;
 }

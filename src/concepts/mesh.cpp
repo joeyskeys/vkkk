@@ -127,8 +127,8 @@ void Mesh::load(aiMesh *mesh) {
     loaded = true;
 }
 
-void Mesh::load(uint32_t v, const char* vdata, uint32_t vsize,
-    uint32_t i, const char* idata, uint32_t isize)
+void Mesh::load(const uint32_t v, const char* vdata, const uint32_t vsize,
+    const uint32_t i, const char* idata, const uint32_t isize)
 {
     const auto vbuf_size = v * comp_size * sizeof(float);
     const auto ibuf_size = i * 3 * sizeof(uint32_t);

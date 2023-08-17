@@ -103,7 +103,17 @@ Pipeline::Pipeline(Pipeline&& rhs)
 
 Pipeline::~Pipeline() {}
 
+void Pipeline::free_gpu_resources() {
+    uniforms->free_gpu_resources();
+    modules.free_gpu_resources();
+}
+
 PipelineMgr::~PipelineMgr() {}
+
+void PipelineMgr::free_gpu_resources() {
+    for (auto& ppl : pipelines)
+        ppl.free_gpu_resources();
+}
 
 void PipelineMgr::register_pipeline(const std::string& name) {
     auto found = pipeline_map.find(name);

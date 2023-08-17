@@ -33,7 +33,8 @@ public:
     virtual ~Mesh();
 
     void load(aiMesh *mesh);
-    void load(uint32_t, const char*, uint32_t, uint32_t, const char*, uint32_t);
+    void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
+        const uint32_t);
     void unload();
     void set_view(uint32_t v, void* vview, uint32_t i, void* iview);
     void load_gpu();

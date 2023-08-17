@@ -34,8 +34,9 @@ public:
     ~Texture();
     Texture(Texture&& t);
 
+    void free_gpu_resources();
+
     void update_descriptor();
-    void destroy();
     bool load_image(const fs::path&);
     bool load_cubemap(const fs::path&);
 };

@@ -23,6 +23,8 @@ public:
     UniformMgr(UniformMgr&& rhs);
     virtual ~UniformMgr();
 
+    void free_gpu_resources();
+
     bool add_buffer(const std::string& name, VkShaderStageFlagBits t,
         uint32_t binding, uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, VkShaderStageFlagBits t,

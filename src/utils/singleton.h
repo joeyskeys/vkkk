@@ -10,10 +10,12 @@ class Singleton {
 public:
     using ObjectType = T;
 
+    /*
     static ObjectType& instance() {
         static ObjectType object;
         return object;
     }
+    */
 
     template <typename ...Ts>
     static ObjectType& instance(Ts... args) {

@@ -1,5 +1,8 @@
+#include "asset_mgr/light_mgr.h"
+#include "asset_mgr/mesh_mgr.h"
 #include "binding/utils.h"
 #include "concepts/mesh.h"
+#include "vk_ins/pipeline_mgr.h"
 #include "vk_ins/types.h"
 #include "vk_ins/vkabstraction.h"
 
@@ -45,4 +48,25 @@ void bind_types(nb::module_& m) {
                 throw nb::index_error();
             return m.vbuf[idx];
         });
+
+    nb::class_<MeshMgr> mmcl(m, "MeshMgr");
+
+    mmcl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&MeshMgr::instance<VkWrappedInstance*>))
+        .def("load", &MeshMgr::load)
+        .def("pour_info_gpu", &MeshMgr::pour_into_gpu)
+        .def("free_gpu_resources", &MeshMgr::free_gpu_resources);
+        //.def("emit_draw_cmds", &MeshMgr::emit_draw_cmds);
+
+    nb::class_<LightInfo> licl(m, "LightInfo");
+
+    licl.def_rw("pt_lights", &LightInfo::pt_lights)
+        .def_rw("dir_lights", &LightInfo::dir_lights)
+        .def_rw("spot_lights", &LightInfo::spot_lights);
+
+    nb::class_<LightMgr> lmcl(m, "LightMgr");
+
+    lmcl.def_static("Instance", nb::overload_cast<>(&LightMgr::instance<>))
+        .def("add_pt_light", &LightMgr::add_pt_light)
+        .def("add_dir_light", &LightMgr::add_dir_light)
+        .def("add_spot_light", &LightMgr::add_spot_light);
 }

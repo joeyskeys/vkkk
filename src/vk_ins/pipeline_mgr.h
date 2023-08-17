@@ -32,11 +32,13 @@ public:
     //Pipeline(const Pipeline& rhs);
     Pipeline(Pipeline&& rhs);
     virtual ~Pipeline();
+
+    void free_gpu_resources();
 };
 
-//class PipelineMgr : public Singleton<PipelineMgr> {
-class PipelineMgr {
-/*
+class PipelineMgr : public Singleton<PipelineMgr> {
+//class PipelineMgr {
+///*
 private:
     // For singleton pattern
     PipelineMgr(VkWrappedInstance* i) : ins(i) {}
@@ -44,9 +46,11 @@ private:
 
     PipelineMgr(const Pipeline& rhs) = delete;
     PipelineMgr& operator= (const Pipeline& rhs) = delete;
-*/
+//*/
+/*
 public:
     PipelineMgr(VkWrappedInstance* i) : ins(i) {}
+*/
     
 public:
     VkWrappedInstance*                      ins;
@@ -57,6 +61,8 @@ public:
     std::map<std::string, uint32_t>         pipeline_map;
 
     virtual ~PipelineMgr();
+
+    void            free_gpu_resources();
 
     void            register_pipeline(const std::string&);
     void            create_pipelines(const VkRenderPass& renderpass);

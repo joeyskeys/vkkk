@@ -21,11 +21,9 @@ private:
 
 public:
     Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
+    void  load(const std::vector<VERT_COMP>&, const uint32_t, const char*,
+        const uint32_t, const uint32_t, const char*, const uint32_t);
     void add_box(const void *min, const void *max);
-
-    inline void init(VkWrappedInstance* i) {
-        ins = i;
-    }
 
     inline void pour_into_gpu() {
         for (auto& mesh : meshes)

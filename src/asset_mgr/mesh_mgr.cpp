@@ -43,4 +43,12 @@ Mesh* MeshMgr::load_file(const fs::path& path, const std::vector<VERT_COMP>& cs)
     return &meshes[idx];
 }
 
+void MeshMgr::load(const std::vector<VERT_COMP>& cs, const uint32_t v, const char* vbuf,
+    const uint32_t vs, const uint32_t i, const char* ibuf, const uint32_t is)
+{
+    Mesh m{ins, cs};
+    m.load(v, vbuf, vs, i, ibuf, is);
+    meshes.emplace_back(std::move(m));
+}
+
 }

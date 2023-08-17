@@ -28,10 +28,6 @@ UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size
 
 UBO::~UBO() {
     if (loaded) {
-        for (auto& gpu_buf : gpu_bufs)
-            vkDestroyBuffer(instance->get_device(), gpu_buf, nullptr);
-        for (auto& memo : memos)
-            vkFreeMemory(instance->get_device(), memo, nullptr);
         if (cpu_buf)
             cpu_buf.reset();
         loaded = false;
@@ -52,6 +48,17 @@ UBO::UBO(UBO&& rhs)
 {
     loaded = true;
     rhs.loaded = false;
+}
+
+void UBO::free_gpu_resources() {
+    for (auto& gpu_buf : gpu_bufs)
+        vkDestroyBuffer(instance->get_device(), gpu_buf, nullptr);
+    for (auto& memo : memos)
+        vkFreeMemory(instance->get_device(), memo, nullptr);
+
+    gpu_bufs.clear();
+    memos.clear();
+    descriptors.clear();
 }
 
 void UBO::update_descriptor() {

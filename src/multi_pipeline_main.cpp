@@ -93,8 +93,8 @@ int main() {
     ins.list_physical_devices();
     ins.create_resources(VK_SAMPLE_COUNT_8_BIT);
 
-    vkkk::PipelineMgr pipeline_mgr(&ins);
-    //auto& pipeline_mgr = vkkk::PipelineMgr::instance(&ins);
+    //vkkk::PipelineMgr pipeline_mgr(&ins);
+    auto& pipeline_mgr = vkkk::PipelineMgr::instance(&ins);
     pipeline_mgr.register_pipeline("object");
     pipeline_mgr.register_pipeline("skybox");
     pipeline_mgr.register_pipeline("forward");

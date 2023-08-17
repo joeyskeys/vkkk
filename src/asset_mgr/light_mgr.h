@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <vector>
 
 #include "concepts/lights.h"
@@ -7,6 +8,13 @@
 
 namespace vkkk
 {
+
+// Add this for easier python binding
+struct LightInfo {
+    std::array<PointLight, MAX_POINT_LIGHTS> pt_lights;
+    std::array<DirectionalLight, MAX_DIRECTIONAL_LIGHTS> dir_lights;
+    std::array<SpotLight, MAX_SPOT_LIGHTS> spot_lights;
+};
 
 class LightMgr : public Singleton<LightMgr> {
 private:
@@ -32,6 +40,7 @@ public:
     }
 
     void update_uniform(void* data) const;
+    void update_uniform(LightInfo& infos) const;
 
 private:
     // since the lights.h header is shared for shader code, we cannot

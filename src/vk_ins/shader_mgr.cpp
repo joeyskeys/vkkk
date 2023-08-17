@@ -16,8 +16,11 @@ ShaderModules::ShaderModules(VkWrappedInstance *ins,
     , uniform_mgr(mgr)
 {}
 
-ShaderModules::~ShaderModules() {
-    for (const auto &shader_module : shader_modules)
+ShaderModules::~ShaderModules()
+{}
+
+void ShaderModules::free_gpu_resources() {
+    for (const auto& shader_module : shader_modules)
         vkDestroyShaderModule(device, shader_module, nullptr);
     shader_modules.clear();
 }

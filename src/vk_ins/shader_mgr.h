@@ -27,6 +27,8 @@ public:
     ShaderModules(VkWrappedInstance *ins, UniformMgr *mgr);
     virtual ~ShaderModules();
 
+    void free_gpu_resources();
+
     bool add_module(fs::path path, VkShaderStageFlagBits t);
     void assign_tex_image(const std::string& tex_name, const std::string& tex_path, bool is_cubemap=false);
     void alloc_uniforms();

@@ -15,12 +15,8 @@ Texture::Texture(VkWrappedInstance* ins, const std::string& n, VkShaderStageFlag
     , binding(b)
 {}
 
-Texture::~Texture() {
-    if (loaded) {
-        destroy();
-        loaded = false;
-    }
-}
+Texture::~Texture()
+{}
 
 Texture::Texture(Texture&& t)
     : instance(t.instance)
@@ -43,19 +39,20 @@ Texture::Texture(Texture&& t)
     t.loaded = false;
 }
 
-void Texture::update_descriptor() {
-    descriptor.sampler = sampler;
-    descriptor.imageView = view;
-    descriptor.imageLayout = image_layout;
-}
-
-void Texture::destroy() {
+void Texture::free_gpu_resources() {
     vkDestroyImageView(instance->get_device(), view, nullptr);
     vkDestroyImage(instance->get_device(), image, nullptr);
     if (sampler)
         vkDestroySampler(instance->get_device(), sampler, nullptr);
 
     vkFreeMemory(instance->get_device(), memory, nullptr);
+    loaded = false;
+}
+
+void Texture::update_descriptor() {
+    descriptor.sampler = sampler;
+    descriptor.imageView = view;
+    descriptor.imageLayout = image_layout;
 }
 
 bool Texture::load_image(const fs::path& path) {

@@ -29,6 +29,8 @@ public:
     UBO(UBO&& rhs);
     UBO(const UBO& rhs) = delete;
 
+    void free_gpu_resources();
+
     void update_descriptor();
     void update(uint32_t idx);
 

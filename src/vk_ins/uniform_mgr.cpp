@@ -35,6 +35,13 @@ UniformMgr::UniformMgr(UniformMgr&& rhs)
 UniformMgr::~UniformMgr()
 {}
 
+void UniformMgr::free_gpu_resources() {
+    for (auto& ubo : ubos)
+        ubo.second.free_gpu_resources();
+    for (auto& tex : textures)
+        tex.free_gpu_resources();
+}
+
 bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
     uint32_t binding, uint32_t size, uint32_t vecsize)
 {

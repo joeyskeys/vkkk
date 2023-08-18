@@ -271,6 +271,7 @@ int main() {
     // instance may get freed before calling other resources' dtor.
     // Guess it's same issue for the pipeline.
     mesh_mgr.free_gpu_resources();
+    pipeline_mgr.free_gpu_resources();
 
     return 0;
 }

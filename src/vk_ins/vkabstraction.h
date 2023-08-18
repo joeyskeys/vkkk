@@ -105,8 +105,16 @@ public:
         return graphic_queue;
     }
 
+    inline auto get_swapchain() {
+        return swapchain;
+    }
+
     inline auto get_swapchain_cnt() {
         return swapchain_cnt;
+    }
+
+    inline auto get_swapchain_format() {
+        return swapchain_surface_format;
     }
 
     inline auto get_renderpass() {

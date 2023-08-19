@@ -37,8 +37,6 @@ public:
 };
 
 class PipelineMgr : public Singleton<PipelineMgr> {
-//class PipelineMgr {
-///*
 private:
     // For singleton pattern
     PipelineMgr(VkWrappedInstance* i) : ins(i) {}
@@ -46,11 +44,6 @@ private:
 
     PipelineMgr(const Pipeline& rhs) = delete;
     PipelineMgr& operator= (const Pipeline& rhs) = delete;
-//*/
-/*
-public:
-    PipelineMgr(VkWrappedInstance* i) : ins(i) {}
-*/
     
 public:
     VkWrappedInstance*                      ins;

@@ -19,6 +19,7 @@
 #include "concepts/mesh.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "vk_ins/cmd_buf.h"
+#include "vk_ins/render_target.h"
 #include "vk_ins/shader_mgr.h"
 
 namespace fs = std::filesystem;
@@ -183,6 +184,9 @@ public:
     void setup_mouse_btn_cbk(MouseBtnCBK);
     using MousePosCBK = void(*)(GLFWwindow*, double, double);
     void setup_mouse_pos_cbk(MousePosCBK);
+
+    // Utils
+    std::unique_ptr<char[]> get_image_buffer(const RenderTarget& rt) const;
 
 private:
     // Private methods

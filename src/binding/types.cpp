@@ -19,11 +19,19 @@ void bind_types(nb::module_& m) {
         .def("init_glfw", &VkWrappedInstance::init_glfw)
         .def("create_resources", &VkWrappedInstance::create_resources)
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
-        .def("mainloop", &VkWrappedInstance::mainloop);
+        .def("mainloop", &VkWrappedInstance::mainloop)
+        .def("get_image_buffer", &VkWrappedInstance::get_image_buffer);
 
-    //nb::class_<PipelineMgr> pycl(m, "PipelineMgr");
+    nb::class_<PipelineMgr> pycl(m, "PipelineMgr");
 
-    //pycl.def();
+    pycl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&PipelineMgr::instance<VkWrappedInstance*>))
+        .def("free_gpu_resources", &PipelineMgr::free_gpu_resources)
+        .def("register_pipeline", &PipelineMgr::register_pipeline)
+        .def("create_pipelines", &PipelineMgr::create_pipelines)
+        .def("create_descriptor_layouts", &PipelineMgr::create_descriptor_layouts)
+        .def("create_input_descriptions", &PipelineMgr::create_input_descriptions)
+        .def("create_descriptor_pools", &PipelineMgr::create_descriptor_pools)
+        .def("create_descriptor_sets", &PipelineMgr::create_descriptor_sets);
 
     nb::enum_<VERT_COMP>(m, "VERT_COMP")
         .value("VERTEX", VERT_COMP::VERTEX)

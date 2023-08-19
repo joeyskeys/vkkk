@@ -1079,4 +1079,16 @@ void VkWrappedInstance::setup_mouse_pos_cbk(MousePosCBK cbk) {
     glfwSetCursorPosCallback(window, cbk);
 }
 
+std::unique_ptr<char[]> VkWrappedInstance::get_image_buffer(const RenderTarget& rt) const {
+    VkImageSubresource subresource { VK_IMAGE_ASPECT_COLOR_BIT, 0, 0 };
+    VkSubresourceLayout subresource_layout;
+    vkGetImageSubresourceLayout(device, rt.image, &subresource, &subresource_layout);
+
+    char* data;
+    vkMapMemory(device, rt.memo, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void**>(&data));
+    data += subresource_layout.offset;
+
+    vkUnmapMemory(device, rt.memo, nullptr);
+}
+
 }

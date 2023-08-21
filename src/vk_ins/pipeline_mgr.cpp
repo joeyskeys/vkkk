@@ -8,8 +8,8 @@ namespace vkkk
 
 Pipeline::Pipeline(VkWrappedInstance* i)
     : ins(i)
-    , uniforms(std::make_unique<UniformMgr>(i))
-    , modules(i, uniforms.get())
+    , uniforms(std::make_shared<UniformMgr>(i))
+    , modules(std::make_shared<ShaderModules>(i, uniforms.get()))
     , input_info()
     , input_assembly()
     , viewport()
@@ -80,6 +80,26 @@ Pipeline::Pipeline(VkWrappedInstance* i)
     blend_state.blendConstants[3] = 0.f;
 }
 
+Pipeline::Pipeline(const Pipeline& rhs)
+    : ins(rhs.ins)
+    , uniforms(rhs.uniforms)
+    , modules(rhs.modules)
+    , input_info(rhs.input_info)
+    , input_assembly(rhs.input_assembly)
+    , viewport(rhs.viewport)
+    , vp_state_info(rhs.vp_state_info)
+    , scissor(rhs.scissor)
+    , rasterizer(rhs.rasterizer)
+    , multisampling(rhs.multisampling)
+    , depth_stencil(rhs.depth_stencil)
+    , blend_attachment(rhs.blend_attachment)
+    , blend_state(rhs.blend_state)
+{
+    vp_state_info.pViewports = &viewport;
+    vp_state_info.pScissors = &scissor;
+    blend_state.pAttachments = &blend_attachment;
+}
+
 Pipeline::Pipeline(Pipeline&& rhs)
     : ins(rhs.ins)
     , uniforms(std::move(rhs.uniforms))
@@ -95,7 +115,7 @@ Pipeline::Pipeline(Pipeline&& rhs)
     , blend_attachment(rhs.blend_attachment)
     , blend_state(rhs.blend_state)
 {
-    // Cannot just previous pointer values
+    // Cannot just use previous pointer values
     vp_state_info.pViewports = &viewport;
     vp_state_info.pScissors = &scissor;
     blend_state.pAttachments = &blend_attachment;
@@ -105,7 +125,7 @@ Pipeline::~Pipeline() {}
 
 void Pipeline::free_gpu_resources() {
     uniforms->free_gpu_resources();
-    modules.free_gpu_resources();
+    modules->free_gpu_resources();
 }
 
 PipelineMgr::~PipelineMgr() {}
@@ -131,32 +151,32 @@ void PipelineMgr::register_pipeline(const std::string& name) {
     // will give a incorrect result, look into it later
 }
 
-void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {
+void PipelineMgr::create_pipelines() {
     std::vector<VkGraphicsPipelineCreateInfo> pipeline_create_infos;
     for (int i = 0; i < layouts.size(); ++i) {
         auto& pipeline = pipelines[i];
-        if (!pipeline.modules.valid())
+        if (!pipeline.modules->valid())
             throw std::runtime_error(fmt::format("pipeline modules are not valid for index {}", i));
 
         VkPipelineLayoutCreateInfo layout_info{};
         layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
         // Set is another concept which need to futher investigate
         layout_info.setLayoutCount = 1;
-        layout_info.pSetLayouts = pipeline.modules.get_descriptor_set_layout();
+        layout_info.pSetLayouts = pipeline.modules->get_descriptor_set_layout();
 
         if (vkCreatePipelineLayout(ins->get_device(), &layout_info, nullptr, &layouts[i]) != VK_SUCCESS)
             throw std::runtime_error(fmt::format("failed to create pipeline layout for index {}", i));
 
-        pipeline.modules.generate_create_infos();
+        pipeline.modules->generate_create_infos();
         VkGraphicsPipelineCreateInfo pipeline_create_info{};
         pipeline_create_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipeline_create_info.stageCount = pipeline.modules.get_stages_count();
-        pipeline_create_info.pStages = pipeline.modules.get_stages_data();
+        pipeline_create_info.stageCount = pipeline.modules->get_stages_count();
+        pipeline_create_info.pStages = pipeline.modules->get_stages_data();
 
-        pipeline.input_info.vertexBindingDescriptionCount = pipeline.modules.get_binding_description_count();
-        pipeline.input_info.pVertexBindingDescriptions = pipeline.modules.get_binding_descriptions();
-        pipeline.input_info.vertexAttributeDescriptionCount = pipeline.modules.get_attr_description_count();
-        pipeline.input_info.pVertexAttributeDescriptions = pipeline.modules.get_attr_descriptions();
+        pipeline.input_info.vertexBindingDescriptionCount = pipeline.modules->get_binding_description_count();
+        pipeline.input_info.pVertexBindingDescriptions = pipeline.modules->get_binding_descriptions();
+        pipeline.input_info.vertexAttributeDescriptionCount = pipeline.modules->get_attr_description_count();
+        pipeline.input_info.pVertexAttributeDescriptions = pipeline.modules->get_attr_descriptions();
         pipeline_create_info.pVertexInputState = &pipeline.input_info;
 
         pipeline_create_info.pInputAssemblyState = &pipeline.input_assembly;
@@ -169,7 +189,7 @@ void PipelineMgr::create_pipelines(const VkRenderPass& renderpass) {
         // Renderpass is bound to framebuffer or other buffers
         // When we're trying to render into another buffer, this code will
         // cause problem.
-        pipeline_create_info.renderPass = renderpass;
+        pipeline_create_info.renderPass = ins->get_renderpass();
         pipeline_create_info.subpass = 0;
         pipeline_create_info.basePipelineHandle = VK_NULL_HANDLE;
 

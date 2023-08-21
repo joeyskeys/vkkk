@@ -51,6 +51,22 @@ struct Pixel {
 
 using UpdateCBK = std::function<void(uint32_t, float)>;
 
+/************************************************************
+ * A design problem occurred now:
+ * Seperate vk objects into different classes will have us to
+ * explicitly call free_gpu_resources function to do the job
+ * instead of relying on RAII(Since the instance could be freed
+ * before other resources).
+ * Another problem is it will hurt when we're creating bindings
+ * for these functions when we're passing vk objects around,
+ * which will require us to add bindings for basically all the
+ * vk natives class we used in the function interface and that
+ * will be a lot of work.
+ * Now considering to put all the vulkan resources into the
+ * wrapped instance and keep a pointer or index in the abstract
+ * classes.
+ ************************************************************/
+
 class VkWrappedInstance {
 public:
     VkWrappedInstance();

@@ -15,8 +15,8 @@ class VkWrappedInstance;
 class Pipeline {
 public:
     VkWrappedInstance*                      ins;
-    std::unique_ptr<UniformMgr>             uniforms;
-    ShaderModules                           modules;
+    std::shared_ptr<UniformMgr>             uniforms;
+    std::shared_ptr<ShaderModules>          modules;
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;
     VkViewport                              viewport;
@@ -29,7 +29,7 @@ public:
     VkPipelineColorBlendStateCreateInfo     blend_state;
     
     Pipeline(VkWrappedInstance* i);
-    //Pipeline(const Pipeline& rhs);
+    Pipeline(const Pipeline& rhs);
     Pipeline(Pipeline&& rhs);
     virtual ~Pipeline();
 
@@ -58,16 +58,16 @@ public:
     void            free_gpu_resources();
 
     void            register_pipeline(const std::string&);
-    void            create_pipelines(const VkRenderPass& renderpass);
+    void            create_pipelines();
 
     inline void     create_descriptor_layouts() {
         for (auto& pipeline : pipelines)
-            pipeline.modules.create_descriptor_layouts();
+            pipeline.modules->create_descriptor_layouts();
     }
 
     inline void     create_input_descriptions(const std::vector<VERT_COMP>& comps) {
         for (auto& pipeline : pipelines)
-            pipeline.modules.create_input_descriptions(comps);
+            pipeline.modules->create_input_descriptions(comps);
     }
     
     inline void     create_descriptor_pools() {
@@ -75,12 +75,12 @@ public:
         // Create a single pool for all modules and you will only to create
         // the pool once
         for (auto& pipeline : pipelines)
-            pipeline.modules.create_descriptor_pool();
+            pipeline.modules->create_descriptor_pool();
     }
 
     inline void     create_descriptor_sets() {
         for (auto& pipeline : pipelines)
-            pipeline.modules.create_descriptor_set();
+            pipeline.modules->create_descriptor_set();
     }
 
     inline Pipeline& get_pipeline(const uint32_t idx) {

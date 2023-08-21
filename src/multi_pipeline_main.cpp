@@ -117,23 +117,23 @@ int main() {
     pipeline_mat.multisampling.sampleShadingEnable = VK_TRUE;
     pipeline_mat.multisampling.rasterizationSamples = ins.nsample;
 
-    pipeline_obj.modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_obj.modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_obj.modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
-    pipeline_obj.modules.alloc_uniforms();
+    pipeline_obj.modules->add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_obj.modules->add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_obj.modules->assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
+    pipeline_obj.modules->alloc_uniforms();
 
-    pipeline_sky.modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_sky.modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_sky.modules.assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png", true);
-    pipeline_sky.modules.alloc_uniforms();
+    pipeline_sky.modules->add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_sky.modules->add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_sky.modules->assign_tex_image("cubemap_spl", "../resource/textures/skybox1.png", true);
+    pipeline_sky.modules->alloc_uniforms();
 
-    pipeline_for.modules.add_module("../resource/shaders/basic_lighting_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_for.modules.add_module("../resource/shaders/basic_lighting_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_for.modules.alloc_uniforms();
+    pipeline_for.modules->add_module("../resource/shaders/basic_lighting_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_for.modules->add_module("../resource/shaders/basic_lighting_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_for.modules->alloc_uniforms();
 
-    pipeline_mat.modules.add_module("../resource/shaders/matte_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    pipeline_mat.modules.add_module("../resource/shaders/matte_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    pipeline_mat.modules.alloc_uniforms();
+    pipeline_mat.modules->add_module("../resource/shaders/matte_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
+    pipeline_mat.modules->add_module("../resource/shaders/matte_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    pipeline_mat.modules->alloc_uniforms();
 
     // We need a concept of a complete scene now..
     auto& light_mgr = vkkk::LightMgr::instance();
@@ -200,24 +200,24 @@ int main() {
 
     pipeline_mgr.create_descriptor_layouts();
 
-    pipeline_obj.modules.set_attribute_binding(0, 0);
-    pipeline_obj.modules.set_attribute_binding(0, 1);
-    pipeline_obj.modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+    pipeline_obj.modules->set_attribute_binding(0, 0);
+    pipeline_obj.modules->set_attribute_binding(0, 1);
+    pipeline_obj.modules->create_input_descriptions({vkkk::VERTEX, vkkk::UV});
 
-    pipeline_sky.modules.set_attribute_binding(0, 0);
-    pipeline_sky.modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+    pipeline_sky.modules->set_attribute_binding(0, 0);
+    pipeline_sky.modules->create_input_descriptions({vkkk::VERTEX, vkkk::UV});
 
-    pipeline_for.modules.set_attribute_binding(0, 0);
-    pipeline_for.modules.set_attribute_binding(0, 1);
-    pipeline_for.modules.set_attribute_binding(0, 2);
-    pipeline_for.modules.create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
+    pipeline_for.modules->set_attribute_binding(0, 0);
+    pipeline_for.modules->set_attribute_binding(0, 1);
+    pipeline_for.modules->set_attribute_binding(0, 2);
+    pipeline_for.modules->create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
 
-    pipeline_mat.modules.set_attribute_binding(0, 0);
-    pipeline_mat.modules.set_attribute_binding(0, 1);
-    pipeline_mat.modules.set_attribute_binding(0, 2);
-    pipeline_mat.modules.create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
+    pipeline_mat.modules->set_attribute_binding(0, 0);
+    pipeline_mat.modules->set_attribute_binding(0, 1);
+    pipeline_mat.modules->set_attribute_binding(0, 2);
+    pipeline_mat.modules->create_input_descriptions({vkkk::VERTEX, vkkk::NORMAL, vkkk::UV});
 
-    pipeline_mgr.create_pipelines(ins.get_renderpass());
+    pipeline_mgr.create_pipelines();
 
     pipeline_mgr.create_descriptor_pools();
     pipeline_mgr.create_descriptor_sets();
@@ -248,13 +248,13 @@ int main() {
         [&](uint32_t idx) {
             pipeline_mgr.bind("skybox", cmd_bufs.bufs[idx]);
             skybox_obj->emit_draw_cmd(cmd_bufs.bufs[idx], box_ppl_layout,
-                pipeline_sky.modules.get_descriptor_set(idx));
+                pipeline_sky.modules->get_descriptor_set(idx));
             pipeline_mgr.bind("object", cmd_bufs.bufs[idx]);
             moon_obj->emit_draw_cmd(cmd_bufs.bufs[idx], obj_ppl_layout,
-                pipeline_obj.modules.get_descriptor_set(idx));
+                pipeline_obj.modules->get_descriptor_set(idx));
             pipeline_mgr.bind("forward", cmd_bufs.bufs[idx]);
             sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], for_ppl_layout,
-                pipeline_for.modules.get_descriptor_set(idx));
+                pipeline_for.modules->get_descriptor_set(idx));
             /*
             pipeline_mgr.bind("matte", cmd_bufs.bufs[idx]);
             sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], mat_ppl_layout,

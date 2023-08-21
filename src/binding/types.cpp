@@ -3,7 +3,9 @@
 #include "binding/utils.h"
 #include "concepts/mesh.h"
 #include "vk_ins/pipeline_mgr.h"
+#include "vk_ins/shader_mgr.h"
 #include "vk_ins/types.h"
+#include "vk_ins/uniform_mgr.h"
 #include "vk_ins/vkabstraction.h"
 
 using namespace vkkk;
@@ -21,6 +23,42 @@ void bind_types(nb::module_& m) {
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
         .def("mainloop", &VkWrappedInstance::mainloop)
         .def("get_image_buffer", &VkWrappedInstance::get_image_buffer);
+
+    nb::class_<UniformMgr> umcl(m, "UniformMgr");
+
+    umcl.def(nb::init<VkWrappedInstance*>())
+        .def("free_gpu_resources", &UniformMgr::free_gpu_resources)
+        //.def("add_buffer", &UniformMgr::add_buffer)
+        //.def("add_texture", &UniformMgr::add_texture)
+        //.def("add_cubemap", &UniformMgr::add_cubemap)
+        .def("generate_writes", &UniformMgr::generate_writes)
+        .def("set_dest_set", &UniformMgr::set_dest_set)
+        //.def("find_ubo", &Uniform::find_ubo)
+        .def("update_ubos", &UniformMgr::update_ubos);
+
+    nb::class_<ShaderModules> smcl(m, "ShaderModules");
+
+    smcl.def(nb::init<VkWrappedInstance*, UniformMgr*>())
+        .def("free_gpu_resources", &ShaderModules::free_gpu_resources)
+        //.def("add_module", &ShaderModules::add_module)
+        .def("assign_tex_image", &ShaderModules::assign_tex_image)
+        .def("alloc_uniforms", &ShaderModules::alloc_uniforms)
+        .def("set_attribute_binding", &ShaderModules::set_attribute_binding)
+        .def("create_input_descriptions", &ShaderModules::create_input_descriptions)
+        .def("create_descriptor_layouts", &ShaderModules::create_descriptor_layouts)
+        .def("create_descriptor_pool", &ShaderModules::create_descriptor_pool)
+        .def("create_descriptor_set", &ShaderModules::create_descriptor_set)
+        .def("valid", &ShaderModules::valid)
+        .def("get_stages_count", &ShaderModules::get_stages_count)
+        .def("get_binding_description_count", &ShaderModules::get_binding_description_count)
+        .def("get_attr_description_count", &ShaderModules::get_attr_description_count);
+
+    nb::class_<Pipeline> ppcl(m, "Pipeline");
+
+    ppcl.def(nb::init<VkWrappedInstance*>())
+        .def("free_gpu_resources", &Pipeline::free_gpu_resources)
+        .def_ro("uniforms", &Pipeline::uniforms)
+        .def_ro("modules", &Pipeline::modules);
 
     nb::class_<PipelineMgr> pycl(m, "PipelineMgr");
 

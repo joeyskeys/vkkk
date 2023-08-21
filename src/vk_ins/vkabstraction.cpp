@@ -1084,11 +1084,15 @@ std::unique_ptr<char[]> VkWrappedInstance::get_image_buffer(const RenderTarget& 
     VkSubresourceLayout subresource_layout;
     vkGetImageSubresourceLayout(device, rt.image, &subresource, &subresource_layout);
 
-    char* data;
-    vkMapMemory(device, rt.memo, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void**>(&data));
-    data += subresource_layout.offset;
+    char* mapped_ptr;
+    // Assume pixel format default to R8G8B8A8
+    auto data = std::make_unique<char[]>(sizeof(float));
+    vkMapMemory(device, rt.memo, 0, VK_WHOLE_SIZE, 0, reinterpret_cast<void**>(&mapped_ptr));
+    mapped_ptr += subresource_layout.offset;
 
-    vkUnmapMemory(device, rt.memo, nullptr);
+    vkUnmapMemory(device, rt.memo);
+
+    return data;
 }
 
 }

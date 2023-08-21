@@ -10,6 +10,7 @@ namespace vkkk
 class VkWrappedInstance;
 
 class RenderTarget {
+public:
     RenderTarget(VkWrappedInstance*);
 
     void free_gpu_resources();

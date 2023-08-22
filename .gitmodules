@@ -4,3 +4,6 @@
 [submodule "thirdparty/nanobind"]
 	path = thirdparty/nanobind
 	url = https://github.com/wjakob/nanobind
+[submodule "plugin/blend_vk"]
+	path = plugin/blend_vk
+	url = git@github.com:joeyskeys/bitto.git

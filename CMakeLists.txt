@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.18)
 
 cmake_policy(SET CMP0074 NEW)
 set(CMAKE_CXX_STANDARD 20)
@@ -88,4 +88,5 @@ include_directories(${CMAKE_SOURCE_DIR}/src)
 
 add_subdirectory(thirdparty/nanobind)
 add_subdirectory(src)
+add_subdirectory(plugin)
 add_subdirectory(tests)

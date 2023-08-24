@@ -9,3 +9,11 @@ set(SRC_FILES
 nanobind_add_module(pyvkkk ${SRC_FILES})
 target_link_libraries(pyvkkk PRIVATE
     vkkk)
+
+add_custom_command(TARGET pyvkkk POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy
+        $<TARGET_FILE:pyvkkk>
+        ${CMAKE_SOURCE_DIR}/plugin/vulender)
+
+add_custom_target(copylib
+    DEPENDS ${CMAKE_SOURCE_DIR}/plugin/vulender/$<TARGET_FILE:pyvkkk>)

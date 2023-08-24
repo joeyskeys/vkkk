@@ -18,6 +18,8 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
+#include "vk_ins/cmd_buf.h"
+#include "vk_ins/pipeline_mgr.h"
 #include "vk_ins/types.h"
 
 namespace vkkk
@@ -41,6 +43,7 @@ public:
     void unload_gpu();
 
     void emit_draw_cmd(VkCommandBuffer, VkPipelineLayout, const VkDescriptorSet*);
+    void emit_draw_cmd(CommandBuffers&, const uint32_t, PipelineMgr&, const std::string&);
 
 public:
     VkWrappedInstance*          ins;

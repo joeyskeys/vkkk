@@ -5,6 +5,7 @@
 #include <vulkan/vulkan.h>
 
 #include "utils/singleton.h"
+#include "vk_ins/cmd_buf.h"
 #include "vk_ins/shader_mgr.h"
 
 namespace vkkk
@@ -116,12 +117,12 @@ public:
             return std::make_pair(vk_pipelines[found->second], layouts[found->second]);
     }
 
-    inline void bind(const std::string& name, VkCommandBuffer buf) {
+    inline void bind(const std::string& name, CommandBuffers& bufs, uint32_t idx) {
         auto found = pipeline_map.find(name);
         if (found == pipeline_map.end())
             return;
         else
-            vkCmdBindPipeline(buf, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipelines[found->second]);
+            vkCmdBindPipeline(bufs[idx], VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipelines[found->second]);
     }
 };
 

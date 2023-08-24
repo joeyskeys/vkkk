@@ -5,6 +5,8 @@
 #include <fmt/format.h>
 
 #include "concepts/mesh.h"
+//#include "vk_ins/cmd_buf.h"
+//#include "vk_ins/pipeline_mgr.h"
 #include "vk_ins/vkabstraction.h"
 
 namespace vkkk
@@ -190,6 +192,23 @@ void Mesh::emit_draw_cmd(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(cmd_buf, 0, 1, bufs, offsets);
     vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, ppl_layout,
+        0, 1, desc_set, 0, nullptr);
+    vkCmdBindIndexBuffer(cmd_buf, ibuf_gpu, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, icnt * 3, 1, 0, 0, 0);
+}
+
+void Mesh::emit_draw_cmd(CommandBuffers& cbufs, const uint32_t idx, PipelineMgr& ppl_mgr,
+    const std::string& ppl_name)
+{
+    auto& cmd_buf = cbufs[idx];
+    auto layout = ppl_mgr.get_vkpipeline_layout(ppl_name);
+    auto& ppl = ppl_mgr.get_pipeline(ppl_name);
+    auto desc_set = ppl.modules->get_descriptor_set(idx);
+
+    VkBuffer bufs[] = {vbuf_gpu};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmd_buf, 0, 1, bufs, offsets);
+    vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, layout,
         0, 1, desc_set, 0, nullptr);
     vkCmdBindIndexBuffer(cmd_buf, ibuf_gpu, 0, VK_INDEX_TYPE_UINT32);
     vkCmdDrawIndexed(cmd_buf, icnt * 3, 1, 0, 0, 0);

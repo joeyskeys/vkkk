@@ -246,13 +246,13 @@ int main() {
         cmd_bufs.bufs,
         ins.get_framebuffers(),
         [&](uint32_t idx) {
-            pipeline_mgr.bind("skybox", cmd_bufs.bufs[idx]);
+            pipeline_mgr.bind("skybox", cmd_bufs, idx);
             skybox_obj->emit_draw_cmd(cmd_bufs.bufs[idx], box_ppl_layout,
                 pipeline_sky.modules->get_descriptor_set(idx));
-            pipeline_mgr.bind("object", cmd_bufs.bufs[idx]);
+            pipeline_mgr.bind("object", cmd_bufs, idx);
             moon_obj->emit_draw_cmd(cmd_bufs.bufs[idx], obj_ppl_layout,
                 pipeline_obj.modules->get_descriptor_set(idx));
-            pipeline_mgr.bind("forward", cmd_bufs.bufs[idx]);
+            pipeline_mgr.bind("forward", cmd_bufs, idx);
             sphere_obj->emit_draw_cmd(cmd_bufs.bufs[idx], for_ppl_layout,
                 pipeline_for.modules->get_descriptor_set(idx));
             /*

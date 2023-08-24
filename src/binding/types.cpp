@@ -1,7 +1,9 @@
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/mesh_mgr.h"
 #include "binding/utils.h"
+#include "concepts/camera.h"
 #include "concepts/mesh.h"
+#include "vk_ins/cmd_buf.h"
 #include "vk_ins/pipeline_mgr.h"
 #include "vk_ins/shader_mgr.h"
 #include "vk_ins/types.h"
@@ -60,6 +62,11 @@ void bind_types(nb::module_& m) {
         .def_ro("uniforms", &Pipeline::uniforms)
         .def_ro("modules", &Pipeline::modules);
 
+    nb::class_<CommandBuffers> cbcl(m, "CommandBuffers");
+
+    cbcl.def(nb::init<VkWrappedInstance*>())
+        .def("alloc", &CommandBuffers::alloc);
+
     nb::class_<PipelineMgr> pycl(m, "PipelineMgr");
 
     pycl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&PipelineMgr::instance<VkWrappedInstance*>))
@@ -69,7 +76,10 @@ void bind_types(nb::module_& m) {
         .def("create_descriptor_layouts", &PipelineMgr::create_descriptor_layouts)
         .def("create_input_descriptions", &PipelineMgr::create_input_descriptions)
         .def("create_descriptor_pools", &PipelineMgr::create_descriptor_pools)
-        .def("create_descriptor_sets", &PipelineMgr::create_descriptor_sets);
+        .def("create_descriptor_sets", &PipelineMgr::create_descriptor_sets)
+        .def("get_pipeline_by_idx", nb::overload_cast<const uint32_t>(&PipelineMgr::get_pipeline))
+        .def("get_pipeline_by_name", nb::overload_cast<const std::string&>(&PipelineMgr::get_pipeline))
+        .def("bind", &PipelineMgr::bind);
 
     nb::enum_<VERT_COMP>(m, "VERT_COMP")
         .value("VERTEX", VERT_COMP::VERTEX)
@@ -89,6 +99,8 @@ void bind_types(nb::module_& m) {
         .def("set_view", &Mesh::set_view)
         .def("load_gpu", &Mesh::load_gpu)
         .def("unload_gpu", &Mesh::unload_gpu)
+        .def("emit_draw_cmd", nb::overload_cast<CommandBuffers&, const uint32_t,
+            PipelineMgr&, const std::string&>(&Mesh::emit_draw_cmd))
         .def("get_vert", [](const Mesh& m, size_t idx) {
             if (idx >= m.vcnt * 3)
                 throw nb::index_error();
@@ -115,4 +127,10 @@ void bind_types(nb::module_& m) {
         .def("add_pt_light", &LightMgr::add_pt_light)
         .def("add_dir_light", &LightMgr::add_dir_light)
         .def("add_spot_light", &LightMgr::add_spot_light);
+
+    nb::class_<Camera> cmcl(m, "Camera");
+    cmcl.def(nb::init<>())
+        .def(nb::init<glm::mat4, glm::mat4>())
+        .def("look_at", &Camera::look_at)
+        .def("perspective", &Camera::perspective);
 }

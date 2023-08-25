@@ -8,17 +8,17 @@
 namespace vkkk
 {
 
-Texture::Texture(VkWrappedInstance* ins, const std::string& n, VkShaderStageFlagBits t, uint32_t b)
+TextureDeprecated::TextureDeprecated(VkWrappedInstance* ins, const std::string& n, VkShaderStageFlagBits t, uint32_t b)
     : instance(ins)
     , name(n)
     , stage(t)
     , binding(b)
 {}
 
-Texture::~Texture()
+TextureDeprecated::~TextureDeprecated()
 {}
 
-Texture::Texture(Texture&& t)
+TextureDeprecated::TextureDeprecated(TextureDeprecated&& t)
     : instance(t.instance)
     , name(std::move(t.name))
     , stage(t.stage)
@@ -39,7 +39,7 @@ Texture::Texture(Texture&& t)
     t.loaded = false;
 }
 
-void Texture::free_gpu_resources() {
+void TextureDeprecated::free_gpu_resources() {
     vkDestroyImageView(instance->get_device(), view, nullptr);
     vkDestroyImage(instance->get_device(), image, nullptr);
     if (sampler)
@@ -49,13 +49,13 @@ void Texture::free_gpu_resources() {
     loaded = false;
 }
 
-void Texture::update_descriptor() {
+void TextureDeprecated::update_descriptor() {
     descriptor.sampler = sampler;
     descriptor.imageView = view;
     descriptor.imageLayout = image_layout;
 }
 
-bool Texture::load_image(const fs::path& path) {
+bool TextureDeprecated::load_image(const fs::path& path) {
     fs::path abs_path = path;
     if (path.is_relative())
         abs_path = fs::absolute(path);
@@ -161,7 +161,7 @@ bool Texture::load_image(const fs::path& path) {
     return true;
 }
 
-bool Texture::load_cubemap(const fs::path& path) {
+bool TextureDeprecated::load_cubemap(const fs::path& path) {
     fs::path abs_path = path;
     if (path.is_relative())
         abs_path = fs::absolute(path);

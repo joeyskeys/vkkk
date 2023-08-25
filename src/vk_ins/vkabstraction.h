@@ -51,6 +51,32 @@ struct Pixel {
 
 using UpdateCBK = std::function<void(uint32_t, float)>;
 
+struct UBO {
+    size_t                                  size;
+    size_t                                  vecsize;
+    uint32_t                                binding;
+    std::shared_ptr<char[]>                 cpu_buf;
+    std::vector<VkBuffer>                   gpu_bufs;
+    std::vector<VkDeviceMemory>             memos;
+    std::vector<VkDescriptorBufferInfo>     descriptors;
+};
+
+struct Texture {
+    uint32_t                                binding;
+    size_t                                  vecsize;
+    VkImage                                 image;
+    VkDeviceMemory                          memo;
+    VkImageView                             view;
+    VkImageLayout                           layout;
+    VkDescriptorImageInfo                   descriptor;
+    VkSampler                               sampler;
+};
+
+struct Pipeline {
+    VkPipeline                              pipeline;
+    VkPipelineLayout                        layout;
+};
+
 /************************************************************
  * A design problem occurred now:
  * Seperate vk objects into different classes will have us to
@@ -203,6 +229,8 @@ public:
 
     // Utils
     std::unique_ptr<char[]> get_image_buffer(const RenderTarget& rt) const;
+    std::pair<VkBuffer, VkDeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
+    void delete_buffer(VkBuffer buf, VkDeviceMemory memo) const;
 
 private:
     // Private methods
@@ -341,12 +369,30 @@ private:
     VkImageView                     depth_img_view;
     bool                            depth_created = false;
 
+
     // Window, bound to glfw for now
     GLFWwindow*                     window;
     std::chrono::time_point<std::chrono::system_clock>  time;
 
 public:
     VkSampleCountFlagBits           nsample = VK_SAMPLE_COUNT_1_BIT;
+
+/*****************************************************
+ * Resource related part 
+ *****************************************************/
+public:
+    bool add_buffer(const std::string& name, const uint32_t binding,
+        uint32_t size, uint32_t vecsize=1);
+    bool add_texture(const std::string& name, const uint32_t binding,
+        const std::string& path);
+    bool add_cubemap(const std::string& name, const uint32_t binding,
+        const std::string& path);
+
+public:
+    // Vulkan resources
+    std::unordered_map<std::string, UBO>        ubos;
+    std::unordered_map<std::string, Texture>    textures;
+    std::unordered_map<std::string, Pipeline>   pipelines;
 };
 
 }

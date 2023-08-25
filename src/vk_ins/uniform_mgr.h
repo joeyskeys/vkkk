@@ -34,7 +34,7 @@ public:
     void generate_writes();
     void set_dest_set(const uint32_t dst_set);
     
-    inline UBO* find_ubo(const std::string& name) {
+    inline UBODeprecated* find_ubo(const std::string& name) {
         auto dest = ubos.find(name);
         if (dest == ubos.end())
             return nullptr;
@@ -56,8 +56,8 @@ protected:
     uint32_t                                swapchain_image_cnt;
 
 public:
-    std::unordered_map<std::string, UBO>    ubos;
-    std::vector<Texture>                    textures;
+    std::unordered_map<std::string, UBODeprecated>    ubos;
+    std::vector<TextureDeprecated>                    textures;
     std::vector<VkWriteDescriptorSet>       writes;
 };
 

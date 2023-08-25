@@ -45,7 +45,7 @@ void UniformMgr::free_gpu_resources() {
 bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
     uint32_t binding, uint32_t size, uint32_t vecsize)
 {
-    auto ubo = UBO(instance, t, binding, size, vecsize);
+    auto ubo = UBODeprecated(instance, t, binding, size, vecsize);
     ubo.name = name;
     ubos.emplace(name, std::move(ubo));
     return true;
@@ -53,7 +53,7 @@ bool UniformMgr::add_buffer(const std::string& name, VkShaderStageFlagBits t,
 
 bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t,
     uint32_t binding, const std::string& path) {
-    auto tex = Texture(instance, name, t, binding);
+    auto tex = TextureDeprecated(instance, name, t, binding);
     if (!tex.load_image(path))
         return false;
 
@@ -64,7 +64,7 @@ bool UniformMgr::add_texture(const std::string& name, VkShaderStageFlagBits t,
 bool UniformMgr::add_cubemap(const std::string& name, VkShaderStageFlagBits t,
     uint32_t binding, const std::string& path)
 {
-    auto tex = Texture(instance, name, t, binding);
+    auto tex = TextureDeprecated(instance, name, t, binding);
     if (!tex.load_cubemap(path))
         return false;
 

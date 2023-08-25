@@ -1095,4 +1095,145 @@ std::unique_ptr<char[]> VkWrappedInstance::get_image_buffer(const RenderTarget& 
     return data;
 }
 
+std::pair<VkBuffer, VkDeviceMemory> VkWrappedInstance::load_into_staging_buffer(void* data, uint32_t size) const {
+    VkBuffer buf;
+    VkDeviceMemory memo;
+    create_buffer(size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        buf, memo);
+
+    void* mapped;
+    vkMapMemory(device, memo, 0, size, 0, &mapped);
+    memcpy(mapped, data, size);
+    vkUnmapMemory(device, memo);
+
+    return std::make_pair(buf, memo);
+}
+
+void VkWrappedInstance::delete_buffer(VkBuffer buf, VkDeviceMemory memo) const {
+    vkDestroyBuffer(device, buf, nullptr);
+    vkFreeMemory(device, memo, nullptr);
+}
+
+bool VkWrappedInstance::add_buffer(const std::string& name, const uint32_t binding,
+    uint32_t size, uint32_t vecsize)
+{
+    UBO ubo{.size = size, .vecsize = vecsize, .binding = binding};
+    ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
+    ubo.gpu_bufs.resize(swapchain_cnt);
+    ubo.memos.resize(swapchain_cnt);
+    ubo.descriptors.resize(swapchain_cnt);
+
+    for (int i = 0; i < cnt; ++i)
+        ins->create_buffer(size * vecsize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            ubo.gpu_bufs[i], memos[i]);
+
+    ubos.emplace(name, std::move(ubo));
+
+    return true;
+}
+
+bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t binding,
+    const std::string& path)
+{
+    Texture tex{.binding = binding};
+
+    fs::path abs_path = path;
+    if (path.is_relative())
+        abs_path = fs::absolute(path);
+    if (!fs::exists(abs_path)) {
+        std::cout << "path for texture " << name << "does not exists" << std::endl;
+        return false;
+    }
+
+    OIIO::ImageBuf oiio_buf(abs_path.string().c_str());
+    if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0)) {
+        std::cout << "[OIIO] Texture spec initialization for " << name << " failed"
+            << std::endl;
+        return false;
+    }
+
+    int ch_ords[] = {0, 1, 2, -1};
+    float ch_vals[] = {0, 0, 0, 1.f};
+    std::string ch_names[] = {"R", "G", "B", "A"};
+    OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(oiio_buf, 4, ch_ords,
+        ch_vals, ch_names);
+    
+    auto spec = with_alpha_buf.spec();
+    // Default to R8G8B8A8
+    VkDeviceSize image_size = width * height * sizeof(float);
+    std::vector<float> pixels;
+    pixels.resize(spec.width * spec.height);
+    with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
+
+    auto [staging_buf, memo] = load_into_staging_buffer(pixels.data(), image_size);
+
+    create_vk_image(spec.width, spec.height, 1, VK_SAMPLE_COUNT_1_BIT,
+        VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, tex.image, tex.memo);
+
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = 1;
+    range.baseArrayLayer = 0;
+    range.layerCount = 1;
+
+    std::vector<VkBufferImageCopy> regions;
+    VkBufferImageCopy region{};
+    region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+    region.imageOffset = {0, 0, 0};
+    region.imageExtent = {spec.width, spec.height, 1};
+    regions.push_back(region);
+
+    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+        instance->copy_buffer_to_image(staging_buf, image, regions);
+    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
+
+    delete_buffer(staging_buf, memo);
+
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+    view_info.image = tex.image;
+    if (vkCreateImageView(device, &view_info, nullptr, &tex.view) != VK_SUCCESS) {
+        std::cout << "Create image view for texture " << name << " failed" << std::endl;
+        return false;
+    }
+
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampelr_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.mipLodBias = 0.f;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.minLod = 0.f;
+    sampler_info.maxLod = 0.f;
+    sampler_info.maxAnisotropy = 1.f;
+    sampler_info.anisotropyEnable = false;
+    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+    if (vkCreateSampler(device, &sampler_info, nullptr, &tex.sampler) != VK_SUCCESS) {
+        std::cout << "Create sampler for texture " << name << " failed" << std::endl;
+        return false;
+    }
+
+    return true;
+}
+
+bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t binding,
+    const std::string& path)
+{
+
+}
+
 }

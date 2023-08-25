@@ -13,7 +13,7 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class Pipeline {
+class PipelineDeprecated {
 public:
     VkWrappedInstance*                      ins;
     std::shared_ptr<UniformMgr>             uniforms;
@@ -29,10 +29,10 @@ public:
     VkPipelineColorBlendAttachmentState     blend_attachment;
     VkPipelineColorBlendStateCreateInfo     blend_state;
     
-    Pipeline(VkWrappedInstance* i);
-    Pipeline(const Pipeline& rhs);
-    Pipeline(Pipeline&& rhs);
-    virtual ~Pipeline();
+    PipelineDeprecated(VkWrappedInstance* i);
+    PipelineDeprecated(const PipelineDeprecated& rhs);
+    PipelineDeprecated(PipelineDeprecated&& rhs);
+    virtual ~PipelineDeprecated();
 
     void free_gpu_resources();
 };
@@ -43,13 +43,13 @@ private:
     PipelineMgr(VkWrappedInstance* i) : ins(i) {}
     friend class Singleton<PipelineMgr>;
 
-    PipelineMgr(const Pipeline& rhs) = delete;
-    PipelineMgr& operator= (const Pipeline& rhs) = delete;
+    PipelineMgr(const PipelineMgr& rhs) = delete;
+    PipelineMgr& operator= (const PipelineMgr& rhs) = delete;
     
 public:
     VkWrappedInstance*                      ins;
 
-    std::vector<Pipeline>                   pipelines;
+    std::vector<PipelineDeprecated>         pipelines;
     std::vector<VkPipeline>                 vk_pipelines;
     std::vector<VkPipelineLayout>           layouts;
     std::map<std::string, uint32_t>         pipeline_map;
@@ -84,11 +84,11 @@ public:
             pipeline.modules->create_descriptor_set();
     }
 
-    inline Pipeline& get_pipeline(const uint32_t idx) {
+    inline PipelineDeprecated& get_pipeline(const uint32_t idx) {
         return pipelines.at(idx);
     }
 
-    inline Pipeline& get_pipeline(const std::string& name) {
+    inline PipelineDeprecated& get_pipeline(const std::string& name) {
         auto idx = pipeline_map[name];
         return pipelines.at(idx);
     }

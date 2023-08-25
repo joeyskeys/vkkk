@@ -55,12 +55,12 @@ void bind_types(nb::module_& m) {
         .def("get_binding_description_count", &ShaderModules::get_binding_description_count)
         .def("get_attr_description_count", &ShaderModules::get_attr_description_count);
 
-    nb::class_<Pipeline> ppcl(m, "Pipeline");
+    nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
 
     ppcl.def(nb::init<VkWrappedInstance*>())
-        .def("free_gpu_resources", &Pipeline::free_gpu_resources)
-        .def_ro("uniforms", &Pipeline::uniforms)
-        .def_ro("modules", &Pipeline::modules);
+        .def("free_gpu_resources", &PipelineDeprecated::free_gpu_resources)
+        .def_ro("uniforms", &PipelineDeprecated::uniforms)
+        .def_ro("modules", &PipelineDeprecated::modules);
 
     nb::class_<CommandBuffers> cbcl(m, "CommandBuffers");
 

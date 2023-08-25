@@ -6,7 +6,7 @@
 namespace vkkk
 {
 
-Pipeline::Pipeline(VkWrappedInstance* i)
+PipelineDeprecated::PipelineDeprecated(VkWrappedInstance* i)
     : ins(i)
     , uniforms(std::make_shared<UniformMgr>(i))
     , modules(std::make_shared<ShaderModules>(i, uniforms.get()))
@@ -80,7 +80,7 @@ Pipeline::Pipeline(VkWrappedInstance* i)
     blend_state.blendConstants[3] = 0.f;
 }
 
-Pipeline::Pipeline(const Pipeline& rhs)
+PipelineDeprecated::PipelineDeprecated(const PipelineDeprecated& rhs)
     : ins(rhs.ins)
     , uniforms(rhs.uniforms)
     , modules(rhs.modules)
@@ -100,7 +100,7 @@ Pipeline::Pipeline(const Pipeline& rhs)
     blend_state.pAttachments = &blend_attachment;
 }
 
-Pipeline::Pipeline(Pipeline&& rhs)
+PipelineDeprecated::PipelineDeprecated(PipelineDeprecated&& rhs)
     : ins(rhs.ins)
     , uniforms(std::move(rhs.uniforms))
     , modules(std::move(rhs.modules))
@@ -121,9 +121,9 @@ Pipeline::Pipeline(Pipeline&& rhs)
     blend_state.pAttachments = &blend_attachment;
 }
 
-Pipeline::~Pipeline() {}
+PipelineDeprecated::~PipelineDeprecated() {}
 
-void Pipeline::free_gpu_resources() {
+void PipelineDeprecated::free_gpu_resources() {
     uniforms->free_gpu_resources();
     modules->free_gpu_resources();
 }
@@ -141,7 +141,7 @@ void PipelineMgr::register_pipeline(const std::string& name) {
     if (found == pipeline_map.end()) {
         idx = pipelines.size();
         pipeline_map[name] = idx;
-        auto pipeline = Pipeline(ins);
+        auto pipeline = PipelineDeprecated(ins);
         pipelines.emplace_back(std::move(pipeline));
         vk_pipelines.emplace_back(VkPipeline{});
         layouts.emplace_back(VkPipelineLayout{});

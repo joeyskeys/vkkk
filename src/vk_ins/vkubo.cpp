@@ -4,7 +4,7 @@
 namespace vkkk
 {
 
-UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size_t s, size_t vs)
+UBODeprecated::UBODeprecated(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size_t s, size_t vs)
     : instance(ins)
     , stage(t)
     , binding(b)
@@ -26,7 +26,7 @@ UBO::UBO(VkWrappedInstance* ins, const VkShaderStageFlagBits t, uint32_t b, size
     loaded = true;
 }
 
-UBO::~UBO() {
+UBODeprecated::~UBODeprecated() {
     if (loaded) {
         if (cpu_buf)
             cpu_buf.reset();
@@ -34,7 +34,7 @@ UBO::~UBO() {
     }
 }
 
-UBO::UBO(UBO&& rhs)
+UBODeprecated::UBODeprecated(UBODeprecated&& rhs)
     : instance(rhs.instance)
     , stage(rhs.stage)
     , name(rhs.name)
@@ -50,7 +50,7 @@ UBO::UBO(UBO&& rhs)
     rhs.loaded = false;
 }
 
-void UBO::free_gpu_resources() {
+void UBODeprecated::free_gpu_resources() {
     for (auto& gpu_buf : gpu_bufs)
         vkDestroyBuffer(instance->get_device(), gpu_buf, nullptr);
     for (auto& memo : memos)
@@ -61,7 +61,7 @@ void UBO::free_gpu_resources() {
     descriptors.clear();
 }
 
-void UBO::update_descriptor() {
+void UBODeprecated::update_descriptor() {
     for (int i = 0; i < descriptors.size(); ++i) {
         auto& descriptor = descriptors[i];
         descriptor.buffer = gpu_bufs[i];
@@ -70,7 +70,7 @@ void UBO::update_descriptor() {
     }
 }
 
-void UBO::update(uint32_t idx) {
+void UBODeprecated::update(uint32_t idx) {
     void* mapped_data;
     vkMapMemory(instance->get_device(), memos[idx], 0, size, 0, &mapped_data);
         memcpy(mapped_data, cpu_buf.get(), size);

@@ -10,6 +10,7 @@ namespace vkkk
 Scene::Scene()
     : mesh_mgr(&MeshMgr::instance())
     , light_mgr(&LightMgr::instance())
+    //, ppl_mgr(&PipelineMgr::instance())
 {}
 
 }

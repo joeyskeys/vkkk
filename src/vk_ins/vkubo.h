@@ -11,7 +11,7 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class UBO {
+class UBODeprecated {
 public:
     VkWrappedInstance*                      instance;
     VkShaderStageFlagBits                   stage;
@@ -24,10 +24,10 @@ public:
     std::vector<VkDeviceMemory>             memos;
     std::vector<VkDescriptorBufferInfo>     descriptors;
 
-    UBO(VkWrappedInstance*, const VkShaderStageFlagBits, uint32_t, size_t, size_t vs=1);
-    ~UBO();
-    UBO(UBO&& rhs);
-    UBO(const UBO& rhs) = delete;
+    UBODeprecated(VkWrappedInstance*, const VkShaderStageFlagBits, uint32_t, size_t, size_t vs=1);
+    ~UBODeprecated();
+    UBODeprecated(UBODeprecated&& rhs);
+    UBODeprecated(const UBODeprecated& rhs) = delete;
 
     void free_gpu_resources();
 

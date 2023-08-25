@@ -11,7 +11,7 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class Texture {
+class TextureDeprecated {
 public:
     VkWrappedInstance*                  instance;
     std::string                         name;
@@ -29,10 +29,10 @@ public:
     VkSampler                           sampler;
     bool                                loaded = false;
 
-    Texture(VkWrappedInstance*, const std::string&, VkShaderStageFlagBits,
+    TextureDeprecated(VkWrappedInstance*, const std::string&, VkShaderStageFlagBits,
         uint32_t);
-    ~Texture();
-    Texture(Texture&& t);
+    ~TextureDeprecated();
+    TextureDeprecated(TextureDeprecated&& t);
 
     void free_gpu_resources();
 

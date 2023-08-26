@@ -192,7 +192,7 @@ public:
     void create_command_pool();
     
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags props, VkBuffer &buf, VkDeviceMemory& buf_memo);
+        VkMemoryPropertyFlags props, VkBuffer &buf, VkDeviceMemory& buf_memo) const;
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const float *, VkBuffer&, VkDeviceMemory&, size_t, size_t);
     void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
@@ -212,7 +212,7 @@ public:
         create_framebuffers();
     }
 
-    void create_descriptors(const ShaderModules& modules);
+    void create_descriptors(const ShaderModulesDeprecated& modules);
     void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
     void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
         const std::function<void(uint32_t)>& emit_func);
@@ -384,9 +384,10 @@ public:
     bool add_buffer(const std::string& name, const uint32_t binding,
         uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, const uint32_t binding,
-        const std::string& path);
+        const fs::path& path);
     bool add_cubemap(const std::string& name, const uint32_t binding,
-        const std::string& path);
+        const fs::path& path);
+    bool create_pipeline(const std::string& name, ShaderModules& modules);
 
 public:
     // Vulkan resources

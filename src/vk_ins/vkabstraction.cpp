@@ -12,7 +12,8 @@
 //#define STB_IMAGE_IMPLEMENTATION
 //#include <stb_image.h>
 
-#include "vkabstraction.h"
+#include "utils/io.h"
+#include "vk_ins/vkabstraction.h"
 
 namespace fs = std::filesystem;
 
@@ -574,25 +575,6 @@ void VkWrappedInstance::create_imageviews() {
     imageviews_created = true;
 }
 
-static std::vector<char> load_file(const fs::path& filepath) {
-    if (!fs::exists(filepath))
-        throw std::runtime_error(fmt::format("file {} not exists..", filepath.string()));
-
-    std::ifstream file(filepath, std::ios::ate | std::ios::binary);
-    if (!file.good()) {
-        //throw std::runtime_error(std::format("failed to open file : {}..", filepath));
-        throw std::runtime_error("failed to open file..");
-    }
-
-    size_t file_size = fs::file_size(filepath);
-    std::vector<char> buffer(file_size);
-    file.seekg(0);
-    file.read(buffer.data(), file_size);
-    file.close();
-
-    return buffer;
-}
-
 void VkWrappedInstance::create_renderpass() {
     VkAttachmentDescription attachment{};
     attachment.format = swapchain_surface_format.format;
@@ -720,7 +702,7 @@ uint32_t VkWrappedInstance::find_memory_type(uint32_t type_filter, VkMemoryPrope
 }
 
 void VkWrappedInstance::create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-    VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo) {
+    VkMemoryPropertyFlags props, VkBuffer& buf, VkDeviceMemory& buf_memo) const {
     VkBufferCreateInfo buf_info{};
     buf_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buf_info.size = size;
@@ -1124,10 +1106,10 @@ bool VkWrappedInstance::add_buffer(const std::string& name, const uint32_t bindi
     ubo.memos.resize(swapchain_cnt);
     ubo.descriptors.resize(swapchain_cnt);
 
-    for (int i = 0; i < cnt; ++i)
-        ins->create_buffer(size * vecsize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+    for (int i = 0; i < swapchain_cnt; ++i)
+        create_buffer(size * vecsize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-            ubo.gpu_bufs[i], memos[i]);
+            ubo.gpu_bufs[i], ubo.memos[i]);
 
     ubos.emplace(name, std::move(ubo));
 
@@ -1135,15 +1117,15 @@ bool VkWrappedInstance::add_buffer(const std::string& name, const uint32_t bindi
 }
 
 bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t binding,
-    const std::string& path)
+    const fs::path& path)
 {
-    Texture tex{.binding = binding};
+    Texture tex{.binding = binding, .vecsize = 1};
 
     fs::path abs_path = path;
     if (path.is_relative())
         abs_path = fs::absolute(path);
     if (!fs::exists(abs_path)) {
-        std::cout << "path for texture " << name << "does not exists" << std::endl;
+        std::cout << "path for texture " << name << "does not exist" << std::endl;
         return false;
     }
 
@@ -1185,12 +1167,13 @@ bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t bind
     VkBufferImageCopy region{};
     region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
     region.imageOffset = {0, 0, 0};
-    region.imageExtent = {spec.width, spec.height, 1};
+    region.imageExtent = {static_cast<uint32_t>(spec.width),
+        static_cast<uint32_t>(spec.height), 1};
     regions.push_back(region);
 
-    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
-        instance->copy_buffer_to_image(staging_buf, image, regions);
-    instance->transition_image_layout(image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
+    transition_image_layout(tex.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+        copy_buffer_to_image(staging_buf, tex.image, regions);
+    transition_image_layout(tex.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
 
     delete_buffer(staging_buf, memo);
 
@@ -1211,7 +1194,7 @@ bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t bind
     sampler_info.minFilter = VK_FILTER_LINEAR;
     sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    sampelr_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
     sampler_info.mipLodBias = 0.f;
     sampler_info.compareEnable = VK_FALSE;
@@ -1227,13 +1210,134 @@ bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t bind
         return false;
     }
 
+    textures.emplace(name, std::move(tex));
+
     return true;
 }
 
 bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t binding,
-    const std::string& path)
+    const fs::path& path)
 {
+    Texture tex{.binding = binding, .vecsize = 6};
 
+    fs::path abs_path = path;
+    if (path.is_relative())
+        abs_path = fs::absolute(path);
+    if (!fs::exists(abs_path)) {
+        std::cout << "path for cubemap " << name << "does not exist" << std::endl;
+        return false;
+    }
+
+    OIIO::ImageBuf oiio_buf(abs_path.string().c_str());
+    if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0)) {
+        std::cout << "[OIIO] Cubemap spec initialization for " << name << " failed"
+            << std::endl;
+        return false;
+    }
+
+    oiio_buf.read();
+    auto spec = oiio_buf.spec();
+    uint32_t size = spec.width / 4;
+
+    auto top_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size, size * 2, 0, size));
+    auto bottom_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size, size * 2, size * 2, size * 3));
+    auto left_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(0, size, size, size * 2));
+    auto right_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size * 2, size * 3, size, size * 2));
+    auto front_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size, size * 2, size, size * 2));
+    auto back_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size * 3, size * 4, size, size * 2));
+    std::array<OIIO::ImageBuf, 6> bufs = {right_buf, left_buf, top_buf, bottom_buf, front_buf, back_buf};
+
+    std::vector<float> pixel_pool;
+    pixel_pool.reserve(size * size * 6);
+    VkDeviceSize image_size = size * size * sizeof(float) * 6;
+
+    for (auto& buf : bufs) {
+        int ch_ords[] = {0, 1, 2, -1};
+        float ch_vals[] = {0, 0, 0, 1.f};
+        std::string ch_names[] = {"R", "G", "B", "A"};
+        OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(buf, 4, ch_ords,
+            ch_vals, ch_names);
+
+        std::vector<float> pixels;
+        pixels.resize(size * size);
+        with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
+        pixel_pool.insert(pixel_pool.end(),
+            std::make_move_iterator(pixels.begin()), std::make_move_iterator(pixels.end()));
+    }
+
+    auto [staging_buf, memo] = load_into_staging_buffer(pixel_pool.data(), image_size);
+
+    create_vk_image(size, size, 6, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        tex.image, tex.memo);
+
+    VkImageSubresourceRange range{};
+    range.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    range.baseMipLevel = 0;
+    range.levelCount = 1;
+    range.baseArrayLayer = 0;
+    range.layerCount = 6;
+
+    size_t offset = 0;
+    std::vector<VkBufferImageCopy> regions;
+    for (uint32_t i = 0; i < 6; ++i) {
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, i, 1};
+        region.imageOffset = {0, 0, 0};
+        region.imageExtent = {size, size, 1};
+        region.bufferOffset = offset;
+        offset += size * size * sizeof(float);
+        regions.push_back(region);
+    }
+
+    transition_image_layout(tex.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, range);
+    copy_buffer_to_image(staging_buf, tex.image, regions);
+    transition_image_layout(tex.image, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, range);
+
+    delete_buffer(staging_buf, memo);
+
+    VkImageViewCreateInfo view_info{};
+    view_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    view_info.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+    view_info.format = VK_FORMAT_R8G8B8A8_SRGB;
+    view_info.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 6};
+    view_info.image = tex.image;
+    if (vkCreateImageView(device, &view_info, nullptr, &tex.view) != VK_SUCCESS) {
+        std::cout << "Create view for texture " << name << " failed" << std::endl;
+        return false;
+    }
+
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    sampler_info.mipLodBias = 0.f;
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_ALWAYS;
+    sampler_info.minLod = 0.f;
+    sampler_info.maxLod = 0.f;
+    sampler_info.maxAnisotropy = 1.f;
+    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+    if (vkCreateSampler(device, &sampler_info, nullptr, &tex.sampler) != VK_SUCCESS) {
+        std::cout << "Create sampler for cubemap " << name << " failed" << std::endl;
+        return false;
+    }
+
+    textures.emplace(name, std::move(tex));
+
+    return true;
+}
+
+bool VkWrappedInstance::create_pipeline(const std::string& name, ShaderModules& moduels) {
+    return true;
 }
 
 }

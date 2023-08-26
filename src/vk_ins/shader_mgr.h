@@ -20,12 +20,18 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-using texture_map = std::unordered_map<std::string, std::string>;
+using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
+    uint32_t, uint32_t, uint32_t>;
+using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
+    uint32_t>;
+using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
+    GLSLTYPE>;
+using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
 
-class ShaderModules {
+class ShaderModulesDeprecated {
 public:
-    ShaderModules(VkWrappedInstance *ins, UniformMgr *mgr);
-    virtual ~ShaderModules();
+    ShaderModulesDeprecated(VkWrappedInstance *ins, UniformMgr *mgr);
+    virtual ~ShaderModulesDeprecated();
 
     void free_gpu_resources();
 
@@ -106,13 +112,6 @@ private:
     std::unordered_map<VkShaderStageFlagBits, std::vector<ImageResources>> m_img_resources;
     std::unordered_map<VkShaderStageFlagBits, std::vector<VkSampler>> m_sampler_resources;
 
-    using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
-        uint32_t, uint32_t, uint32_t>;
-    using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
-        uint32_t>;
-    using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
-        GLSLTYPE>;
-    using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
     std::vector<BufInfoWithBinding>                 m_buf_brefs;
     std::vector<ImgInfoWithBinding>                 m_img_brefs;
     std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
@@ -121,6 +120,34 @@ private:
 
     std::vector<VkWriteDescriptorSet>               m_writes;
     std::vector<VkDescriptorPoolSize>               m_pool_sizes;
+};
+
+class ShaderModule {
+public:
+    VkShaderStageFlagBits                           type;
+    std::vector<char>                               source_code;
+    std::vector<char>                               spirv_code;
+    std::vector<BufInfoWithBinding>                 m_buf_brefs;
+    std::vector<ImgInfoWithBinding>                 m_img_brefs;
+    std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
+    std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
+    TexImgPairs                                     m_tex_img_pairs;
+};
+
+class ShaderModules {
+public:
+    bool add_module(fs::path path, VkShaderStageFlagBits t);
+
+private:
+    VkWrappedInstance*                              ins;
+    std::vector<VkShaderModule>                     modules;
+    std::vector<VkShaderStageFlagBits>              types;
+
+    std::vector<BufInfoWithBinding>                 m_buf_brefs;
+    std::vector<ImgInfoWithBinding>                 m_img_brefs;
+    std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
+    std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
+    TexImgPairs                                     m_tex_img_pairs;
 };
 
 }

@@ -8,7 +8,7 @@
 namespace vkkk
 {
 
-ShaderModules::ShaderModules(VkWrappedInstance *ins,
+ShaderModulesDeprecated::ShaderModulesDeprecated(VkWrappedInstance *ins,
     UniformMgr *mgr)
     : instance(ins)
     , device(ins->get_device())
@@ -16,10 +16,10 @@ ShaderModules::ShaderModules(VkWrappedInstance *ins,
     , uniform_mgr(mgr)
 {}
 
-ShaderModules::~ShaderModules()
+ShaderModulesDeprecated::~ShaderModulesDeprecated()
 {}
 
-void ShaderModules::free_gpu_resources() {
+void ShaderModulesDeprecated::free_gpu_resources() {
     for (const auto& shader_module : shader_modules)
         vkDestroyShaderModule(device, shader_module, nullptr);
     shader_modules.clear();
@@ -35,7 +35,7 @@ static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {
     return vt;
 }
 
-bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
+bool ShaderModulesDeprecated::add_module(fs::path path, VkShaderStageFlagBits t) {
     fs::path abs_path = path;
     if (path.is_relative())
         abs_path = fs::absolute(path);
@@ -100,11 +100,11 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
     return true;
 }
 
-void ShaderModules::assign_tex_image(const std::string& tex_name, const std::string& tex_path, bool is_cubemap) {
+void ShaderModulesDeprecated::assign_tex_image(const std::string& tex_name, const std::string& tex_path, bool is_cubemap) {
     m_tex_img_pairs[tex_name] = std::make_pair(tex_path, is_cubemap);
 }
 
-void ShaderModules::alloc_uniforms() {
+void ShaderModulesDeprecated::alloc_uniforms() {
     for (auto& bref : m_buf_brefs) {
         auto [name, stage, size, vecsize, binding] = bref;
         uniform_mgr->add_buffer(name, stage, binding, size, vecsize);
@@ -122,7 +122,7 @@ void ShaderModules::alloc_uniforms() {
     }
 }
 
-void ShaderModules::generate_create_infos() {
+void ShaderModulesDeprecated::generate_create_infos() {
     for (int i = 0; i < shader_modules.size(); ++i) {
         VkPipelineShaderStageCreateInfo create_info{};
         create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -133,14 +133,14 @@ void ShaderModules::generate_create_infos() {
     }
 }
 
-void ShaderModules::set_attribute_binding(uint32_t binding_idx, uint32_t attr_location) {
+void ShaderModulesDeprecated::set_attribute_binding(uint32_t binding_idx, uint32_t attr_location) {
     if (m_input_brefs.find(binding_idx) == m_input_brefs.end())
         m_input_brefs[binding_idx] = std::vector<uint32_t>({attr_location});
     else
         m_input_brefs[binding_idx].push_back(attr_location);
 }
 
-void ShaderModules::create_input_descriptions(const std::vector<VERT_COMP>& comps) {
+void ShaderModulesDeprecated::create_input_descriptions(const std::vector<VERT_COMP>& comps) {
     for (auto& [b_idx, attrs] : m_input_brefs) {
         VkVertexInputBindingDescription input_des{};
         input_des.binding = b_idx;
@@ -170,7 +170,7 @@ void ShaderModules::create_input_descriptions(const std::vector<VERT_COMP>& comp
     }
 }
 
-void ShaderModules::create_descriptor_layouts() {
+void ShaderModulesDeprecated::create_descriptor_layouts() {
     // Create bindings
     uint32_t binding_cnt = 0;
     auto setup_binding = [&](const auto& des, const VkDescriptorType des_type) {
@@ -198,7 +198,7 @@ void ShaderModules::create_descriptor_layouts() {
         throw std::runtime_error("failed to create descriptor set layout");
 }
 
-void ShaderModules::create_descriptor_pool() {
+void ShaderModulesDeprecated::create_descriptor_pool() {
     // Create the descriptor set layout
     auto swapchain_img_cnt = instance->get_swapchain_cnt();
 
@@ -220,7 +220,7 @@ void ShaderModules::create_descriptor_pool() {
         throw std::runtime_error("failed to create descriptor pool..");
 }
 
-void ShaderModules::create_descriptor_set() {
+void ShaderModulesDeprecated::create_descriptor_set() {
     auto swapchain_img_cnt = instance->get_swapchain_cnt();
     m_descriptor_sets.resize(swapchain_img_cnt);
 
@@ -267,11 +267,30 @@ void ShaderModules::create_descriptor_set() {
     }
 }
 
-void ShaderModules::setup_pool(const VkDescriptorType des_type, const uint32_t cnt) {
+void ShaderModulesDeprecated::setup_pool(const VkDescriptorType des_type, const uint32_t cnt) {
     VkDescriptorPoolSize pool_size{};
     pool_size.type = des_type;
     pool_size.descriptorCount = cnt;
     m_pool_sizes.emplace_back(std::move(pool_size));
+}
+
+bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
+    fs::path abs_path = path;
+    if (path.is_relative())
+        abs_path = fs::absolute(path);
+
+    if (!fs::exists(abs_path) || !fs::is_regular_file(abs_path)) {
+        std::cout << "Shader file: " << path << " does not exist or is not a file"
+            << std::endl;
+        return false;
+    }
+
+    auto shader_code = load_file(path);
+    VkShaderModuleCreateInfo module_info{};
+    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODuLE_CREATE_INFO;
+    module_info.codeSize = shader_code.size();
+    module_info.pCode = reinterpret_cast<const uint32_t*>(shader_code.data());
+    VkShaderModule shader_module;
 }
 
 }

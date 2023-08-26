@@ -174,7 +174,7 @@ bool TextureDeprecated::load_cubemap(const fs::path& path) {
 
     oiio_buf.read();
     auto spec = oiio_buf.spec();
-    auto size = spec.width / 4;
+    uint32_t size = spec.width / 4;
 
     auto top_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size, size * 2, 0, size));
     auto bottom_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(size, size * 2, size * 2, size * 3));

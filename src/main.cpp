@@ -126,7 +126,7 @@ int main() {
     ins.create_command_pool();
 
     vkkk::UniformMgr uniform_mgr{ &ins };
-    vkkk::ShaderModules modules{ &ins, &uniform_mgr };
+    vkkk::ShaderModulesDeprecated modules{ &ins, &uniform_mgr };
     modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 
@@ -137,7 +137,7 @@ int main() {
     modules.alloc_uniforms();
 
     vkkk::UniformMgr skybox_uniforms{ &ins };
-    vkkk::ShaderModules skybox_modules{ &ins, &skybox_uniforms };
+    vkkk::ShaderModulesDeprecated skybox_modules{ &ins, &skybox_uniforms };
     skybox_modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
     skybox_modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
 

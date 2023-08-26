@@ -17,7 +17,7 @@ class PipelineDeprecated {
 public:
     VkWrappedInstance*                      ins;
     std::shared_ptr<UniformMgr>             uniforms;
-    std::shared_ptr<ShaderModules>          modules;
+    std::shared_ptr<ShaderModulesDeprecated>          modules;
     VkPipelineVertexInputStateCreateInfo    input_info;
     VkPipelineInputAssemblyStateCreateInfo  input_assembly;
     VkViewport                              viewport;

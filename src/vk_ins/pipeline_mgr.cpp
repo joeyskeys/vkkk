@@ -9,7 +9,7 @@ namespace vkkk
 PipelineDeprecated::PipelineDeprecated(VkWrappedInstance* i)
     : ins(i)
     , uniforms(std::make_shared<UniformMgr>(i))
-    , modules(std::make_shared<ShaderModules>(i, uniforms.get()))
+    , modules(std::make_shared<ShaderModulesDeprecated>(i, uniforms.get()))
     , input_info()
     , input_assembly()
     , viewport()

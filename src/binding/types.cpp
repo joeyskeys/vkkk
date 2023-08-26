@@ -38,22 +38,22 @@ void bind_types(nb::module_& m) {
         //.def("find_ubo", &Uniform::find_ubo)
         .def("update_ubos", &UniformMgr::update_ubos);
 
-    nb::class_<ShaderModules> smcl(m, "ShaderModules");
+    nb::class_<ShaderModulesDeprecated> smcl(m, "ShaderModulesDeprecated");
 
     smcl.def(nb::init<VkWrappedInstance*, UniformMgr*>())
-        .def("free_gpu_resources", &ShaderModules::free_gpu_resources)
-        //.def("add_module", &ShaderModules::add_module)
-        .def("assign_tex_image", &ShaderModules::assign_tex_image)
-        .def("alloc_uniforms", &ShaderModules::alloc_uniforms)
-        .def("set_attribute_binding", &ShaderModules::set_attribute_binding)
-        .def("create_input_descriptions", &ShaderModules::create_input_descriptions)
-        .def("create_descriptor_layouts", &ShaderModules::create_descriptor_layouts)
-        .def("create_descriptor_pool", &ShaderModules::create_descriptor_pool)
-        .def("create_descriptor_set", &ShaderModules::create_descriptor_set)
-        .def("valid", &ShaderModules::valid)
-        .def("get_stages_count", &ShaderModules::get_stages_count)
-        .def("get_binding_description_count", &ShaderModules::get_binding_description_count)
-        .def("get_attr_description_count", &ShaderModules::get_attr_description_count);
+        .def("free_gpu_resources", &ShaderModulesDeprecated::free_gpu_resources)
+        //.def("add_module", &ShaderModulesDeprecated::add_module)
+        .def("assign_tex_image", &ShaderModulesDeprecated::assign_tex_image)
+        .def("alloc_uniforms", &ShaderModulesDeprecated::alloc_uniforms)
+        .def("set_attribute_binding", &ShaderModulesDeprecated::set_attribute_binding)
+        .def("create_input_descriptions", &ShaderModulesDeprecated::create_input_descriptions)
+        .def("create_descriptor_layouts", &ShaderModulesDeprecated::create_descriptor_layouts)
+        .def("create_descriptor_pool", &ShaderModulesDeprecated::create_descriptor_pool)
+        .def("create_descriptor_set", &ShaderModulesDeprecated::create_descriptor_set)
+        .def("valid", &ShaderModulesDeprecated::valid)
+        .def("get_stages_count", &ShaderModulesDeprecated::get_stages_count)
+        .def("get_binding_description_count", &ShaderModulesDeprecated::get_binding_description_count)
+        .def("get_attr_description_count", &ShaderModulesDeprecated::get_attr_description_count);
 
     nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
 

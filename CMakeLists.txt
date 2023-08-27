@@ -66,6 +66,14 @@ else()
     message(STATUS ${SPIRVCROSS_INCLUDE_DIRS})
 endif()
 
+find_package(SHADERC)
+
+if (NOT SHADERC_FOUND)
+    message(FATAL_ERROR "Could not find Shaderc library!")
+else()
+    message(STATUS "Found Shaderc: ${SHADERC_INCLUDE_DIRS}")
+endif()
+
 if (UNIX)
     find_package(X11)
 

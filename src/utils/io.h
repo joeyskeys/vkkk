@@ -36,3 +36,10 @@ std::vector<uint32_t> load_spirv_file(const fs::path& path) {
 
     return buffer;
 }
+
+inline fs::path ensure_abs_path(const fs::path& p) {
+    auto abs_path = p;
+    if (p.is_relative())
+        abs_path = fs::absolute(p);
+    return abs_path;
+}

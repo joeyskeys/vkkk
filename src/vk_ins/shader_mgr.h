@@ -22,10 +22,14 @@ class VkWrappedInstance;
 
 using BufInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
     uint32_t, uint32_t, uint32_t>;
+using BufInfoMap = std::unordered_map<std::string, std::tuple<uint32_t,
+    uint32_t, uint32_t>>;
 using ImgInfoWithBinding = std::tuple<std::string, VkShaderStageFlagBits,
     uint32_t>;
+using ImgInfoMap = std::unordered_map<std::string, uint32_t>;
 using AttrInfoWithLoc = std::tuple<std::string, VkShaderStageFlagBits,
     GLSLTYPE>;
+using AttrInfoMap = std::unordered_map<uint32_t, std::tuple<std::string, uint32_t>>;
 using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
 
 class ShaderModulesDeprecated {
@@ -126,17 +130,22 @@ class ShaderModule {
 public:
     VkShaderStageFlagBits                           type;
     std::vector<char>                               source_code;
-    std::vector<char>                               spirv_code;
-    std::vector<BufInfoWithBinding>                 m_buf_brefs;
-    std::vector<ImgInfoWithBinding>                 m_img_brefs;
+    std::vector<uint32_t>                           spirv_code;
+    //std::vector<BufInfoWithBinding>                 m_buf_brefs;
+    BufInfoMap                                      m_buf_infos;
+    //std::vector<ImgInfoWithBinding>                 m_img_brefs;
+    ImgInfoMap                                      m_img_infos;
     std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
-    std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
+    //std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
+    AttrInfoMap                                     m_attr_brefs;
     TexImgPairs                                     m_tex_img_pairs;
+
+    bool load(const fs::path& path, const VkShaderStageFlagBits t);
 };
 
 class ShaderModules {
 public:
-    bool add_module(fs::path path, VkShaderStageFlagBits t);
+    bool add_module(const fs::path& path, const VkShaderStageFlagBits t);
 
 private:
     VkWrappedInstance*                              ins;

@@ -38,9 +38,9 @@ void bind_types(nb::module_& m) {
         //.def("find_ubo", &Uniform::find_ubo)
         .def("update_ubos", &UniformMgr::update_ubos);
 
-    nb::class_<ShaderModulesDeprecated> smcl(m, "ShaderModulesDeprecated");
+    nb::class_<ShaderModulesDeprecated> smdcl(m, "ShaderModulesDeprecated");
 
-    smcl.def(nb::init<VkWrappedInstance*, UniformMgr*>())
+    smdcl.def(nb::init<VkWrappedInstance*, UniformMgr*>())
         .def("free_gpu_resources", &ShaderModulesDeprecated::free_gpu_resources)
         //.def("add_module", &ShaderModulesDeprecated::add_module)
         .def("assign_tex_image", &ShaderModulesDeprecated::assign_tex_image)
@@ -54,6 +54,10 @@ void bind_types(nb::module_& m) {
         .def("get_stages_count", &ShaderModulesDeprecated::get_stages_count)
         .def("get_binding_description_count", &ShaderModulesDeprecated::get_binding_description_count)
         .def("get_attr_description_count", &ShaderModulesDeprecated::get_attr_description_count);
+        
+    nb::class_<ShaderModule> smcl(m, "ShaderModule");
+    
+    smcl.def("load", &ShaderModule::load);
 
     nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
 

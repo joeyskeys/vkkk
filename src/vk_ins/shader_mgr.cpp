@@ -1,4 +1,5 @@
 #include <fmt/format.h>
+#include <shaderc/shaderc.hpp>
 
 #include "utils/io.h"
 #include "vk_ins/vkabstraction.h"
@@ -274,10 +275,119 @@ void ShaderModulesDeprecated::setup_pool(const VkDescriptorType des_type, const 
     m_pool_sizes.emplace_back(std::move(pool_size));
 }
 
-bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
-    fs::path abs_path = path;
-    if (path.is_relative())
-        abs_path = fs::absolute(path);
+bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
+    type = t;
+
+    auto abs_path = ensure_abs_path(path);
+    auto extension = abs_path.extension();
+
+    if (extension.string().ends_with(".spv")) {
+        // Compiled SPRIV
+        spirv_code = load_spirv_file(abs_path);
+    }
+    else {
+        source_code = load_file(abs_path);
+
+        shaderc::Compiler compiler;
+        shaderc::CompileOptions options;
+
+        // Make it a static map to lookup?
+        shaderc_shader_kind tt;
+        switch (t) {
+            case VK_SHADER_STAGE_VERTEX_BIT: {
+                tt = shaderc_glsl_vertex_shader;
+                break;
+            }
+
+            case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT: {
+                tt = shaderc_glsl_tess_control_shader;
+                break;
+            }
+
+            case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT: {
+                tt = shaderc_glsl_tess_evaluation_shader;
+                break;
+            }
+
+            case VK_SHADER_STAGE_GEOMETRY_BIT: {
+                tt = shaderc_glsl_geometry_shader;
+                break;
+            }
+
+            case VK_SHADER_STAGE_FRAGMENT_BIT: {
+                tt = shaderc_glsl_fragment_shader;
+                break;
+            }
+
+            case VK_SHADER_STAGE_COMPUTE_BIT: {
+                tt = shaderc_glsl_fragment_shader;
+                break;
+            }
+
+            default: {
+                std::cout << "Shader type " << t << " not supported yet.."
+                    << std::endl;
+                return false;
+            }
+        }
+
+        // Default to performance first
+        options.SetOptimizationLevel(shaderc_optimization_level_performance);
+
+        // entry point default to "main"
+        shaderc::SpvCompilationResult ret =
+            compiler.CompileGlslToSpv(source_code.data(), source_code.size(),
+                tt, abs_path.filename().string().c_str(), options);
+        
+        if (ret.GetCompilationStatus() != shaderc_compilation_status_success) {
+            std::cout << ret.GetErrorMessage();
+            return false;
+        }
+
+        // Limited to the implementation of shaderc
+        //auto spv_size = (ret.cend() - ret.cbegin()) * sizeof(uint32_t);
+        //spirv_code.resize(spv_size);
+        //memcpy(spirv_code.data(), ret.cbegin(), spv_size);
+        spirv_code.insert(spirv_code.begin(), ret.cbegin(), ret.cend());
+    }
+
+    // Collecting uniform&attribute infos
+    spirv_cross::CompilerGLSL comp(spirv_code);
+    auto res = comp.get_shader_resources();
+
+    // UBOs
+    for (auto& ubo : res.uniform_buffers) {
+        auto name = comp.get_name(ubo.id);
+        auto type_info = comp.get_type(ubo.type_id);
+        auto base_type_info = comp.get_type(ubo.base_type_id);
+        auto binding_idx = comp.get_decoration(ubo.id, spv::DecorationBinding);
+        auto struct_size = comp.get_declared_struct_size(base_type_info);
+        // This code is problematic, we're assuming the array always be 1 dimension
+        auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
+        m_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
+    }
+
+    // Textures
+    for (auto& img : res.sampled_images) {
+        auto binding_idx = comp.get_decoration(img.id, spv::DecorationBinding);
+        m_img_infos.emplace(img.name, binding_idx);
+    }
+
+    if (t == VK_SHADER_STAGE_VERTEX_BIT) {
+        for (auto& input : res.stage_inputs) {
+            auto name = comp.get_name(input.id);
+            auto type_info = comp.get_type(input.base_type_id);
+            auto vectype = find_vec_type(type_info);
+            auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
+            m_attr_brefs.emplace(loc, std::make_tuple(name, vectype));
+        }
+    }
+
+    return true;
+}
+
+bool ShaderModules::add_module(const fs::path& path, const VkShaderStageFlagBits t) {
+    auto abs_path = ensure_abs_path(path);
 
     if (!fs::exists(abs_path) || !fs::is_regular_file(abs_path)) {
         std::cout << "Shader file: " << path << " does not exist or is not a file"
@@ -285,12 +395,14 @@ bool ShaderModules::add_module(fs::path path, VkShaderStageFlagBits t) {
         return false;
     }
 
-    auto shader_code = load_file(path);
+    auto shader_code = load_file(abs_path);
     VkShaderModuleCreateInfo module_info{};
-    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODuLE_CREATE_INFO;
+    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     module_info.codeSize = shader_code.size();
     module_info.pCode = reinterpret_cast<const uint32_t*>(shader_code.data());
     VkShaderModule shader_module;
+
+    return true;
 }
 
 }

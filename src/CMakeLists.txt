@@ -43,7 +43,8 @@ target_link_libraries(vkkk
     ${OIIO_LIBRARIES}
     ${ASSIMP_LIBRARIES}
     ${SPIRVCROSS_LIBRARIES}
-    ${PLATFORM_RELATED_LIBS})
+    ${PLATFORM_RELATED_LIBS}
+    ${SHADERC_LIBRARIES})
 
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti

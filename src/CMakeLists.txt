@@ -39,6 +39,7 @@ endif()
 
 target_link_libraries(vkkk
     ${GLFW_LIBRARIES}
+    ${FMT_LIBRARIES}
     ${Vulkan_LIBRARIES}
     ${OIIO_LIBRARIES}
     ${ASSIMP_LIBRARIES}

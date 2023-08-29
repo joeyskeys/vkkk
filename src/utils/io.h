@@ -2,7 +2,7 @@
 
 #include "utils/common.h"
 
-std::vector<char> load_file(const fs::path& path) {
+inline std::vector<char> load_file(const fs::path& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
 
     if (!file.good()) {
@@ -20,7 +20,7 @@ std::vector<char> load_file(const fs::path& path) {
     return buffer;
 }
 
-std::vector<uint32_t> load_spirv_file(const fs::path& path) {
+inline std::vector<uint32_t> load_spirv_file(const fs::path& path) {
     std::ifstream file(path, std::ios::ate | std::ios::binary);
 
     if (!file.good()) {

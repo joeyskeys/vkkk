@@ -332,7 +332,8 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
         }
 
         // Default to performance first
-        options.SetOptimizationLevel(shaderc_optimization_level_performance);
+        //options.SetOptimizationLevel(shaderc_optimization_level_performance);
+        //options.SetOptimizationLevel(shaderc_optimization_level_size);
 
         // entry point default to "main"
         shaderc::SpvCompilationResult ret =
@@ -379,7 +380,7 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
             auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
-            m_attr_brefs.emplace(loc, std::make_tuple(name, vectype));
+            m_attr_infos.emplace(loc, std::make_tuple(name, vectype));
         }
     }
 

@@ -23,3 +23,9 @@ target_link_libraries(singleton_test
     PRIVATE
         Catch2::Catch2WithMain
         vkkk)
+
+add_executable(shadermgr_test asset_mgr_tests/shader_mgr_test.cpp)
+target_link_libraries(shadermgr_test
+    PRIVATE
+        Catch2::Catch2WithMain
+        vkkk)

@@ -13,6 +13,19 @@
 using namespace vkkk;
 
 void bind_types(nb::module_& m) {
+    /*************************
+     * Necessary vulkan types
+     *************************/
+
+    nb::enum_<VkShaderStageFlagBits>(m, "ShaderStage")
+        .value("VERTEX", VK_SHADER_STAGE_VERTEX_BIT)
+        .value("TESSELLATION_CONTROL", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)
+        .value("TESSELLATION_EVALUATION", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT)
+        .value("GEOMETRY", VK_SHADER_STAGE_GEOMETRY_BIT)
+        .value("FRAGMENT", VK_SHADER_STAGE_FRAGMENT_BIT)
+        .value("COMPUTE", VK_SHADER_STAGE_COMPUTE_BIT)
+        .export_values();
+
     nb::class_<VkWrappedInstance> incl(m, "VkInstance");
 
     incl.def(nb::init<>())
@@ -57,7 +70,11 @@ void bind_types(nb::module_& m) {
         
     nb::class_<ShaderModule> smcl(m, "ShaderModule");
     
-    smcl.def("load", &ShaderModule::load);
+    smcl.def(nb::init<>())
+        .def("load", [](ShaderModule& m, const std::string& path, VkShaderStageFlagBits stage) {
+            return m.load(path, stage);
+        })
+        .def("get_uniform_info", &ShaderModule::get_uniform_info);
 
     nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
 

@@ -137,10 +137,22 @@ public:
     ImgInfoMap                                      m_img_infos;
     std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
     //std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
-    AttrInfoMap                                     m_attr_brefs;
+    AttrInfoMap                                     m_attr_infos;
     TexImgPairs                                     m_tex_img_pairs;
 
     bool load(const fs::path& path, const VkShaderStageFlagBits t);
+    
+    std::tuple<std::string, uint32_t, uint32_t, uint32_t>
+        get_uniform_info(const std::string& name) const
+    {
+        auto found = m_buf_infos.find(name);
+        if (found != m_buf_infos.end()) {
+            auto [v1, v2, v3] = found->second;
+            return std::make_tuple(name, v1, v2, v3);
+        }
+        else
+            return std::make_tuple("", 0, 0, 0);
+    }
 };
 
 class ShaderModules {

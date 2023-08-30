@@ -17,7 +17,7 @@ void bind_types(nb::module_& m) {
      * Necessary vulkan types
      *************************/
 
-    nb::enum_<VkShaderStageFlagBits>(m, "ShaderStage")
+    nb::enum_<VkShaderStageFlagBits>(m, "vkShaderStage")
         .value("VERTEX", VK_SHADER_STAGE_VERTEX_BIT)
         .value("TESSELLATION_CONTROL", VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT)
         .value("TESSELLATION_EVALUATION", VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT)
@@ -25,6 +25,25 @@ void bind_types(nb::module_& m) {
         .value("FRAGMENT", VK_SHADER_STAGE_FRAGMENT_BIT)
         .value("COMPUTE", VK_SHADER_STAGE_COMPUTE_BIT)
         .export_values();
+
+    /*************************
+     * Abstraction types
+     *************************/
+
+    nb::enum_<VERT_COMP>(m, "VERT_COMP")
+        .value("VERTEX", VERT_COMP::VERTEX)
+        .value("NORMAL", VERT_COMP::NORMAL)
+        .value("UV", VERT_COMP::UV)
+        .value("COLOR", VERT_COMP::COLOR)
+        .export_values();
+
+    nb::class_<ShaderModule> smcl(m, "ShaderModule");
+    
+    smcl.def(nb::init<>())
+        .def("load", [](ShaderModule& m, const std::string& path, VkShaderStageFlagBits stage) {
+            return m.load(path, stage);
+        })
+        .def("get_uniform_info", &ShaderModule::get_uniform_info);
 
     nb::class_<VkWrappedInstance> incl(m, "VkInstance");
 
@@ -37,7 +56,8 @@ void bind_types(nb::module_& m) {
         .def("create_resources", &VkWrappedInstance::create_resources)
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
         .def("mainloop", &VkWrappedInstance::mainloop)
-        .def("get_image_buffer", &VkWrappedInstance::get_image_buffer);
+        .def("get_image_buffer", &VkWrappedInstance::get_image_buffer)
+        .def("create_pipeline", &VkWrappedInstance::create_pipeline);
 
     nb::class_<UniformMgr> umcl(m, "UniformMgr");
 
@@ -67,14 +87,6 @@ void bind_types(nb::module_& m) {
         .def("get_stages_count", &ShaderModulesDeprecated::get_stages_count)
         .def("get_binding_description_count", &ShaderModulesDeprecated::get_binding_description_count)
         .def("get_attr_description_count", &ShaderModulesDeprecated::get_attr_description_count);
-        
-    nb::class_<ShaderModule> smcl(m, "ShaderModule");
-    
-    smcl.def(nb::init<>())
-        .def("load", [](ShaderModule& m, const std::string& path, VkShaderStageFlagBits stage) {
-            return m.load(path, stage);
-        })
-        .def("get_uniform_info", &ShaderModule::get_uniform_info);
 
     nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
 
@@ -101,13 +113,6 @@ void bind_types(nb::module_& m) {
         .def("get_pipeline_by_idx", nb::overload_cast<const uint32_t>(&PipelineMgr::get_pipeline))
         .def("get_pipeline_by_name", nb::overload_cast<const std::string&>(&PipelineMgr::get_pipeline))
         .def("bind", &PipelineMgr::bind);
-
-    nb::enum_<VERT_COMP>(m, "VERT_COMP")
-        .value("VERTEX", VERT_COMP::VERTEX)
-        .value("NORMAL", VERT_COMP::NORMAL)
-        .value("UV", VERT_COMP::UV)
-        .value("COLOR", VERT_COMP::COLOR)
-        .export_values();
 
     nb::class_<Mesh> mecl(m, "Mesh");
 

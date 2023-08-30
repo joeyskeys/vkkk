@@ -76,7 +76,76 @@ struct Texture {
 
 struct Pipeline {
     VkPipeline                              pipeline;
-    VkPipelineLayout                        layout;
+    VkPipelineLayout                        ppl_layout;
+    VkDescriptorSetLayout                   descriptor_layout;
+};
+
+#DEFINE VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
+
+struct PipelineOption {
+    PipelineOption();
+
+    VkPipelineVertexInputStateCreateInfo    input_info;
+    VkPipelineInputAssemblyStateCreateInfo  input_assembly;
+    VkViewport                              viewport;
+    VkPipelineViewportStateCreateInfo       vp_state_info;
+    VkRect2D                                scissor;
+    VkPipelineRasterizationStateCreateInfo  rasterizer;
+    VkPipelineMultisampleStateCreateInfo    multisampling;
+    VkPipelineDepthStencilStateCreateInfo   depth_stencil;
+    VkPipelineColorBlendAttachmentState     blend_attachment;
+    VkPipelineColorBlendStateCreateInfo     blend_state;
+
+    inline void setup_input_assembly(const VkPrimitiveTopology topo, bool restart) {
+        input_assembly.topology = topo;
+        input_assembly.primitiveRestartEnable = VK_BOOL(restart);
+    }
+
+    inline void setup_viewport(const float x, const float y, const float w,
+        const float h, const float mindepth, const float maxdepth)
+    {
+        viewport.x = x;
+        viewport.y = y;
+        viewport.width = w;
+        viewport.height = h;
+        viewport.minDepth = mindepth;
+        viewport.maxDepth = maxdepth;
+    }
+
+    inline void setup_scissor(const int offx, const int offy, const uint32_t extx,
+        const uint32_t exty)
+    {
+        scissor.offset = {offx, offy};
+        scissor.extent = {extx, exty};
+    }
+
+    inline void setup_rasterizer(const bool depth_clamp, const bool discard,
+        const VkPolygonMode mode, const float line_width, const VkCullModeFlagBits cullmode,
+        const VkFrontFace front, const bool depth_bias)
+    {
+        rasterizer.depthClampEnable = VK_BOOL(depth_clamp);
+        rasterizer.rasterizerDiscardEnable = VK_BOOL(discard);
+        rasterizer.polygonMode = mode;
+        rasterizer.lineWidth = line_width;
+        rasterizer.cullMode = cullmode;
+        rasterizer.frontFace = front,
+        rasterizer.depthBiasEnable = VK_BOOL(depth_bias);
+    }
+
+    inline void setup_multisampling(const bool enable, const VkSampleCountFlagBits nsample) {
+        multisampling.sampleShadingEnable = VK_BOOL(enable);
+        multisampling.rasterizationSamples = nsample;
+    }
+
+    inline void setup_depth_stencil(const bool test_enable, const bool write_enable,
+        const VkCompareOp cmpop, const bool bound_enable, const bool stencil_enable)
+    {
+        depth_stencil.depthTestEnable = VK_BOOL(test_enable);
+        depth_stencil.depthWriteEnable = VK_BOOL(write_enable);
+        depth_stencil.depthCompareOp = cmpop;
+        depth_stencil.depthBoundsTestEnable = VK_BOOL(bound_enable);
+        depth_stencil.stencilTestEnable = VK_BOOL(stencil_enable);
+    }
 };
 
 /************************************************************
@@ -383,13 +452,14 @@ public:
  * Resource related part 
  *****************************************************/
 public:
-    bool add_buffer(const std::string& name, const uint32_t binding,
+    bool add_ubo(const std::string& name, const uint32_t binding,
         uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, const uint32_t binding,
         const fs::path& path);
     bool add_cubemap(const std::string& name, const uint32_t binding,
         const fs::path& path);
-    bool create_pipeline(const std::string& name, ShaderModules& modules);
+    bool create_pipeline(const std::string&, const std::vector<ShaderModule>&,
+        const std::vector<VERT_COMP>&, PipelineOption& option);
 
 public:
     // Vulkan resources

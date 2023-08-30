@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <iostream>
 #include <map>
 #include <vector>
 #include <utility>
@@ -132,13 +133,13 @@ public:
     std::vector<char>                               source_code;
     std::vector<uint32_t>                           spirv_code;
     //std::vector<BufInfoWithBinding>                 m_buf_brefs;
-    BufInfoMap                                      m_buf_infos;
+    BufInfoMap                                      buf_infos;
     //std::vector<ImgInfoWithBinding>                 m_img_brefs;
-    ImgInfoMap                                      m_img_infos;
-    std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
+    ImgInfoMap                                      img_infos;
+    std::map<uint32_t, std::vector<uint32_t>>       input_brefs;
     //std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
-    AttrInfoMap                                     m_attr_infos;
-    TexImgPairs                                     m_tex_img_pairs;
+    AttrInfoMap                                     attr_infos;
+    TexImgPairs                                     tex_img_pairs;
 
     bool load(const fs::path& path, const VkShaderStageFlagBits t);
     
@@ -151,24 +152,9 @@ public:
             return std::make_tuple(name, v1, v2, v3);
         }
         else
+            std::cout << "No UBO for name " << name << " found.." << std::endl;
             return std::make_tuple("", 0, 0, 0);
     }
-};
-
-class ShaderModules {
-public:
-    bool add_module(const fs::path& path, const VkShaderStageFlagBits t);
-
-private:
-    VkWrappedInstance*                              ins;
-    std::vector<VkShaderModule>                     modules;
-    std::vector<VkShaderStageFlagBits>              types;
-
-    std::vector<BufInfoWithBinding>                 m_buf_brefs;
-    std::vector<ImgInfoWithBinding>                 m_img_brefs;
-    std::map<uint32_t, std::vector<uint32_t>>       m_input_brefs;
-    std::map<uint32_t, AttrInfoWithLoc>             m_attr_brefs;
-    TexImgPairs                                     m_tex_img_pairs;
 };
 
 }

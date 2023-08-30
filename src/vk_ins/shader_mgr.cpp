@@ -365,13 +365,13 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
         auto struct_size = comp.get_declared_struct_size(base_type_info);
         // This code is problematic, we're assuming the array always be 1 dimension
         auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
-        m_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
+        buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
     }
 
     // Textures
     for (auto& img : res.sampled_images) {
         auto binding_idx = comp.get_decoration(img.id, spv::DecorationBinding);
-        m_img_infos.emplace(img.name, binding_idx);
+        img_infos.emplace(img.name, binding_idx);
     }
 
     if (t == VK_SHADER_STAGE_VERTEX_BIT) {
@@ -380,28 +380,9 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
             auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
-            m_attr_infos.emplace(loc, std::make_tuple(name, vectype));
+            attr_infos.emplace(loc, std::make_tuple(name, vectype));
         }
     }
-
-    return true;
-}
-
-bool ShaderModules::add_module(const fs::path& path, const VkShaderStageFlagBits t) {
-    auto abs_path = ensure_abs_path(path);
-
-    if (!fs::exists(abs_path) || !fs::is_regular_file(abs_path)) {
-        std::cout << "Shader file: " << path << " does not exist or is not a file"
-            << std::endl;
-        return false;
-    }
-
-    auto shader_code = load_file(abs_path);
-    VkShaderModuleCreateInfo module_info{};
-    module_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-    module_info.codeSize = shader_code.size();
-    module_info.pCode = reinterpret_cast<const uint32_t*>(shader_code.data());
-    VkShaderModule shader_module;
 
     return true;
 }

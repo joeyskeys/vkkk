@@ -1097,7 +1097,7 @@ void VkWrappedInstance::delete_buffer(VkBuffer buf, VkDeviceMemory memo) const {
     vkFreeMemory(device, memo, nullptr);
 }
 
-bool VkWrappedInstance::add_buffer(const std::string& name, const uint32_t binding,
+bool VkWrappedInstance::add_ubo(const std::string& name, const uint32_t binding,
     uint32_t size, uint32_t vecsize)
 {
     UBO ubo{.size = size, .vecsize = vecsize, .binding = binding};
@@ -1336,7 +1336,163 @@ bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t bind
     return true;
 }
 
-bool VkWrappedInstance::create_pipeline(const std::string& name, ShaderModules& moduels) {
+bool VkWrappedInstance::create_pipeline(const std::string& name,
+    const std::vector<ShaderModule>& modules,
+    const std::vector<VERT_COMP>& comps,
+    PipelineOption& option)
+{
+    // Pipeline creation resources
+    std::vector<VkShaderModule>                     vkmodules;
+    std::vector<VkVertexInputBindingDescription>    input_descriptions;
+    std::vector<VkVertexInputAttributeDescription>  attr_descriptions;
+    std::vector<VkDescriptorSetLayoutBinding>       descriptor_layouts;
+    std::vector<VkPipelineShaderStageCreateInfo>    shader_infos;
+
+    for (auto& mod : modules) {
+        // Create vk shadermodules
+        VkShaderModuleCreateInfo module_info{
+            .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+            .codeSize = mod.spirv_code.size() * sizeof(uint32_t),
+            .pCode = mod.spirv_code.data()
+        };
+        VkShaderModule vkmodule;
+        if (vkCreateShaderModule(device, &module_info, nullptr, &vkmodule) != VK_SUCCESS) {
+            std::cout << "Module creation for pipeline " << name << " failed" << std::endl;
+            return false;
+        }
+        vkmodules.emplace_back(vkmodule);
+
+        // Create shader infos for pipeline creation
+        VkPipelineShaderStageCreateInfo shader_info{
+            .sType = VK_STRCUTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .stage = mod.type,
+            .module = vkmodule,
+            .pName = "main"
+        };
+
+        shader_infos.emplace_back(std::move(shader_info));
+
+        for (auto& [ubo_name, ubo_info] : mod.buf_infos) {
+            auto& [struct_size, array_size, binding] = ubo_info;
+            auto ppl_ubo_name = name + ":" + ubo_name;
+            add_ubo(ppl_ubo_name, binding, struct_size, array_size);
+
+            VkDescriptorSetLayoutBinding binding {
+                .binding = binding,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .descriptorCount = array_size,
+                .pImmutableSamplers = nullptr,
+                .stageFlags = mod.type
+            };
+            descriptor_layouts.emplace_back(std::move(binding));
+        }
+
+        for (auto& [tex_name, tex_binding] : mod.img_infos) {
+            auto tex_path_info = tex_img_pairs.find(tex_name);
+            if (tex_path_info == tex_img_pairs.end()) {
+                std::cout << "No texture assigned for sampler " << tex_name
+                    << std::endl;
+            }
+
+            auto& [path, is_cubemap] = tex_path_info->second;
+            auto ppl_tex_name = name + ":" + tex_name;
+            if (!is_cubemap)
+                add_texture(ppl_tex_name, tex_binding, path);
+            else
+                add_cubemap(ppl_tex_name, tex_binding, path);
+
+            VkDescriptorSetLayoutBinding binding {
+                .binding = tex_binding,
+                .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                .descriptorCount = is_cubemap ? 6 : 1,
+                .pImmutableSamplers = nullptr,
+                .stageFlags = mod.type
+            };
+            descriptor_layouts.emplace_back(std::move(binding));
+        }
+
+        if (mod.type == VK_SHADER_STAGE_VERTEX_BIT) {
+            for (auto& [attr_binding, attrs] : mod.input_brefs) {
+                VkVertexInputBindingDescription input_des{};
+                input_des.binding = attr_binding;
+                uint32_t offset = 0;
+
+                for (const auto& attr_loc : attrs) {
+                    const auto& attr_bref = mod.attr_brefs[attr_loc];
+                    VkVertexInputAttributeDescription attr_des{};
+                    attr_des.binding = attr_binding;
+                    attr_des.location = attr_loc;
+                    auto glsl_type = std::get<2>(attr_bref);
+                    attr_des.format = glsl_type_macro[glsl_type];
+                    attr_des.offset = offset;
+                    offset += glsl_type_sizes[glsl_type];
+                    attr_descriptions.emplace_back(std::move(attr_des));
+                }
+
+                uint32_t stride = 0;
+                for (const auto& c : comps)
+                    stride += comp_sizes[c] * sizeof(float);
+
+                input_des.stride = stride;
+
+                input_des.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+                input_descriptions.emplace_back(std::move(input_des));
+            }
+        }
+    }
+    
+    Pipeline ppl{};
+
+    // Create descriptor set layout
+    VkDescriptorSetLayoutCreateInfo descriptor_layout_info{};
+    descriptor_layout_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    descriptor_layout_info.bindingCount = descriptor_layouts.size();
+    descriptor_layout_info.pBindings = descriptor_layouts.data();
+
+    if (vkCreateDescriptorSetLayout(device, &descriptor_layout_info, nullptr, &ppl.descriptor_layout) != VK_SUCCESS) {
+        std::cout << "Descriptor layout creation failed for pipeline " << name << std::endl;
+        return false;
+    }
+
+    // Create pipeline layout
+    VkPipelineLayoutCreateInfo ppl_layout_info{};
+    ppl_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    ppl_layout_info.setLayoutCount = 1;
+    ppl_layout_info.pSetLayouts = &ppl.descriptor_layout;
+
+    if (vkCreatePipelineLayout(device, &ppl_layout_info, nullptr, &ppl.ppl_layout) != VK_SUCCESS) {
+        std::cout << "Pipeline layout creation failed for pipeline " << name << std::endl;
+        return false;
+    }
+
+    // Create pipeline
+    VkGraphicsPipelineCreateInfo pipeline_info{
+        .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+        .stageCount = shader_infos.size(),
+        .pStages = shader_infos.data(),
+        .pVertexInputState = &option.input_info,
+        .pInputAssemblyState = &option.input_assembly,
+        .pRasterizationState = &option.vp_state_info,
+        .pMultisampleState = &option.multisampling,
+        .pDepthStencilState = &option.depth_stencil,
+        .pColorBlendState = &option.blend_state,
+        .layout = ppl.ppl_layout,
+        .renderPass = get_renderpass(),
+        .subpass = 0,
+        .basePipelineHandle = VK_NULL_HANDLE
+    };
+
+    // Pipelines could be created batched, maybe postpone the creation
+    // will be better?
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipeline_info,
+        nullptr, &ppl.pipeline) != VK_SUCCESS)
+    {
+        std::cout << "Pipeline " << name << " creation failed" << std::endl;
+        return false;
+    }
+
+    pipelines.emplace(name, ppl);
+
     return true;
 }
 

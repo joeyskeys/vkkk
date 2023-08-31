@@ -26,6 +26,57 @@ void bind_types(nb::module_& m) {
         .value("COMPUTE", VK_SHADER_STAGE_COMPUTE_BIT)
         .export_values();
 
+    nb::enum_<VkPrimitiveTopology>(m, "vkTopology")
+        .value("POINT_LIST", VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
+        .value("LINE_LIST", VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
+        .value("LINE_STRIP", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP)
+        .value("TRIANGLE_LIST", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+        .value("TRIANGLE_FAN", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN)
+        .value("LINE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY)
+        .value("LINE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY)
+        .value("TRIANGLE_LIST_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY)
+        .value("TRIANGLE_STRIP_WITH_ADJACENCY", VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY)
+        .export_values();
+
+    nb::enum_<VkPolygonMode>(m, "vkPolygonMode")
+        .value("FILL", VK_POLYGON_MODE_FILL)
+        .value("LINE", VK_POLYGON_MODE_LINE)
+        .value("POINT", VK_POLYGON_MODE_POINT)
+        .export_values();
+
+    nb::enum_<VkCullModeFlagBits>(m, "vkCullMode")
+        .value("NONE", VK_CULL_MODE_NONE)
+        .value("FRONT", VK_CULL_MODE_FRONT_BIT)
+        .value("BACK", VK_CULL_MODE_BACK_BIT)
+        .value("FRONT_AND_BACK", VK_CULL_MODE_FRONT_AND_BACK)
+        .export_values();
+
+    nb::enum_<VkFrontFace>(m, "vkFrontFace")
+        .value("CCW", VK_FRONT_FACE_COUNTER_CLOCKWISE)
+        .value("CW", VK_FRONT_FACE_CLOCKWISE)
+        .export_values();
+
+    nb::enum_<VkSampleCountFlagBits>(m, "vkSampleCount")
+        .value("_1", VK_SAMPLE_COUNT_1_BIT)
+        .value("_2", VK_SAMPLE_COUNT_2_BIT)
+        .value("_4", VK_SAMPLE_COUNT_4_BIT)
+        .value("_8", VK_SAMPLE_COUNT_8_BIT)
+        .value("_16", VK_SAMPLE_COUNT_16_BIT)
+        .value("_32", VK_SAMPLE_COUNT_32_BIT)
+        .value("_64", VK_SAMPLE_COUNT_64_BIT)
+        .export_values();
+
+    nb::enum_<VkCompareOp>(m, "vkCmpOp")
+        .value("NEVER", VK_COMPARE_OP_NEVER)
+        .value("LESS", VK_COMPARE_OP_LESS)
+        .value("EQUAL", VK_COMPARE_OP_EQUAL)
+        .value("LESS_OR_EQUAL", VK_COMPARE_OP_LESS_OR_EQUAL)
+        .value("GREATER", VK_COMPARE_OP_GREATER)
+        .value("NOT_EQUAL", VK_COMPARE_OP_NOT_EQUAL)
+        .value("GREATER_OR_EQUAL", VK_COMPARE_OP_GREATER_OR_EQUAL)
+        .value("ALWAYS", VK_COMPARE_OP_ALWAYS)
+        .export_values();
+
     /*************************
      * Abstraction types
      *************************/
@@ -44,6 +95,15 @@ void bind_types(nb::module_& m) {
             return m.load(path, stage);
         })
         .def("get_uniform_info", &ShaderModule::get_uniform_info);
+
+    nb::class_<PipelineOption>(m, "PipelineOption")
+        .def(nb::init<>())
+        .def("setup_input_assembly", &PipelineOption::setup_input_assembly)
+        .def("setup_viewport", &PipelineOption::setup_viewport)
+        .def("setup_scissor", &PipelineOption::setup_scissor)
+        .def("setup_rasterizer", &PipelineOption::setup_rasterizer)
+        .def("setup_multisampling", &PipelineOption::setup_multisampling)
+        .def("setup_depth_stencil", &PipelineOption::setup_depth_stencil);
 
     nb::class_<VkWrappedInstance> incl(m, "VkInstance");
 

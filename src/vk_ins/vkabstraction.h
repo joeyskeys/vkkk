@@ -80,7 +80,7 @@ struct Pipeline {
     VkDescriptorSetLayout                   descriptor_layout;
 };
 
-#DEFINE VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
+#define VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
 
 struct PipelineOption {
     PipelineOption();
@@ -458,7 +458,7 @@ public:
         const fs::path& path);
     bool add_cubemap(const std::string& name, const uint32_t binding,
         const fs::path& path);
-    bool create_pipeline(const std::string&, const std::vector<ShaderModule>&,
+    bool create_pipeline(const std::string&, std::vector<ShaderModule>&,
         const std::vector<VERT_COMP>&, PipelineOption& option);
 
 public:

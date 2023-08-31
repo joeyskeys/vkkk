@@ -22,6 +22,81 @@ namespace vkkk
 
 inline constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
+PipelineOption::PipelineOption() {
+    input_info = VkPipelineVertexInputStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+    };
+
+    input_assembly = VkPipelineInputAssemblyStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .primitiveRestartEnable = VK_FALSE
+    };
+
+    viewport = VkViewport {
+        .x = 0.f,
+        .y = 0.f,
+        // Width height default to a fixed size but should be set accordingly
+        .width = 800,
+        .height = 600,
+        .minDepth = 0.f,
+        .maxDepth = 1.f
+    };
+
+    scissor = VkRect2D {
+        .offset = {0, 0},
+        .extent = {800, 600}
+    };
+
+    vp_state_info = VkPipelineViewportStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+        .viewportCount = 1,
+        .pViewports = &viewport,
+        .scissorCount = 1,
+        .pScissors = &scissor
+    };
+
+    rasterizer = VkPipelineRasterizationStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+        .depthClampEnable = VK_FALSE,
+        .rasterizerDiscardEnable = VK_FALSE,
+        .cullMode = VK_CULL_MODE_BACK_BIT,
+        .frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE,
+        .depthBiasEnable = VK_FALSE,
+        .lineWidth = 1.f
+    };
+
+    multisampling = VkPipelineMultisampleStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+        .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+        .sampleShadingEnable = VK_FALSE
+    };
+
+    depth_stencil = VkPipelineDepthStencilStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,
+        .depthTestEnable = VK_TRUE,
+        .depthWriteEnable = VK_TRUE,
+        .depthCompareOp = VK_COMPARE_OP_LESS,
+        .depthBoundsTestEnable = VK_FALSE,
+        .stencilTestEnable = VK_FALSE
+    };
+
+    blend_attachment = VkPipelineColorBlendAttachmentState {
+        .blendEnable = VK_FALSE,
+        .colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_B_BIT
+            | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_A_BIT
+    };
+
+    blend_state = VkPipelineColorBlendStateCreateInfo {
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+        .logicOpEnable = VK_FALSE,
+        .logicOp = VK_LOGIC_OP_COPY,
+        .attachmentCount = 1,
+        .pAttachments = &blend_attachment,
+        .blendConstants = {0.f, 0.f, 0.f, 0.f}
+    };
+}
+
 VkWrappedInstance::VkWrappedInstance()
     : window(nullptr)
 {}
@@ -1337,7 +1412,7 @@ bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t bind
 }
 
 bool VkWrappedInstance::create_pipeline(const std::string& name,
-    const std::vector<ShaderModule>& modules,
+    std::vector<ShaderModule>& modules,
     const std::vector<VERT_COMP>& comps,
     PipelineOption& option)
 {
@@ -1364,7 +1439,7 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
 
         // Create shader infos for pipeline creation
         VkPipelineShaderStageCreateInfo shader_info{
-            .sType = VK_STRCUTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+            .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
             .stage = mod.type,
             .module = vkmodule,
             .pName = "main"
@@ -1377,19 +1452,19 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
             auto ppl_ubo_name = name + ":" + ubo_name;
             add_ubo(ppl_ubo_name, binding, struct_size, array_size);
 
-            VkDescriptorSetLayoutBinding binding {
+            VkDescriptorSetLayoutBinding desc_layout_binding {
                 .binding = binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = array_size,
-                .pImmutableSamplers = nullptr,
-                .stageFlags = mod.type
+                .stageFlags = mod.type,
+                .pImmutableSamplers = nullptr
             };
-            descriptor_layouts.emplace_back(std::move(binding));
+            descriptor_layouts.emplace_back(std::move(desc_layout_binding));
         }
 
         for (auto& [tex_name, tex_binding] : mod.img_infos) {
-            auto tex_path_info = tex_img_pairs.find(tex_name);
-            if (tex_path_info == tex_img_pairs.end()) {
+            auto tex_path_info = mod.tex_img_pairs.find(tex_name);
+            if (tex_path_info == mod.tex_img_pairs.end()) {
                 std::cout << "No texture assigned for sampler " << tex_name
                     << std::endl;
             }
@@ -1404,9 +1479,9 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
             VkDescriptorSetLayoutBinding binding {
                 .binding = tex_binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = is_cubemap ? 6 : 1,
-                .pImmutableSamplers = nullptr,
-                .stageFlags = mod.type
+                .descriptorCount = is_cubemap ? uint32_t(6) : uint32_t(1),
+                .stageFlags = mod.type,
+                .pImmutableSamplers = nullptr
             };
             descriptor_layouts.emplace_back(std::move(binding));
         }
@@ -1418,11 +1493,11 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
                 uint32_t offset = 0;
 
                 for (const auto& attr_loc : attrs) {
-                    const auto& attr_bref = mod.attr_brefs[attr_loc];
+                    const auto& attr_bref = mod.attr_infos[attr_loc];
                     VkVertexInputAttributeDescription attr_des{};
                     attr_des.binding = attr_binding;
                     attr_des.location = attr_loc;
-                    auto glsl_type = std::get<2>(attr_bref);
+                    auto glsl_type = std::get<1>(attr_bref);
                     attr_des.format = glsl_type_macro[glsl_type];
                     attr_des.offset = offset;
                     offset += glsl_type_sizes[glsl_type];
@@ -1468,11 +1543,12 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     // Create pipeline
     VkGraphicsPipelineCreateInfo pipeline_info{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-        .stageCount = shader_infos.size(),
+        .stageCount = static_cast<uint32_t>(shader_infos.size()),
         .pStages = shader_infos.data(),
         .pVertexInputState = &option.input_info,
         .pInputAssemblyState = &option.input_assembly,
-        .pRasterizationState = &option.vp_state_info,
+        .pViewportState = &option.vp_state_info,
+        .pRasterizationState = &option.rasterizer,
         .pMultisampleState = &option.multisampling,
         .pDepthStencilState = &option.depth_stencil,
         .pColorBlendState = &option.blend_state,

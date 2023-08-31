@@ -146,8 +146,8 @@ public:
     std::tuple<std::string, uint32_t, uint32_t, uint32_t>
         get_uniform_info(const std::string& name) const
     {
-        auto found = m_buf_infos.find(name);
-        if (found != m_buf_infos.end()) {
+        auto found = buf_infos.find(name);
+        if (found != buf_infos.end()) {
             auto [v1, v2, v3] = found->second;
             return std::make_tuple(name, v1, v2, v3);
         }

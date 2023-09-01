@@ -109,7 +109,7 @@ void bind_types(nb::module_& m) {
 
     incl.def(nb::init<>())
         .def(nb::init<uint32_t, uint32_t, const std::string&, const std::string&>())
-        .def("setup_resolution", &VkWrappedInstance::setup_basis)
+        .def("setup_resolution", &VkWrappedInstance::setup_resolution)
         .def("list_physical_devices", &VkWrappedInstance::list_physical_devices)
         .def("choose_device", &VkWrappedInstance::choose_device)
         .def("init", &VkWrappedInstance::init)
@@ -197,8 +197,8 @@ void bind_types(nb::module_& m) {
     nb::class_<MeshMgr> mmcl(m, "MeshMgr");
 
     mmcl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&MeshMgr::instance<VkWrappedInstance*>))
-        .def("load", [](MeshMgr& mgr, const uint32_t v, nb::byptes& vbuf, const uint32_t i, nb::byptes& ibuf) {
-            mgr.load(v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+        .def("load", [](MeshMgr& mgr, const std::vector<VERT_COMP>& cs, const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
+            mgr.load(cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
         })
         .def("pour_info_gpu", &MeshMgr::pour_into_gpu)
         .def("free_gpu_resources", &MeshMgr::free_gpu_resources);

@@ -170,6 +170,11 @@ public:
     VkWrappedInstance(uint32_t w, uint32_t h, const std::string& appname, const std::string& enginename);
     ~VkWrappedInstance();
 
+    inline void setup_resolution(const uint32_t w, const uint32_t h) {
+        width = w;
+        height = h;
+    }
+
     static inline void print_validation_layer_supports() {
         uint32_t layer_cnt;
         vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);

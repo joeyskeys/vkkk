@@ -650,9 +650,9 @@ void VkWrappedInstance::create_imageviews() {
     imageviews_created = true;
 }
 
-void VkWrappedInstance::create_renderpass() {
+void VkWrappedInstance::create_renderpass(const VkFormat format) {
     VkAttachmentDescription attachment{};
-    attachment.format = swapchain_surface_format.format;
+    attachment.format = format;
     attachment.samples = nsample;
     attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -663,7 +663,7 @@ void VkWrappedInstance::create_renderpass() {
 
     // Final representation attachment remains 1 sample
     VkAttachmentDescription resolve_attachment{};
-    resolve_attachment.format = swapchain_surface_format.format;
+    resolve_attachment.format = format;
     resolve_attachment.samples = VK_SAMPLE_COUNT_1_BIT;
     resolve_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     resolve_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -1568,6 +1568,32 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     }
 
     pipelines.emplace(name, ppl);
+
+    return true;
+}
+
+bool VkWrappedInstance::create_render_target(const std::string& name, const VkFormat format) {
+    RenderTarget target {
+        .format = format
+    };
+    create_vk_image(width, height, 1, nsample, format,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, target.image, target.memo);
+    target.view = create_imageview(target.image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    render_targets.emplace(name, std::move(target));
+
+    return true;
+}
+
+bool VkWrappedInstance::create_render_target_from_swapchain(const std::string& name) {
+    RenderTargetFromSwapchain target;
+    uint32_t cnt;
+    vkGetSwapchainImagesKHR(device, swapchain, &cnt, nullptr);
+    target.images.resize(cnt);
+    target.views.resize(cnt);
+    vkGetSwapchainImagesKHR(device, swapchain, &cnt, target.images.data());
+    for (int i = 0; i < cnt; ++i)
+        target.views[i] = create_imageview(target.images[i], swapchain_surface_format.format, VK_IMAGE_ASPECT_COLOR_BIT);
 
     return true;
 }

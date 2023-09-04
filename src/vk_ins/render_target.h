@@ -9,9 +9,9 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class RenderTarget {
+class RenderTargetDeprecated {
 public:
-    RenderTarget(VkWrappedInstance*);
+    RenderTargetDeprecated(VkWrappedInstance*);
 
     void free_gpu_resources();
 
@@ -21,9 +21,9 @@ public:
     VkImageView                 view;
 };
 
-class RenderTargetFromSwapchain {
+class RenderTargetFromSwapchainDeprecated {
 public:
-    RenderTargetFromSwapchain(VkWrappedInstance*);
+    RenderTargetFromSwapchainDeprecated(VkWrappedInstance*);
 
     void free_gpu_resources();
 

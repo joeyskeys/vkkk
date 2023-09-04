@@ -16,4 +16,4 @@ add_custom_command(TARGET pyvkkk POST_BUILD
         ${CMAKE_SOURCE_DIR}/plugin/vulender)
 
 add_custom_target(copylib ALL
-    DEPENDS ${CMAKE_SOURCE_DIR}/plugin/vulender/$<TARGET_FILE_NAME:pyvkkk>)
+    DEPENDS pyvkkk)

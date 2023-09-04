@@ -74,6 +74,18 @@ struct Texture {
     VkSampler                               sampler;
 };
 
+struct RenderTarget {
+    VkFormat                                format;
+    VkImage                                 image;
+    VkDeviceMemory                          memo;
+    VkImageView                             view;
+};
+
+struct RenderTargetFromSwapchain {
+    std::vector<VkImage>                    images;
+    std::vector<VkImageView>                views;
+};
+
 struct Pipeline {
     VkPipeline                              pipeline;
     VkPipelineLayout                        ppl_layout;
@@ -263,7 +275,7 @@ public:
     void recreate_swapchain();
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
-    void create_renderpass();
+    void create_renderpass(const VkFormat format=VK_FORMAT_R8G8B8A8_SRGB);
     void create_framebuffers();
     void create_command_pool();
     
@@ -466,11 +478,17 @@ public:
     bool create_pipeline(const std::string&, std::vector<ShaderModule>&,
         const std::vector<VERT_COMP>&, PipelineOption& option);
 
+    bool create_render_target(const std::string&, const VkFormat);
+    bool create_render_target_from_swapchain(const std::string&);
+
 public:
     // Vulkan resources
-    std::unordered_map<std::string, UBO>        ubos;
-    std::unordered_map<std::string, Texture>    textures;
-    std::unordered_map<std::string, Pipeline>   pipelines;
+    std::unordered_map<std::string, UBO>                ubos;
+    std::unordered_map<std::string, Texture>            textures;
+    std::unordered_map<std::string, Pipeline>           pipelines;
+    std::unordered_map<std::string, RenderTarget>       render_targets;
+    std::unordered_map<std::string, RenderTargetFromSwapchain>
+                                                        render_targets_from_swapchain;
 };
 
 }

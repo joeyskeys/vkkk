@@ -161,6 +161,8 @@ void bind_types(nb::module_& m) {
         .def("create_command_pool", &VkWrappedInstance::create_command_pool)
         .def("create_color_resource", &VkWrappedInstance::create_color_resource)
         .def("create_depth_resource", &VkWrappedInstance::create_depth_resource)
+        .def("create_framebuffer_from_target", &VkWrappedInstance::create_framebuffer_from_target)
+        .def("create_framebuffer_from_swapchain_target", &VkWrappedInstance::create_framebuffer_from_swapchain_target)
         .def("create_resources", &VkWrappedInstance::create_resources)
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
         .def("mainloop", &VkWrappedInstance::mainloop)

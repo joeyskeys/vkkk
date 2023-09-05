@@ -277,6 +277,8 @@ public:
     void create_imageviews();
     void create_renderpass(const VkFormat format=VK_FORMAT_R8G8B8A8_SRGB);
     void create_framebuffers();
+    bool create_framebuffer_from_target(const std::string&);
+    bool create_framebuffer_from_swapchain_target(const std::string&);
     void create_command_pool();
     
     void create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -489,6 +491,8 @@ public:
     std::unordered_map<std::string, RenderTarget>       render_targets;
     std::unordered_map<std::string, RenderTargetFromSwapchain>
                                                         render_targets_from_swapchain;
+    std::unordered_map<std::string, std::vector<VkFramebuffer>>
+                                                        framebuffers;
 };
 
 }

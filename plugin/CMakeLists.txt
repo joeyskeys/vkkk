@@ -5,4 +5,4 @@ add_custom_command(OUTPUT ${CMAKE_CURRENT_DIR}/vulender.zip
     DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/vulender)
 
 add_custom_target(create_zip ALL
-    DEPENDS ${CMAKE_BINARY_DiR}/vulender.zip)
+    DEPENDS copylib ${CMAKE_BINARY_DiR}/vulender.zip)

@@ -751,6 +751,72 @@ void VkWrappedInstance::create_framebuffers() {
     framebuffer_created = true;
 }
 
+bool VkWrappedInstance::create_framebuffer_from_target(const std::string& name) {
+    auto found = render_targets.find(name);
+    if (found == render_targets.end()) {
+        std::cout << "No target with name " << name << " found.." << std::endl;
+        return false;
+    }
+
+    auto& target = found->second;
+    std::vector<VkFramebuffer> fbs(1);
+    std::array<VkImageView, 3> attachments = {
+        color_img_view,
+        depth_img_view,
+        target.view
+    };
+
+    VkFramebufferCreateInfo framebuffer_info{
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .renderPass = render_pass,
+        .attachmentCount = attachments.size(),
+        .pAttachments = attachments.data(),
+        .width = width,
+        .height = height,
+        .layers = 1
+    };
+
+    if (vkCreateFramebuffer(device, &framebuffer_info, nullptr, &fbs[0]) != VK_SUCCESS)
+        return false;
+
+    framebuffers.emplace(name, fbs);
+    return true;
+}
+
+bool VkWrappedInstance::create_framebuffer_from_swapchain_target(const std::string& name) {
+    auto found = render_targets_from_swapchain.find(name);
+    if (found == render_targets_from_swapchain.end()) {
+        std::cout << "No target with name " << name << "found.." << std::endl;
+        return false;
+    }
+
+    auto& target = found->second;
+    std::vector<VkFramebuffer> fbs(target.images.size());
+    for (int i = 0; i < fbs.size(); ++i) {
+        std::array<VkImageView, 3> attachments = {
+            color_img_view,
+            depth_img_view,
+            target.views[i],
+        };
+
+        VkFramebufferCreateInfo framebuffer_info {
+            .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+            .renderPass = render_pass,
+            .attachmentCount = attachments.size(),
+            .pAttachments = attachments.data(),
+            .width = width,
+            .height = height,
+            .layers = 1
+        };
+
+        if (vkCreateFramebuffer(device, &framebuffer_info, nullptr, &fbs[i]) != VK_SUCCESS)
+            return false;
+    }
+
+    framebuffers.emplace(name, std::move(fbs));
+    return true;
+}
+
 void VkWrappedInstance::create_command_pool() {
     VkCommandPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;

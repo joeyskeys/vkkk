@@ -396,7 +396,7 @@ VkSampleCountFlagBits VkWrappedInstance::get_max_usable_sample_cnt() const {
     return VK_SAMPLE_COUNT_1_BIT;
 }
 
-bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
+bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx, bool offscreen) {
     if (idx == nullptr)
         return false;
 
@@ -406,25 +406,27 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
     if (!extensions_supported)
         return false;
 
-    bool swapchain_adequate = false;
-    vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &swapchain_details.capabilities);
+    if (!offscreen) {
+        bool swapchain_adequate = false;
+        vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physical_device, surface, &swapchain_details.capabilities);
 
-    uint32_t format_cnt;
-    vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_cnt, nullptr);
-    if (format_cnt != 0) {
-        swapchain_details.formats.resize(format_cnt);
-        vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_cnt, swapchain_details.formats.data());
+        uint32_t format_cnt;
+        vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_cnt, nullptr);
+        if (format_cnt != 0) {
+            swapchain_details.formats.resize(format_cnt);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(physical_device, surface, &format_cnt, swapchain_details.formats.data());
+        }
+
+        uint32_t present_mode_cnt;
+        vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_cnt, nullptr);
+        if (present_mode_cnt != 0) {
+            swapchain_details.present_modes.resize(present_mode_cnt);
+            vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_cnt, swapchain_details.present_modes.data());
+        }
+
+        if (swapchain_details.formats.empty() || swapchain_details.present_modes.empty())
+            return false;
     }
-
-    uint32_t present_mode_cnt;
-    vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_cnt, nullptr);
-    if (present_mode_cnt != 0) {
-        swapchain_details.present_modes.resize(present_mode_cnt);
-        vkGetPhysicalDeviceSurfacePresentModesKHR(physical_device, surface, &present_mode_cnt, swapchain_details.present_modes.data());
-    }
-
-    if (swapchain_details.formats.empty() || swapchain_details.present_modes.empty())
-        return false;
 
     uint32_t queue_family_cnt = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_cnt, nullptr);
@@ -443,9 +445,11 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
         if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             idx->graphic_family = i;
 
-        vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
-        if (present_support)
-            idx->present_family = i;
+        if (surface) {
+            vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
+            if (present_support)
+                idx->present_family = i;
+        }
 
         if (idx->is_valid())
             return true;
@@ -456,16 +460,18 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
     return false;
 }
 
-void VkWrappedInstance::create_logical_device() {
-    if (!validate_current_device(&queue_family_idx))
+void VkWrappedInstance::create_logical_device(bool offscreen) {
+    if (!validate_current_device(&queue_family_idx, offscreen))
         throw std::runtime_error("Queue specified not available");
 
     // Queue create info
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     std::set<uint32_t> queue_families = {
-        queue_family_idx.graphic_family.value(),
-        queue_family_idx.present_family.value()
+        queue_family_idx.graphic_family.value()
+        //queue_family_idx.present_family.value()
     };
+    if (!offscreen)
+        queue_families.insert(queue_family_idx.present_family.value());
     
     float queue_priority = 1.f;
     for (auto& queue_family : queue_families) {
@@ -508,7 +514,8 @@ void VkWrappedInstance::create_logical_device() {
 
     // Retrieve queue
     vkGetDeviceQueue(device, queue_family_idx.graphic_family.value(), 0, &graphic_queue);
-    vkGetDeviceQueue(device, queue_family_idx.present_family.value(), 0, &present_queue);
+    if (!offscreen)
+        vkGetDeviceQueue(device, queue_family_idx.present_family.value(), 0, &present_queue);
 
     queue_created = true;
 }
@@ -609,7 +616,7 @@ void VkWrappedInstance::recreate_swapchain() {
     create_swapchain();
     create_imageviews();
     create_renderpass();
-    create_color_resource();
+    create_color_resource(swapchain_surface_format.format);
     create_depth_resource();
     create_framebuffers();
 
@@ -953,10 +960,9 @@ VkFormat VkWrappedInstance::find_supported_format(const std::vector<VkFormat>& c
     throw std::runtime_error("failed to find supported format");
 }
 
-void VkWrappedInstance::create_color_resource() {
-    VkFormat format = swapchain_surface_format.format;
-    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1,
-        nsample, format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+void VkWrappedInstance::create_color_resource(const VkFormat format) {
+    create_vk_image(width, height, 1, nsample, format,
+        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
         0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, color_img, color_img_memo);
     color_img_view = create_imageview(color_img, format, VK_IMAGE_ASPECT_COLOR_BIT);
 
@@ -966,9 +972,9 @@ void VkWrappedInstance::create_color_resource() {
 void VkWrappedInstance::create_depth_resource() {
     VkFormat depth_format = find_depth_format();
 
-    create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, nsample,
-        depth_format, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_img, depth_img_memo);
+    create_vk_image(width, height, 1, nsample, depth_format, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        depth_img, depth_img_memo);
     depth_img_view = create_imageview(depth_img, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 
     depth_created = true;

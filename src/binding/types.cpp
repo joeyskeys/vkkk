@@ -167,7 +167,9 @@ void bind_types(nb::module_& m) {
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
         .def("mainloop", &VkWrappedInstance::mainloop)
         .def("get_image_buffer", &VkWrappedInstance::get_image_buffer)
-        .def("create_pipeline", &VkWrappedInstance::create_pipeline);
+        .def("create_pipeline", &VkWrappedInstance::create_pipeline)
+        .def("create_render_target", &VkWrappedInstance::create_render_target)
+        .def("create_render_target_from_swapchain", &VkWrappedInstance::create_render_target_from_swapchain);
 
     nb::class_<UniformMgr> umcl(m, "UniformMgr");
 

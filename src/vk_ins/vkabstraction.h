@@ -34,7 +34,8 @@ struct QueueFamilyIndex {
     std::optional<uint32_t> present_family;
 
     inline bool is_valid() {
-        return graphic_family.has_value() && present_family.has_value();
+        //return graphic_family.has_value() && present_family.has_value();
+        return graphic_family.has_value();
     }
 };
 
@@ -268,8 +269,8 @@ public:
         update_cbk = cbk;
     }
 
-    bool validate_current_device(QueueFamilyIndex* idx);
-    void create_logical_device();
+    bool validate_current_device(QueueFamilyIndex* idx, bool offscreen);
+    void create_logical_device(bool offscreen=false);
     uint32_t create_swapchain();
     void cleanup_swapchain();
     void recreate_swapchain();
@@ -286,7 +287,7 @@ public:
     void copy_buffer(VkBuffer src_buf, VkBuffer dst_buf, VkDeviceSize size);
     void create_vertex_buffer(const float *, VkBuffer&, VkDeviceMemory&, size_t, size_t);
     void create_index_buffer(const uint32_t*, VkBuffer&, VkDeviceMemory&, size_t);
-    void create_color_resource();
+    void create_color_resource(const VkFormat format);
     void create_depth_resource();
 
     inline void create_resources(VkSampleCountFlagBits ns) {
@@ -297,7 +298,7 @@ public:
         nsample = ns;
         create_renderpass();
         create_command_pool();
-        create_color_resource();
+        create_color_resource(swapchain_surface_format.format);
         create_depth_resource();
         create_framebuffers();
     }

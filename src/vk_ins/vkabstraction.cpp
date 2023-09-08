@@ -1670,4 +1670,8 @@ bool VkWrappedInstance::create_render_target_from_swapchain(const std::string& n
     return true;
 }
 
+bool VkWrappedInstance::load_mesh(std::string& name, const Mesh& m) {
+    
+}
+
 }

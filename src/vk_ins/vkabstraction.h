@@ -93,6 +93,13 @@ struct Pipeline {
     VkDescriptorSetLayout                   descriptor_layout;
 };
 
+struct Mesh {
+    VkBuffer                                vbuf;
+    VkDeviceMemory                          vbuf_memo;
+    VkBuffer                                ibuf;
+    VkDeviceMemory                          ibuf_memo;
+};
+
 #define VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
 
 struct PipelineOption {
@@ -484,6 +491,8 @@ public:
     bool create_render_target(const std::string&, const VkFormat);
     bool create_render_target_from_swapchain(const std::string&);
 
+    bool load_mesh(std::string&, const Mesh&);
+
 public:
     // Vulkan resources
     std::unordered_map<std::string, UBO>                ubos;
@@ -494,6 +503,8 @@ public:
                                                         render_targets_from_swapchain;
     std::unordered_map<std::string, std::vector<VkFramebuffer>>
                                                         framebuffers;
+
+    std::unordered_map<std::string, Mesh>               meshes;
 };
 
 }

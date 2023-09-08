@@ -27,12 +27,12 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class Mesh {
+class MeshDeprecated {
 public:
-    Mesh(VkWrappedInstance*, const std::vector<VERT_COMP>&, bool indexed=true);
-    Mesh(const Mesh&);
-    Mesh(Mesh&&);
-    virtual ~Mesh();
+    MeshDeprecated(VkWrappedInstance*, const std::vector<VERT_COMP>&, bool indexed=true);
+    MeshDeprecated(const MeshDeprecated&);
+    MeshDeprecated(MeshDeprecated&&);
+    virtual ~MeshDeprecated();
 
     void load(aiMesh *mesh);
     void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
@@ -62,5 +62,29 @@ public:
     VkDeviceMemory              ibuf_memo;
     bool                        gpu_loaded = false;
 };
+
+class Mesh {
+public:
+    Mesh(const std::vector<VERT_COMP>& cs, bool indexed=true)
+        : comps(cs)
+        , indexed(indexed)
+    {}
+    Mesh(const Mesh&);
+    Mesh(Mesh&&);
+
+    void load(aiMesh *mesh);
+    void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
+        const uint32_t);
+    void unload();
+
+    std::vector<VERT_COMP>      comps;
+    bool                        indexed = true;
+    uint32_t                    comp_size = 0;
+    uint32_t                    vcnt = 0;
+    float*                      vbuf = nullptr;
+    uint32_t                    icnt = 0;
+    uint32_t*                   ibuf = nullptr;
+    bool                        loaded = false;
+}
 
 }

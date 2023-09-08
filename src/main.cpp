@@ -183,7 +183,7 @@ int main() {
     modules.create_descriptor_pool();
     modules.create_descriptor_set();
     
-    auto mesh_mgr = vkkk::MeshMgr::instance();
+    auto mesh_mgr = vkkk::MeshMgrDeprecated::instance();
     mesh_mgr.init(&ins);
     mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
     const auto& mesh = mesh_mgr.meshes[0];

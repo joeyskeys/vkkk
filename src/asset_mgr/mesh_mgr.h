@@ -12,12 +12,12 @@ namespace vkkk
 
 class VkWrappedInstance;
 
-class MeshMgr : public Singleton<MeshMgr> {
+class MeshMgrDeprecated : public Singleton<MeshMgrDeprecated> {
 private:
-    MeshMgr(VkWrappedInstance* i);
-    MeshMgr(const MeshMgr&) = delete;
-    MeshMgr& operator= (const MeshMgr&) = delete;
-    friend class Singleton<MeshMgr>;
+    MeshMgrDeprecated(VkWrappedInstance* i);
+    MeshMgrDeprecated(const MeshMgrDeprecated&) = delete;
+    MeshMgrDeprecated& operator= (const MeshMgrDeprecated&) = delete;
+    friend class Singleton<MeshMgrDeprecated>;
 
 public:
     Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
@@ -48,10 +48,31 @@ private:
         const std::vector<VERT_COMP>& cs);
 
 public:
-    std::vector<Mesh>   meshes;
+    std::vector<MeshDeprecated>   meshes;
 
 private:
     VkWrappedInstance*  ins;
+};
+
+class MeshMgr : public Singleton<MeshMgr> {
+private:
+    MeshMgr() {}
+    MeshMgr(const MeshMgr&) = delete;
+    MeshMgr& operator= (const MeshMgr&) = delete;
+    friend class Singleton<MeshMgr>;
+
+    void process_node(aiNode* node, const aiScene* scene,
+        const std::vector<VERT_COMP>& cs);
+
+public:
+    void load_file(const fs::path&, const std::vector<VERT_COMP>&);
+    void load(const std::string&, const std::vector<VERT_COMP>&, const uint32_t,
+        const char*, const uint32_t, const uint32_t, const char*, const uint32_t);
+    
+    void upload_gpu(VkWrappedInstance*, const std::string&) const;
+
+private:
+    std::unordered_map<std::string, Mesh>   meshes;
 };
 
 }

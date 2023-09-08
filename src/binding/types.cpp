@@ -226,34 +226,34 @@ void bind_types(nb::module_& m) {
         .def("get_pipeline_by_name", nb::overload_cast<const std::string&>(&PipelineMgr::get_pipeline))
         .def("bind", &PipelineMgr::bind);
 
-    nb::class_<Mesh> mecl(m, "Mesh");
+    nb::class_<MeshDeprecated> mecl(m, "MeshDeprecated");
 
     mecl.def(nb::init<VkWrappedInstance*, const std::vector<VERT_COMP>&, bool>())
-        .def(nb::init<const Mesh&>())
-        .def("load", [](Mesh& m, uint32_t v, nb::bytes& vbuf, uint32_t i, nb::bytes& ibuf) {
+        .def(nb::init<const MeshDeprecated&>())
+        .def("load", [](MeshDeprecated& m, uint32_t v, nb::bytes& vbuf, uint32_t i, nb::bytes& ibuf) {
             m.load(v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
         })
-        .def("unload", &Mesh::unload)
-        .def("set_view", &Mesh::set_view)
-        .def("load_gpu", &Mesh::load_gpu)
-        .def("unload_gpu", &Mesh::unload_gpu)
+        .def("unload", &MeshDeprecated::unload)
+        .def("set_view", &MeshDeprecated::set_view)
+        .def("load_gpu", &MeshDeprecated::load_gpu)
+        .def("unload_gpu", &MeshDeprecated::unload_gpu)
         .def("emit_draw_cmd", nb::overload_cast<CommandBuffers&, const uint32_t,
-            PipelineMgr&, const std::string&>(&Mesh::emit_draw_cmd))
-        .def("get_vert", [](const Mesh& m, size_t idx) {
+            PipelineMgr&, const std::string&>(&MeshDeprecated::emit_draw_cmd))
+        .def("get_vert", [](const MeshDeprecated& m, size_t idx) {
             if (idx >= m.vcnt * 3)
                 throw nb::index_error();
             return m.vbuf[idx];
         });
 
-    nb::class_<MeshMgr> mmcl(m, "MeshMgr");
+    nb::class_<MeshMgrDeprecated> mmcl(m, "MeshMgrDeprecated");
 
-    mmcl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&MeshMgr::instance<VkWrappedInstance*>))
-        .def("load", [](MeshMgr& mgr, const std::vector<VERT_COMP>& cs, const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
+    mmcl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&MeshMgrDeprecated::instance<VkWrappedInstance*>))
+        .def("load", [](MeshMgrDeprecated& mgr, const std::vector<VERT_COMP>& cs, const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
             mgr.load(cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
         })
-        .def("pour_info_gpu", &MeshMgr::pour_into_gpu)
-        .def("free_gpu_resources", &MeshMgr::free_gpu_resources);
-        //.def("emit_draw_cmds", &MeshMgr::emit_draw_cmds);
+        .def("pour_info_gpu", &MeshMgrDeprecated::pour_into_gpu)
+        .def("free_gpu_resources", &MeshMgrDeprecated::free_gpu_resources);
+        //.def("emit_draw_cmds", &MeshMgrDeprecated::emit_draw_cmds);
 
     nb::class_<LightInfo> licl(m, "LightInfo");
 

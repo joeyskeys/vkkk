@@ -8,7 +8,7 @@ namespace vkkk
 {
 
 Scene::Scene()
-    : mesh_mgr(&MeshMgr::instance())
+    : mesh_mgr(&MeshMgrDeprecated::instance())
     , light_mgr(&LightMgr::instance())
     //, ppl_mgr(&PipelineMgr::instance())
 {}

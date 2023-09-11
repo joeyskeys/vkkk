@@ -20,7 +20,7 @@ private:
     friend class Singleton<MeshMgrDeprecated>;
 
 public:
-    Mesh* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
+    MeshDeprecated* load_file(const fs::path &path, const std::vector<VERT_COMP>& cs);
     void  load(const std::vector<VERT_COMP>&, const uint32_t, const char*,
         const uint32_t, const uint32_t, const char*, const uint32_t);
     void add_box(const void *min, const void *max);
@@ -61,11 +61,11 @@ private:
     MeshMgr& operator= (const MeshMgr&) = delete;
     friend class Singleton<MeshMgr>;
 
-    void process_node(aiNode* node, const aiScene* scene,
+    void process_node(const std::string&, aiNode* node, const aiScene* scene,
         const std::vector<VERT_COMP>& cs);
 
 public:
-    void load_file(const fs::path&, const std::vector<VERT_COMP>&);
+    void load_file(const fs::path&, const std::string&, const std::vector<VERT_COMP>&);
     void load(const std::string&, const std::vector<VERT_COMP>&, const uint32_t,
         const char*, const uint32_t, const uint32_t, const char*, const uint32_t);
     

@@ -71,6 +71,7 @@ public:
     {}
     Mesh(const Mesh&);
     Mesh(Mesh&&);
+    ~Mesh();
 
     void load(aiMesh *mesh);
     void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
@@ -85,6 +86,6 @@ public:
     uint32_t                    icnt = 0;
     uint32_t*                   ibuf = nullptr;
     bool                        loaded = false;
-}
+};
 
 }

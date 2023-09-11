@@ -93,7 +93,7 @@ struct Pipeline {
     VkDescriptorSetLayout                   descriptor_layout;
 };
 
-struct Mesh {
+struct MeshGPU {
     VkBuffer                                vbuf;
     VkDeviceMemory                          vbuf_memo;
     VkBuffer                                ibuf;
@@ -504,7 +504,7 @@ public:
     std::unordered_map<std::string, std::vector<VkFramebuffer>>
                                                         framebuffers;
 
-    std::unordered_map<std::string, Mesh>               meshes;
+    std::unordered_map<std::string, MeshGPU>               meshes;
 };
 
 }

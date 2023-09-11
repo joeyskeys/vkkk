@@ -169,7 +169,8 @@ void bind_types(nb::module_& m) {
         .def("get_image_buffer", &VkWrappedInstance::get_image_buffer)
         .def("create_pipeline", &VkWrappedInstance::create_pipeline)
         .def("create_render_target", &VkWrappedInstance::create_render_target)
-        .def("create_render_target_from_swapchain", &VkWrappedInstance::create_render_target_from_swapchain);
+        .def("create_render_target_from_swapchain", &VkWrappedInstance::create_render_target_from_swapchain)
+        .def("load_mesh", &VkWrappedInstance::load_mesh);
 
     nb::class_<UniformMgr> umcl(m, "UniformMgr");
 
@@ -226,6 +227,7 @@ void bind_types(nb::module_& m) {
         .def("get_pipeline_by_name", nb::overload_cast<const std::string&>(&PipelineMgr::get_pipeline))
         .def("bind", &PipelineMgr::bind);
 
+    /*
     nb::class_<MeshDeprecated> mecl(m, "MeshDeprecated");
 
     mecl.def(nb::init<VkWrappedInstance*, const std::vector<VERT_COMP>&, bool>())
@@ -254,6 +256,15 @@ void bind_types(nb::module_& m) {
         .def("pour_info_gpu", &MeshMgrDeprecated::pour_into_gpu)
         .def("free_gpu_resources", &MeshMgrDeprecated::free_gpu_resources);
         //.def("emit_draw_cmds", &MeshMgrDeprecated::emit_draw_cmds);
+    */
+
+    nb::class_<Mesh>(m, "Mesh")
+        .def(nb::init<const std::vector<VERT_COMP>&, bool>())
+        .def(nb::init<const Mesh&>())
+        .def("load", [](Mesh& m, uint32_t v, nb::bytes& vbuf, uint32_t i, nb::bytes& ibuf) {
+            m.load(v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+        })
+        .def("unload", &Mesh::unload);
 
     nb::class_<LightInfo> licl(m, "LightInfo");
 

@@ -1670,7 +1670,7 @@ bool VkWrappedInstance::create_render_target_from_swapchain(const std::string& n
     return true;
 }
 
-bool VkWrappedInstance::load_mesh(std::string& name, const Mesh& m) {
+bool VkWrappedInstance::load_mesh(const std::string& name, const Mesh& m) {
     MeshGPU mgpu{};
     create_vertex_buffer(m.vbuf, mgpu.vbuf, mgpu.vbuf_memo, m.comp_size, m.vcnt);
     // Triangle mesh for now

@@ -491,7 +491,7 @@ public:
     bool create_render_target(const std::string&, const VkFormat);
     bool create_render_target_from_swapchain(const std::string&);
 
-    bool load_mesh(std::string&, const Mesh&);
+    bool load_mesh(const std::string&, const Mesh&);
 
 public:
     // Vulkan resources
@@ -504,7 +504,7 @@ public:
     std::unordered_map<std::string, std::vector<VkFramebuffer>>
                                                         framebuffers;
 
-    std::unordered_map<std::string, MeshGPU>               meshes;
+    std::unordered_map<std::string, MeshGPU>            meshes;
 };
 
 }

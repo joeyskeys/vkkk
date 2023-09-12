@@ -266,6 +266,14 @@ void bind_types(nb::module_& m) {
         })
         .def("unload", &Mesh::unload);
 
+    nb::class_<MeshMgr>(m, "MeshMgr")
+        .def_static("Instance", nb::overload_cast<>(&MeshMgr::instance_ptr<>))
+        .def("load", [](MeshMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
+            const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
+                mgr.load(name, cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+        })
+        .def("upload_gpu", &MeshMgr::upload_gpu);        
+
     nb::class_<LightInfo> licl(m, "LightInfo");
 
     licl.def_rw("pt_lights", &LightInfo::pt_lights)
@@ -274,7 +282,7 @@ void bind_types(nb::module_& m) {
 
     nb::class_<LightMgr> lmcl(m, "LightMgr");
 
-    lmcl.def_static("Instance", nb::overload_cast<>(&LightMgr::instance<>))
+    lmcl.def_static("Instance", nb::overload_cast<>(&LightMgr::instance_ptr<>))
         .def("add_pt_light", &LightMgr::add_pt_light)
         .def("add_dir_light", &LightMgr::add_dir_light)
         .def("add_spot_light", &LightMgr::add_spot_light);

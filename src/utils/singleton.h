@@ -23,6 +23,12 @@ public:
         return object;
     }
 
+    template <typename ...Ts>
+    static ObjectType* instance_ptr(Ts... args) {
+        static ObjectType object(args...);
+        return &object;
+    }
+
 protected:
     Singleton() {}
     virtual ~Singleton() {}

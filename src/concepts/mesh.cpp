@@ -214,6 +214,15 @@ void MeshDeprecated::emit_draw_cmd(CommandBuffers& cbufs, const uint32_t idx, Pi
     vkCmdDrawIndexed(cmd_buf, icnt * 3, 1, 0, 0, 0);
 }
 
+Mesh::Mesh(const std::vector<VERT_COMP>& cs, bool idx)
+    : comps(cs)
+    , indexed(idx)
+    , comp_size(0)
+{
+    for (const auto& comp : comps)
+        comp_size += comp_sizes[comp];
+}
+
 Mesh::Mesh(const Mesh& m)
     : comps(m.comps)
     , indexed(m.indexed)

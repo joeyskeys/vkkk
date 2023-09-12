@@ -65,10 +65,7 @@ public:
 
 class Mesh {
 public:
-    Mesh(const std::vector<VERT_COMP>& cs, bool indexed=true)
-        : comps(cs)
-        , indexed(indexed)
-    {}
+    Mesh(const std::vector<VERT_COMP>& cs, bool indexed=true);
     Mesh(const Mesh&);
     Mesh(Mesh&&);
     ~Mesh();

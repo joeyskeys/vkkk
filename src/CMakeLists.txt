@@ -52,4 +52,9 @@ target_link_libraries(vkmulti
     vkkk
     ${OIIO_LIBRARIES})
 
+add_executable(vkdebug debug_main.cpp)
+target_link_libraries(vkdebug
+    vkkk
+    ${OIIO_LIBRARIES})
+
 add_subdirectory(binding)

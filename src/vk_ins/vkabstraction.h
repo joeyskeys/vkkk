@@ -208,7 +208,7 @@ public:
     void choose_device(uint32_t i);
 
     void init_glfw();
-    void init();
+    void init(bool off=false);
 
     inline void setup_window(GLFWwindow* win) {
         window = win;
@@ -276,8 +276,8 @@ public:
         update_cbk = cbk;
     }
 
-    bool validate_current_device(QueueFamilyIndex* idx, bool offscreen);
-    void create_logical_device(bool offscreen=false);
+    bool validate_current_device(QueueFamilyIndex* idx);
+    void create_logical_device();
     uint32_t create_swapchain();
     void cleanup_swapchain();
     void recreate_swapchain();
@@ -333,8 +333,11 @@ public:
 private:
     // Private methods
     std::vector<const char*> get_default_instance_extensions();
-    inline std::array<const char*, 1> get_default_device_extensions() {
-        return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    inline std::vector<const char*> get_default_device_extensions() {
+        if (offscreen)
+            return {};
+        else
+            return { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     }
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL default_debug_callback(
@@ -467,6 +470,7 @@ private:
     VkImageView                     depth_img_view;
     bool                            depth_created = false;
 
+    bool                            offscreen = false;
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;

@@ -119,6 +119,43 @@ VkWrappedInstance::~VkWrappedInstance() {
         }
     }
 
+    for (auto& [name, ubo] : ubos) {
+        for (int i = 0; i < ubo.gpu_bufs.size(); ++i) {
+            vkDestroyBuffer(device, ubo.gpu_bufs[i], nullptr);
+            vkFreeMemory(device, ubo.memos[i], nullptr);
+        }
+    }
+
+    for (auto& [name, tex] : textures) {
+        vkDestroySampler(device, tex.sampler, nullptr);
+        vkDestroyImageView(device, tex.view, nullptr);
+        vkDestroyImage(device, tex.image, nullptr);
+        vkFreeMemory(device, tex.memo, nullptr);
+    }
+
+    for (auto& [name, mesh] : meshes) {
+        vkDestroyBuffer(device, mesh.vbuf, nullptr);
+        vkFreeMemory(device, mesh.vbuf_memo, nullptr);
+        vkDestroyBuffer(device, mesh.ibuf, nullptr);
+        vkFreeMemory(device, mesh.ibuf_memo, nullptr);
+    }
+
+    for (auto& [name, rt] : render_targets) {
+        vkDestroyImageView(device, rt.view, nullptr);
+        vkDestroyImage(device, rt.image, nullptr);
+        vkFreeMemory(device, rt.memo, nullptr);
+    }
+
+    for (auto& [name, rt] : render_targets_from_swapchain) {
+        for (auto& view : rt.views)
+            vkDestroyImageView(device, view, nullptr);
+    }
+
+    for (auto& [name, fbs] : framebuffers) {
+        for (auto& fb : fbs)
+            vkDestroyFramebuffer(device, fb, nullptr);
+    }
+
     vkDestroyDevice(device, nullptr);
 
     if (enable_validation_layers) {
@@ -127,11 +164,14 @@ VkWrappedInstance::~VkWrappedInstance() {
             func(instance, debug_messenger, nullptr);
     }
 
-    vkDestroySurfaceKHR(instance, surface, nullptr);
+    if (!offscreen)
+        vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
 
-    glfwDestroyWindow(window);
-    glfwTerminate();
+    if (!offscreen) {
+        glfwDestroyWindow(window);
+        glfwTerminate();
+    }
 }
 
 void VkWrappedInstance::list_physical_devices() const {
@@ -174,7 +214,9 @@ void VkWrappedInstance::init_glfw() {
     glfwSetFramebufferSizeCallback(window, default_resize_callback);
 }
 
-void VkWrappedInstance::init() {
+void VkWrappedInstance::init(bool off) {
+    offscreen = off;
+
     // Init vulkan
     VkApplicationInfo app_info{};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
@@ -396,7 +438,7 @@ VkSampleCountFlagBits VkWrappedInstance::get_max_usable_sample_cnt() const {
     return VK_SAMPLE_COUNT_1_BIT;
 }
 
-bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx, bool offscreen) {
+bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx) {
     if (idx == nullptr)
         return false;
 
@@ -445,7 +487,7 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx, bool offs
         if (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT)
             idx->graphic_family = i;
 
-        if (surface) {
+        if (!offscreen) {
             vkGetPhysicalDeviceSurfaceSupportKHR(physical_device, i, surface, &present_support);
             if (present_support)
                 idx->present_family = i;
@@ -460,8 +502,8 @@ bool VkWrappedInstance::validate_current_device(QueueFamilyIndex* idx, bool offs
     return false;
 }
 
-void VkWrappedInstance::create_logical_device(bool offscreen) {
-    if (!validate_current_device(&queue_family_idx, offscreen))
+void VkWrappedInstance::create_logical_device() {
+    if (!validate_current_device(&queue_family_idx))
         throw std::runtime_error("Queue specified not available");
 
     // Queue create info
@@ -586,9 +628,12 @@ void VkWrappedInstance::cleanup_swapchain() {
         for (auto framebuffer : swapchain_framebuffers)
             vkDestroyFramebuffer(device, framebuffer, nullptr);
 
-    if (commandpool_created)
+    if (commandbuffer_created && commandbuffers.size() > 0)
         vkFreeCommandBuffers(device, command_pool, static_cast<uint32_t>(commandbuffers.size()),
             commandbuffers.data());
+
+    if (commandpool_created)
+        vkDestroyCommandPool(device, command_pool, nullptr);
 
     if (render_pass_created)
         vkDestroyRenderPass(device, render_pass, nullptr);
@@ -1136,10 +1181,14 @@ void VkWrappedInstance::mainloop(const CommandBuffers& cmd_bufs) {
 }
 
 std::vector<const char*> VkWrappedInstance::get_default_instance_extensions() {
-    uint32_t glfw_extension_cnt = 0;
-    const char** glfw_extensions;
-    glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
-    std::vector<const char*> extensions(glfw_extensions, glfw_extensions + glfw_extension_cnt);
+    std::vector<const char*> extensions;
+    if (!offscreen) {
+        uint32_t glfw_extension_cnt = 0;
+        const char** glfw_extensions;
+        glfw_extensions = glfwGetRequiredInstanceExtensions(&glfw_extension_cnt);
+        //std::vector<const char*> extensions(glfw_extensions, glfw_extensions + glfw_extension_cnt);
+        extensions.insert(extensions.begin(), glfw_extensions, glfw_extensions + glfw_extension_cnt);
+    }
     if (enable_validation_layers)
         extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 

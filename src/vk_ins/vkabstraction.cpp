@@ -1719,6 +1719,19 @@ bool VkWrappedInstance::create_render_target_from_swapchain(const std::string& n
     return true;
 }
 
+bool VkWrappedInstance::create_attachment(const std::string& name, const VkSampleCountFlagBits ns,
+    const VkFormat format, const VkImageUsageFlags usage)
+{
+    RenderTarget attachment {
+        .format = format
+    };
+    create_vk_image(width, height, 1, ns, format, VK_IMAGE_TILING_OPTIMAL,
+        usage, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, attachment.image, attachment.memo);
+    attachments.emplace(name, std::move(target));
+
+    return true;
+}
+
 bool VkWrappedInstance::load_mesh(const std::string& name, const Mesh& m) {
     MeshGPU mgpu{};
     create_vertex_buffer(m.vbuf, mgpu.vbuf, mgpu.vbuf_memo, m.comp_size, m.vcnt);

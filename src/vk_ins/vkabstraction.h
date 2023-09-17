@@ -495,6 +495,9 @@ public:
     bool create_render_target(const std::string&, const VkFormat);
     bool create_render_target_from_swapchain(const std::string&);
 
+    bool create_attachment(const std::string&, const VkSampleCountFlagBits,
+        const VkFormat, const VkImageUsageFlags);
+
     bool load_mesh(const std::string&, const Mesh&);
 
 public:
@@ -507,6 +510,9 @@ public:
                                                         render_targets_from_swapchain;
     std::unordered_map<std::string, std::vector<VkFramebuffer>>
                                                         framebuffers;
+
+    // This might be confusing but attachments are sort of render targets
+    std::unordered_map<std::string, RenderTarget>       attachments;
 
     std::unordered_map<std::string, MeshGPU>            meshes;
 };

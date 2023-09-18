@@ -660,7 +660,7 @@ void VkWrappedInstance::recreate_swapchain() {
 
     create_swapchain();
     create_imageviews();
-    create_renderpass();
+    create_renderpass_deprecated();
     create_color_resource(swapchain_surface_format.format);
     create_depth_resource();
     create_framebuffers();
@@ -702,7 +702,7 @@ void VkWrappedInstance::create_imageviews() {
     imageviews_created = true;
 }
 
-void VkWrappedInstance::create_renderpass(const VkFormat format) {
+void VkWrappedInstance::create_renderpass_deprecated(const VkFormat format) {
     VkAttachmentDescription attachment{};
     attachment.format = format;
     attachment.samples = nsample;
@@ -775,6 +775,10 @@ void VkWrappedInstance::create_renderpass(const VkFormat format) {
         throw std::runtime_error("failed to create render pass!");
 
     render_pass_created = true;
+}
+
+void VkWrappedInstance::create_renderpass() {
+    
 }
 
 void VkWrappedInstance::create_framebuffers() {
@@ -1693,13 +1697,14 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     return true;
 }
 
-bool VkWrappedInstance::create_render_target(const std::string& name, const VkFormat format) {
+bool VkWrappedInstance::create_render_target(const std::string& name, const VkFormat format,
+    const VkSampleCountFlagBits ns, const VkImageUsageFlags usage) {
     RenderTarget target {
         .format = format
     };
-    create_vk_image(width, height, 1, nsample, format,
-        VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-        0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, target.image, target.memo);
+    create_vk_image(width, height, 1, ns, format,
+        VK_IMAGE_TILING_OPTIMAL, usage, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        target.image, target.memo);
     target.view = create_imageview(target.image, format, VK_IMAGE_ASPECT_COLOR_BIT);
     render_targets.emplace(name, std::move(target));
 
@@ -1719,15 +1724,22 @@ bool VkWrappedInstance::create_render_target_from_swapchain(const std::string& n
     return true;
 }
 
-bool VkWrappedInstance::create_attachment(const std::string& name, const VkSampleCountFlagBits ns,
-    const VkFormat format, const VkImageUsageFlags usage)
+bool VkWrappedInstance::create_attachment(const AttachmentType t, const VkFormat fmt,
+    const VkSampleCountFlagBits ns, const VkAttachmentLoadOp lop, const VkAttachmentStoreOp sop,
+    const VkAttachmentLoadOp stencil_lop, const VkAttachmentStoreOp stencil_sop,
+    const VkImageLayout init, const VkImageLayout finl)
 {
-    RenderTarget attachment {
-        .format = format
+    VkAttachmentDescription attachemnt_desc {
+        .format = fmt,
+        .samples = ns,
+        .loadOp = lop,
+        .storeOp = sop,
+        .stencilLoadOp = stencil_lop,
+        .stencilStoreOp = stencil_sop,
+        .initialLayout = init,
+        .finalLayout = finl
     };
-    create_vk_image(width, height, 1, ns, format, VK_IMAGE_TILING_OPTIMAL,
-        usage, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, attachment.image, attachment.memo);
-    attachments.emplace(name, std::move(target));
+    attachment_descs.emplace(t, attachemnt_desc);
 
     return true;
 }

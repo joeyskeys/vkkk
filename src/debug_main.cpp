@@ -8,11 +8,16 @@ int main() {
     ins.setup_resolution(800, 600);
 
     ins.create_logical_device();
-    ins.create_render_target("main", VK_FORMAT_R8G8B8A8_SRGB);
+
+    ins.create_render_target("color", VK_FORMAT_R8G8B8A8_SRGB);
+    auto depth_format = ins.find_depth_format();
+    ins.create_render_target("depth", depth_format, VK_SAMPLE_COUNT_1_BIT,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT);
     ins.create_renderpass(VK_FORMAT_R8G8B8A8_SRGB);
+
     ins.create_command_pool();
-    ins.create_color_resource(VK_FORMAT_R8G8B8A8_SRGB);
-    ins.create_depth_resource();
+    //ins.create_color_resource(VK_FORMAT_R8G8B8A8_SRGB);
+    //ins.create_depth_resource();
     ins.create_framebuffer_from_target("main");
     return 0;
 }

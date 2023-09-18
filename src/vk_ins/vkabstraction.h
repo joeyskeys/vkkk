@@ -87,6 +87,12 @@ struct RenderTargetFromSwapchain {
     std::vector<VkImageView>                views;
 };
 
+enum AttachmentType {
+    COLOR,
+    DEPTH_STENCIL,
+    RESOLVE
+};
+
 struct Pipeline {
     VkPipeline                              pipeline;
     VkPipelineLayout                        ppl_layout;
@@ -283,7 +289,8 @@ public:
     void recreate_swapchain();
     VkImageView create_imageview(VkImage image, VkFormat format, VkImageAspectFlags aspect_flags);
     void create_imageviews();
-    void create_renderpass(const VkFormat format=VK_FORMAT_R8G8B8A8_SRGB);
+    void create_renderpass_deprecated(const VkFormat format=VK_FORMAT_R8G8B8A8_SRGB);
+    void create_renderpass();
     void create_framebuffers();
     bool create_framebuffer_from_target(const std::string&);
     bool create_framebuffer_from_swapchain_target(const std::string&);
@@ -303,11 +310,19 @@ public:
         create_swapchain();
         create_imageviews();
         nsample = ns;
-        create_renderpass();
+        create_renderpass_deprecated();
         create_command_pool();
         create_color_resource(swapchain_surface_format.format);
         create_depth_resource();
         create_framebuffers();
+    }
+
+    inline VkFormat find_depth_format() {
+        return find_supported_format(
+            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
+            VK_IMAGE_TILING_OPTIMAL,
+            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+        );
     }
 
     void create_descriptors(const ShaderModulesDeprecated& modules);
@@ -362,14 +377,6 @@ private:
     uint32_t find_memory_type(uint32_t type_filter, VkMemoryPropertyFlags props) const;
 
     VkFormat find_supported_format(const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
-
-    inline VkFormat find_depth_format() {
-        return find_supported_format(
-            {VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT},
-            VK_IMAGE_TILING_OPTIMAL,
-            VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-        );
-    }
 
     inline bool has_stencil_comp(VkFormat format) {
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
@@ -492,11 +499,14 @@ public:
     bool create_pipeline(const std::string&, std::vector<ShaderModule>&,
         const std::vector<VERT_COMP>&, PipelineOption& option);
 
-    bool create_render_target(const std::string&, const VkFormat);
+    bool create_render_target(const std::string&, const VkFormat,
+        const VkSampleCountFlagBits ns=VK_SAMPLE_COUNT_1_BIT,
+        const VkImageUsageFlags=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
     bool create_render_target_from_swapchain(const std::string&);
 
-    bool create_attachment(const std::string&, const VkSampleCountFlagBits,
-        const VkFormat, const VkImageUsageFlags);
+    bool create_attachment(const AttachmentType, const VkFormat, const VkSampleCountFlagBits,
+        const VkAttachmentLoadOp, const VkAttachmentStoreOp, const VkAttachmentLoadOp,
+        const VkAttachmentStoreOp, const VkImageLayout, const VkImageLayout);
 
     bool load_mesh(const std::string&, const Mesh&);
 
@@ -511,8 +521,8 @@ public:
     std::unordered_map<std::string, std::vector<VkFramebuffer>>
                                                         framebuffers;
 
-    // This might be confusing but attachments are sort of render targets
-    std::unordered_map<std::string, RenderTarget>       attachments;
+    std::unordered_map<AttachmentType, VkAttachmentDescription>
+                                                        attachment_descs;
 
     std::unordered_map<std::string, MeshGPU>            meshes;
 };

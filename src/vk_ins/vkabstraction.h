@@ -88,9 +88,9 @@ struct RenderTargetFromSwapchain {
 };
 
 enum AttachmentType {
-    COLOR,
-    DEPTH_STENCIL,
-    RESOLVE
+    ATTACH_COLOR,
+    ATTACH_DEPTH_STENCIL,
+    ATTACH_RESOLVE
 };
 
 struct Pipeline {
@@ -500,8 +500,9 @@ public:
         const std::vector<VERT_COMP>&, PipelineOption& option);
 
     bool create_render_target(const std::string&, const VkFormat,
-        const VkSampleCountFlagBits ns=VK_SAMPLE_COUNT_1_BIT,
-        const VkImageUsageFlags=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT);
+        const VkSampleCountFlagBits=VK_SAMPLE_COUNT_1_BIT,
+        const VkImageUsageFlags=VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+        const VkImageAspectFlagBits=VK_IMAGE_ASPECT_COLOR_BIT);
     bool create_render_target_from_swapchain(const std::string&);
 
     bool create_attachment(const AttachmentType, const VkFormat, const VkSampleCountFlagBits,

@@ -778,7 +778,63 @@ void VkWrappedInstance::create_renderpass_deprecated(const VkFormat format) {
 }
 
 void VkWrappedInstance::create_renderpass() {
-    
+    uint32_t idx = 0;
+    std::vector<VkAttachmentReference> refs(attachment_descs.size());
+    std::vector<VkAttachmentDescription> descs;
+    VkSubpassDescription subpass{};
+
+    for (auto& [t, desc] : attachment_descs) {
+        descs.push_back(desc);
+        auto& ref = refs[idx];
+        ref.attachment = idx++;
+        switch (t) {
+            case AttachmentType::ATTACH_COLOR: {
+                ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                // Default to 1 for now
+                subpass.colorAttachmentCount = 1;
+                subpass.pColorAttachments = &ref;
+                break;
+            }
+
+            case AttachmentType::ATTACH_DEPTH_STENCIL: {
+                ref.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+                subpass.pDepthStencilAttachment = &ref;
+                break;
+            }
+
+            case AttachmentType::ATTACH_RESOLVE: {
+                ref.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                subpass.pResolveAttachments = &ref;
+                break;
+            }
+        }
+    }
+
+    VkSubpassDependency dependency{
+        .srcSubpass = VK_SUBPASS_EXTERNAL,
+        .dstSubpass = 0,
+        .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+        .srcAccessMask = 0,
+        .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT
+    };
+
+    VkRenderPassCreateInfo pass_info{
+        .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+        .attachmentCount = static_cast<uint32_t>(descs.size()),
+        .pAttachments = descs.data(),
+        .subpassCount = 1,
+        .pSubpasses = &subpass,
+        .dependencyCount = 1,
+        .pDependencies = &dependency
+    };
+
+    if (vkCreateRenderPass(device, &pass_info, nullptr, &render_pass) != VK_SUCCESS) {
+        std::cout << "Create renderpass failed" << std::endl;
+        return;
+    }
+
+    render_pass_created = true;
 }
 
 void VkWrappedInstance::create_framebuffers() {
@@ -1698,14 +1754,16 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
 }
 
 bool VkWrappedInstance::create_render_target(const std::string& name, const VkFormat format,
-    const VkSampleCountFlagBits ns, const VkImageUsageFlags usage) {
+    const VkSampleCountFlagBits ns, const VkImageUsageFlags usage,
+    const VkImageAspectFlagBits aspect)
+{
     RenderTarget target {
         .format = format
     };
     create_vk_image(width, height, 1, ns, format,
         VK_IMAGE_TILING_OPTIMAL, usage, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         target.image, target.memo);
-    target.view = create_imageview(target.image, format, VK_IMAGE_ASPECT_COLOR_BIT);
+    target.view = create_imageview(target.image, format, aspect);
     render_targets.emplace(name, std::move(target));
 
     return true;

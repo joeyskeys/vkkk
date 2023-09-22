@@ -44,7 +44,7 @@ public:
 
 private:
     // since the lights.h header is shared for shader code, we cannot
-    // have a traditions OOP design, and hence here in the manager,
+    // have a traditional OOP design, and hence here in the manager,
     // we use a kinda dumb way to manage them
     std::vector<PointLight> pt_lights;
     std::vector<DirectionalLight> dir_lights;

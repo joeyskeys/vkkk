@@ -27,6 +27,6 @@ int main() {
     ins.create_renderpass();
 
     ins.create_command_pool();
-    ins.create_framebuffer_from_target("main");
+    ins.create_framebuffer_from_targets("main");
     return 0;
 }

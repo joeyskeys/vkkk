@@ -1802,6 +1802,29 @@ bool VkWrappedInstance::create_attachment(const AttachmentType t, const VkFormat
     return true;
 }
 
+bool VkWrappedInstance::create_framebuffer_from_targets(const std::string& name) {
+    std::vector<VkFramebuffer> fbs(1);
+    std::vector<VkImageView> attachments;
+    for (auto& [name, target] : render_targets)
+        attachments.push_back(target.view);
+
+    VkFramebufferCreateInfo fb_info{
+        .sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
+        .renderPass = render_pass,
+        .attachmentCount = static_cast<uint32_t>(attachments.size()),
+        .pAttachments = attachments.data(),
+        .width = width,
+        .height = height,
+        .layers = 1
+    };
+
+    if (vkCreateFramebuffer(device, &fb_info, nullptr, &fbs[0]) != VK_SUCCESS)
+        return false;
+
+    framebuffers.emplace(name, std::move(fbs));
+    return true;
+}
+
 bool VkWrappedInstance::load_mesh(const std::string& name, const Mesh& m) {
     MeshGPU mgpu{};
     create_vertex_buffer(m.vbuf, mgpu.vbuf, mgpu.vbuf_memo, m.comp_size, m.vcnt);

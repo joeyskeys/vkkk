@@ -509,6 +509,8 @@ public:
         const VkAttachmentLoadOp, const VkAttachmentStoreOp, const VkAttachmentLoadOp,
         const VkAttachmentStoreOp, const VkImageLayout, const VkImageLayout);
 
+    bool create_framebuffer_from_targets(const std::string&);
+
     bool load_mesh(const std::string&, const Mesh&);
 
 public:

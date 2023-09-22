@@ -117,11 +117,68 @@ void bind_types(nb::module_& m) {
         .value("R8G8B8A8_UINT", VK_FORMAT_R8G8B8A8_UINT)
         .value("R8G8B8A8_SINT", VK_FORMAT_R8G8B8A8_SINT)
         .value("R8G8B8A8_SRGB", VK_FORMAT_R8G8B8A8_SRGB)
+        .value("D32_SFLOAT", VK_FORMAT_D32_SFLOAT)
+        .export_values();
+
+    nb::enum_<VkImageAspectFlagBits>(m, "vkImageAspect")
+        .value("ASPECT_COLOR", VK_IMAGE_ASPECT_COLOR_BIT)
+        .value("ASPECT_DEPTH", VK_IMAGE_ASPECT_DEPTH_BIT)
+        .value("ASPECT_STENCIL", VK_IMAGE_ASPECT_STENCIL_BIT)
+        .value("ASPECT_METADATA", VK_IMAGE_ASPECT_METADATA_BIT)
+        .export_values();
+
+    nb::enum_<VkImageUsageFlagBits>(m, "vkImageUsage")
+        .value("USAGE_TRANSFER_SRC", VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
+        .value("USAGE_TRANSFER_DST", VK_IMAGE_USAGE_TRANSFER_DST_BIT)
+        .value("USAGE_SAMPLED", VK_IMAGE_USAGE_SAMPLED_BIT)
+        .value("USAGE_STORAGE", VK_IMAGE_USAGE_STORAGE_BIT)
+        .value("USAGE_COLOR_ATTACH", VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT)
+        .value("USAGE_DEPTH_STENCIL_ATTACH", VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT)
+        .value("USAGE_INPUT_ATTACH", VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)
+        .export_values();
+
+    nb::class_<VkImageUsageFlags>(m, "vkUsage")
+        .def_static("xor", [](std::vector<VkImageUsageFlagBits>& l) {
+            VkImageUsageFlags usage = 0;
+            for (auto& u : l)
+                usage |= u;
+            return usage;
+        });
+
+    nb::enum_<VkAttachmentLoadOp>(m, "vkAttachmentLoadOp")
+        .value("LOP_LOAD", VK_ATTACHMENT_LOAD_OP_LOAD)
+        .value("LOP_CLEAR", VK_ATTACHMENT_LOAD_OP_CLEAR)
+        .value("LOP_DONT_CARE", VK_ATTACHMENT_LOAD_OP_DONT_CARE)
+        .value("LOP_NONE", VK_ATTACHMENT_LOAD_OP_NONE_EXT)
+        .export_values();
+
+    nb::enum_<VkAttachmentStoreOp>(m, "vkAttachmentStoreOp")
+        .value("SOP_STORE", VK_ATTACHMENT_STORE_OP_STORE)
+        .value("SOP_DONT_CARE", VK_ATTACHMENT_STORE_OP_DONT_CARE)
+        .value("SOP_NONE", VK_ATTACHMENT_STORE_OP_NONE)
+        .export_values();
+
+    nb::enum_<VkImageLayout>(m, "vkImageLayout")
+        .value("LAYOUT_UNDEFINED", VK_IMAGE_LAYOUT_UNDEFINED)
+        .value("LAYOUT_GENERAL", VK_IMAGE_LAYOUT_GENERAL)
+        .value("LAYOUT_COLOR_ATTACH_OPTIMAL", VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
+        .value("LAYOUT_DEPTH_STENCIL_ATTACH_OPTIMAL", VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL)
+        .value("LAYOUT_DEPTH_STENCIL_READ_OPTIMAL", VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL)
+        .value("LAYOUT_SHADER_READ_OPTIMAL", VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)
+        .value("LAYOUT_TRANSFER_SRC_OPTIMAL", VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL)
+        .value("LAYOUT_TRANSFER_DST_OPTIMAL", VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL)
+        .value("LAYOUT_PREINITIALIZED", VK_IMAGE_LAYOUT_PREINITIALIZED)
         .export_values();
 
     /*************************
      * Abstraction types
      *************************/
+
+    nb::enum_<AttachmentType>(m, "AttachmentType")
+        .value("ATTACH_COLOR", AttachmentType::ATTACH_COLOR)
+        .value("ATTACH_DEPTH_STENCIL", AttachmentType::ATTACH_DEPTH_STENCIL)
+        .value("ATTACH_RESOLVE", AttachmentType::ATTACH_RESOLVE)
+        .export_values();
 
     nb::enum_<VERT_COMP>(m, "VERT_COMP")
         .value("VERTEX", VERT_COMP::VERTEX)
@@ -163,13 +220,16 @@ void bind_types(nb::module_& m) {
         .def("create_depth_resource", &VkWrappedInstance::create_depth_resource)
         .def("create_framebuffer_from_target", &VkWrappedInstance::create_framebuffer_from_target)
         .def("create_framebuffer_from_swapchain_target", &VkWrappedInstance::create_framebuffer_from_swapchain_target)
+        .def("create_framebuffer_from_targets", &VkWrappedInstance::create_framebuffer_from_targets)
         .def("create_resources", &VkWrappedInstance::create_resources)
         .def("create_sync_objects", &VkWrappedInstance::create_sync_objects)
         .def("mainloop", &VkWrappedInstance::mainloop)
         .def("get_image_buffer", &VkWrappedInstance::get_image_buffer)
         .def("create_pipeline", &VkWrappedInstance::create_pipeline)
+        .def("create_attachment", &VkWrappedInstance::create_attachment)
         .def("create_render_target", &VkWrappedInstance::create_render_target)
         .def("create_render_target_from_swapchain", &VkWrappedInstance::create_render_target_from_swapchain)
+        .def("find_depth_format", &VkWrappedInstance::find_depth_format)
         .def("load_mesh", &VkWrappedInstance::load_mesh);
 
     nb::class_<UniformMgr> umcl(m, "UniformMgr");

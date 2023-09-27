@@ -242,6 +242,14 @@ public:
         return mem_props;
     }
 
+    inline auto get_window() {
+        return window;
+    }
+
+    inline VkSurfaceKHR get_surface() {
+        return surface;
+    }
+
     inline VkDevice get_device() {
         return device;
     }

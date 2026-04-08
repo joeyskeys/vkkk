@@ -1,11 +1,8 @@
-/*
 #include <iostream>
 #include <array>
 
 #include <GLFW/glfw3.h>
 
-#include "gui/gui.h"
-#include "asset_mgr/mesh_mgr.h"
 #include "concepts/camera.h"
 #include "vk_ins/vkabstraction.h"
 
@@ -21,31 +18,6 @@ const bool enableValidationLayers = false;
 #else
 const bool enableValidationLayers = true;
 #endif
-
-bool check_validation_layer_support() {
-    uint32_t layer_cnt;
-    vkEnumerateInstanceLayerProperties(&layer_cnt, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layer_cnt);
-    vkEnumerateInstanceLayerProperties(&layer_cnt, availableLayers.data());
-
-    for (const char* layerName : validationLayers) {
-        bool layerFound = false;
-
-        for (const auto& layerProperties : availableLayers) {
-            if (strcmp(layerName, layerProperties.layerName) == 0) {
-                layerFound = true;
-                break;
-            }
-        }
-
-        if (!layerFound) {
-            return false;
-        }
-    }
-
-    return true;
-}
 
 vkkk::CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
@@ -110,91 +82,48 @@ void mouse_pos_callback(GLFWwindow* win, double x, double y) {
     }
 }
 
-void ubo_update(vkkk::MVPBuffer *buf) {
-    buf->model = glm::mat4(1);
-    buf->view = cam.get_view_mat();
-    buf->proj = cam.get_proj_mat();
-}
-
 int main() {
     vkkk::VkWrappedInstance ins;
-    ins.create_surface();
-    ins.create_logical_device();
-    auto swapchain_img_cnt = ins.create_swapchain();
-    ins.create_imageviews();
-    ins.create_renderpass();
-    ins.create_command_pool();
+    ins.init_glfw();
+    ins.init();
+    ins.list_physical_devices();
+    ins.create_resources(VK_SAMPLE_COUNT_8_BIT);
 
-    vkkk::UniformMgr uniform_mgr{ &ins };
-    vkkk::ShaderModulesDeprecated modules{ &ins, &uniform_mgr };
-    modules.add_module("../resource/shaders/with_tex_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    modules.add_module("../resource/shaders/with_tex_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
+    std::vector<vkkk::ShaderModule> modules(2);
+    if (!modules[0].load("../resource/shaders/default.vert", VK_SHADER_STAGE_VERTEX_BIT))
+        throw std::runtime_error("failed to load vertex shader");
+    if (!modules[1].load("../resource/shaders/default.frag", VK_SHADER_STAGE_FRAGMENT_BIT))
+        throw std::runtime_error("failed to load fragment shader");
 
-    // Seperation of sampler in shader and it's corresponding texture image
-    // allows a more flexible way of texture assigning
-    modules.assign_tex_image("tex_sampler", "../resource/textures/8k_moon.jpg");
+    vkkk::PipelineOption ppl_opt;
+    ppl_opt.setup_multisampling(true, ins.nsample);
+    if (!ins.create_pipeline("default", modules, {}, ppl_opt))
+        throw std::runtime_error("failed to create default pipeline");
 
-    modules.alloc_uniforms();
-
-    vkkk::UniformMgr skybox_uniforms{ &ins };
-    vkkk::ShaderModulesDeprecated skybox_modules{ &ins, &skybox_uniforms };
-    skybox_modules.add_module("../resource/shaders/skybox_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    skybox_modules.add_module("../resource/shaders/skybox_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-
-    skybox_modules.assign_tex_image("cubemap_spl", "../resource/textures/");
-    modules.alloc_uniforms();
-
-    auto update_cbk = [&](uint32_t idx, float duration) {
-        cam.update_position(duration);
-        cam.update_orientation();
-        auto ubo_ptr = uniform_mgr.find_ubo("ubo");
-        if (!ubo_ptr)
-            return;
-        auto buf = reinterpret_cast<vkkk::MVPBuffer*>(ubo_ptr->cpu_buf.get());
-        buf->model = glm::mat4(1);
-        buf->view = cam.get_view_mat();
-        buf->proj = cam.get_proj_mat();
-        uniform_mgr.update_ubos(idx);
-    };
-    ins.set_update_cbk(update_cbk);
     ins.setup_key_cbk(key_callback);
     ins.setup_mouse_btn_cbk(mouse_btn_callback);
     ins.setup_mouse_pos_cbk(mouse_pos_callback);
 
-    modules.create_descriptor_layouts();
+    vkkk::CommandBuffers cmd_bufs(&ins);
+    cmd_bufs.alloc();
 
-    modules.set_attribute_binding(0, 0);
-    modules.set_attribute_binding(0, 1);
-    modules.create_input_descriptions({vkkk::VERTEX, vkkk::UV});
+    auto found = ins.pipelines.find("default");
+    if (found == ins.pipelines.end())
+        throw std::runtime_error("pipeline default not found");
 
-#define WITH_UV 1
-    ins.create_graphics_pipeline(modules, WITH_UV, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, VK_POLYGON_MODE_FILL);
+    auto& vk_pipeline = found->second.pipeline;
+    ins.record_cmds(
+        cmd_bufs.bufs,
+        ins.get_framebuffers(),
+        [&](uint32_t idx) {
+            auto& cmd = cmd_bufs[idx];
+            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline);
+            vkCmdDraw(cmd, 3, 1, 0, 0);
+        }
+    );
 
-    skybox_modules.create_descriptor_layouts();
-    skybox_modules.set_attribute_binding(0, 0);
-    skybox_modules.create_input_descriptions();
-
-    // We need another pipeline now
-    //ins.
-
-    ins.create_depth_resource();
-    ins.create_framebuffers();
-
-    modules.create_descriptor_pool();
-    modules.create_descriptor_set();
-    
-    auto mesh_mgr = vkkk::MeshMgrDeprecated::instance();
-    mesh_mgr.init(&ins);
-    mesh_mgr.load_file("../resource/models/moon.obj", {vkkk::VERTEX, vkkk::UV});
-    const auto& mesh = mesh_mgr.meshes[0];
-    ins.create_vertex_buffer(mesh.vbuf, mesh.comp_size, mesh.vcnt);
-    ins.create_index_buffer(mesh.ibuf, mesh.icnt * 3);
-
-    ins.create_commandbuffers(swapchain_img_cnt, modules, mesh_mgr);
     ins.create_sync_objects();
-
-    ins.mainloop();
+    ins.mainloop(cmd_bufs);
 
     return 0;
 }
-*/

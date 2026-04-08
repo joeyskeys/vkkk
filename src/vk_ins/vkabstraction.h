@@ -106,6 +106,13 @@ struct MeshGPU {
     VkDeviceMemory                          ibuf_memo;
 };
 
+struct CameraGPU {
+    uint32_t                                binding;
+    VkBuffer                                buf;
+    VkDeviceMemory                          memo;
+    VkDescriptorBufferInfo                  descriptor;
+};
+
 #define VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
 
 struct PipelineOption {

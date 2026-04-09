@@ -3,12 +3,12 @@
 namespace vkkk
 {
 
-void CameraDeprecated::update_position(float duration) {
+void Camera::update_position(float duration) {
     auto right = glm::cross(front, up);
     pos += speed * (x * right + z * front + y * up);
 }
 
-void CameraDeprecated::update_orientation() {
+void Camera::update_orientation() {
     front = rotation * front;
     rotation = glm::quat();
 }

@@ -19,7 +19,7 @@ const bool enableValidationLayers = false;
 const bool enableValidationLayers = true;
 #endif
 
-vkkk::CameraDeprecated cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
+vkkk::Camera cam{glm::vec3{0, 0, 5}, glm::vec3{0, 0, -1}, glm::vec3{0, 1, 0}, 35, 1.333334f, 1, 100};
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {
@@ -100,6 +100,18 @@ int main() {
     if (!ins.create_pipeline("default", modules, {}, ppl_opt))
         throw std::runtime_error("failed to create default pipeline");
 
+    const float tri_vertices[] = {
+        0.0f, -0.5f, 0.0f,
+        0.5f,  0.5f, 0.0f,
+       -0.5f,  0.5f, 0.0f
+    };
+    const uint32_t tri_indices[] = {0, 1, 2};
+    vkkk::Mesh tri_mesh_cpu({vkkk::VERTEX});
+    tri_mesh_cpu.load(3, reinterpret_cast<const char*>(tri_vertices), sizeof(tri_vertices),
+        1, reinterpret_cast<const char*>(tri_indices), sizeof(tri_indices));
+    if (!ins.load_mesh("tri", tri_mesh_cpu))
+        throw std::runtime_error("failed to upload triangle mesh");
+
     ins.setup_key_cbk(key_callback);
     ins.setup_mouse_btn_cbk(mouse_btn_callback);
     ins.setup_mouse_pos_cbk(mouse_pos_callback);
@@ -112,13 +124,18 @@ int main() {
         throw std::runtime_error("pipeline default not found");
 
     auto& vk_pipeline = found->second.pipeline;
+    auto ppl_layout = found->second.ppl_layout;
+    auto mesh_found = ins.meshes.find("tri");
+    if (mesh_found == ins.meshes.end())
+        throw std::runtime_error("triangle mesh not found");
+    auto& tri_mesh_gpu = mesh_found->second;
     ins.record_cmds(
         cmd_bufs.bufs,
         ins.get_framebuffers(),
         [&](uint32_t idx) {
             auto& cmd = cmd_bufs[idx];
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline);
-            vkCmdDraw(cmd, 3, 1, 0, 0);
+            tri_mesh_gpu.emit_draw_cmd(cmd, ppl_layout, nullptr);
         }
     );
 

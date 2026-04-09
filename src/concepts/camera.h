@@ -6,14 +6,14 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <cstring>
+#include <cstdint>
 
 namespace vkkk
 {
 #endif
 
-#ifndef GL_core_profile
-class CameraDeprecated {
-public:
+struct Camera {
+    // User-friendly camera control state.
     glm::vec3 pos;
     glm::vec3 front;
     glm::vec3 up;
@@ -30,6 +30,11 @@ public:
     double prev_y = 0.f;
     glm::quat rotation;
 
+    // Final data mirrored to GPU uniform buffers.
+    glm::mat4 view;
+    glm::mat4 proj;
+
+#ifndef GL_core_profile
     inline glm::mat4 get_trans_mat() const {
         auto flipped = pos;
         flipped[1] *= -1;
@@ -48,16 +53,6 @@ public:
         //return glm::perspective(glm::radians(fov), ratio, near, far);
     }
 
-    void update_position(float duration);
-    void update_orientation();
-};
-#endif
-
-struct Camera {
-    glm::mat4 view;
-    glm::mat4 proj;
-
-#ifndef GL_core_profile
     inline void look_at(const glm::vec3& pos, const glm::vec3& fr, const glm::vec3& up) {
         view = glm::lookAt(pos, pos + fr, up);
     }
@@ -69,8 +64,13 @@ struct Camera {
     inline void update_uniform(void* data, uint32_t n) {
         memcpy(data, this, n);
     }
+
+    void update_position(float duration);
+    void update_orientation();
 #endif
 };
+
+using CameraDeprecated = Camera;
 
 #ifndef GL_core_profile
 }

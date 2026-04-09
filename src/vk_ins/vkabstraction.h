@@ -28,6 +28,8 @@ namespace fs = std::filesystem;
 
 namespace vkkk
 {
+struct Camera;
+class VkWrappedInstance;
 
 struct QueueFamilyIndex {
     std::optional<uint32_t> graphic_family;
@@ -104,6 +106,11 @@ struct MeshGPU {
     VkDeviceMemory                          vbuf_memo;
     VkBuffer                                ibuf;
     VkDeviceMemory                          ibuf_memo;
+    uint32_t                                icnt = 0;
+
+    void sync(const Mesh& mesh, VkWrappedInstance* ins);
+    void emit_draw_cmd(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
+        const VkDescriptorSet* desc_set=nullptr) const;
 };
 
 struct CameraGPU {
@@ -111,6 +118,8 @@ struct CameraGPU {
     VkBuffer                                buf;
     VkDeviceMemory                          memo;
     VkDescriptorBufferInfo                  descriptor;
+
+    void sync(Camera& cam, VkWrappedInstance* ins) const;
 };
 
 #define VK_BOOL(v) (v) ? VK_TRUE : VK_FALSE
@@ -359,6 +368,7 @@ public:
     std::unique_ptr<char[]> get_image_buffer(const RenderTarget& rt) const;
     std::pair<VkBuffer, VkDeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
     void delete_buffer(VkBuffer buf, VkDeviceMemory memo) const;
+    void sync_uniform(VkDeviceMemory memo, const void* data, uint32_t size) const;
 
 private:
     // Private methods

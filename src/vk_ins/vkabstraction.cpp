@@ -13,6 +13,7 @@
 //#include <stb_image.h>
 
 #include "utils/io.h"
+#include "concepts/camera.h"
 #include "vk_ins/vkabstraction.h"
 
 namespace fs = std::filesystem;
@@ -95,6 +96,34 @@ PipelineOption::PipelineOption() {
         .pAttachments = &blend_attachment,
         .blendConstants = {0.f, 0.f, 0.f, 0.f}
     };
+}
+
+void CameraGPU::sync(Camera& cam, VkWrappedInstance* ins) const {
+    ins->sync_uniform(memo, &cam, sizeof(Camera));
+}
+
+void MeshGPU::sync(const Mesh& mesh, VkWrappedInstance* ins) {
+    if (!mesh.loaded)
+        throw std::runtime_error("cannot sync unloaded mesh");
+
+    ins->create_vertex_buffer(mesh.vbuf, vbuf, vbuf_memo, mesh.comp_size, mesh.vcnt);
+    // Mesh index count stores triangles; convert to uint32 index count.
+    ins->create_index_buffer(mesh.ibuf, ibuf, ibuf_memo, mesh.icnt * 3);
+    icnt = mesh.icnt;
+}
+
+void MeshGPU::emit_draw_cmd(VkCommandBuffer cmd_buf, VkPipelineLayout ppl_layout,
+    const VkDescriptorSet* desc_set) const
+{
+    VkBuffer bufs[] = {vbuf};
+    VkDeviceSize offsets[] = {0};
+    vkCmdBindVertexBuffers(cmd_buf, 0, 1, bufs, offsets);
+    if (desc_set != nullptr) {
+        vkCmdBindDescriptorSets(cmd_buf, VK_PIPELINE_BIND_POINT_GRAPHICS, ppl_layout,
+            0, 1, desc_set, 0, nullptr);
+    }
+    vkCmdBindIndexBuffer(cmd_buf, ibuf, 0, VK_INDEX_TYPE_UINT32);
+    vkCmdDrawIndexed(cmd_buf, icnt * 3, 1, 0, 0, 0);
 }
 
 VkWrappedInstance::VkWrappedInstance()
@@ -1353,6 +1382,15 @@ void VkWrappedInstance::delete_buffer(VkBuffer buf, VkDeviceMemory memo) const {
     vkFreeMemory(device, memo, nullptr);
 }
 
+void VkWrappedInstance::sync_uniform(VkDeviceMemory memo, const void* data, uint32_t size) const {
+    void* mapped = nullptr;
+    if (vkMapMemory(device, memo, 0, size, 0, &mapped) != VK_SUCCESS)
+        throw std::runtime_error("failed to map uniform memory");
+
+    memcpy(mapped, data, size);
+    vkUnmapMemory(device, memo);
+}
+
 bool VkWrappedInstance::add_ubo(const std::string& name, const uint32_t binding,
     uint32_t size, uint32_t vecsize)
 {
@@ -1827,9 +1865,7 @@ bool VkWrappedInstance::create_framebuffer_from_targets(const std::string& name)
 
 bool VkWrappedInstance::load_mesh(const std::string& name, const Mesh& m) {
     MeshGPU mgpu{};
-    create_vertex_buffer(m.vbuf, mgpu.vbuf, mgpu.vbuf_memo, m.comp_size, m.vcnt);
-    // Triangle mesh for now
-    create_index_buffer(m.ibuf, mgpu.ibuf, mgpu.ibuf_memo, m.icnt * 3);
+    mgpu.sync(m, this);
     meshes.emplace(name, mgpu);
     return true;
 }

@@ -99,7 +99,8 @@ PipelineOption::PipelineOption() {
 }
 
 void CameraGPU::sync(Camera& cam, VkWrappedInstance* ins) const {
-    ins->sync_uniform(memo, &cam, sizeof(Camera));
+    auto data = cam.get_gpu_uniform();
+    ins->sync_uniform(memo, &data, sizeof(CameraUniform));
 }
 
 void MeshGPU::sync(const Mesh& mesh, VkWrappedInstance* ins) {

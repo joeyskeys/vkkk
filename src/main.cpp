@@ -129,18 +129,82 @@ int main() {
     if (mesh_found == ins.meshes.end())
         throw std::runtime_error("triangle mesh not found");
     auto& tri_mesh_gpu = mesh_found->second;
+
+    auto cam_ubo_found = ins.ubos.find("default:camera");
+    if (cam_ubo_found == ins.ubos.end())
+        cam_ubo_found = ins.ubos.find("default:Camera");
+    if (cam_ubo_found == ins.ubos.end())
+        throw std::runtime_error("camera ubo not found");
+    auto& cam_ubo = cam_ubo_found->second;
+    auto swapchain_cnt = ins.get_swapchain_cnt();
+    std::vector<vkkk::CameraGPU> cam_gpus(swapchain_cnt);
+    for (uint32_t i = 0; i < swapchain_cnt; ++i) {
+        auto& cam_gpu = cam_gpus[i];
+        cam_gpu.binding = cam_ubo.binding;
+        cam_gpu.buf = cam_ubo.gpu_bufs[i];
+        cam_gpu.memo = cam_ubo.memos[i];
+        cam_gpu.descriptor.buffer = cam_gpu.buf;
+        cam_gpu.descriptor.offset = 0;
+        cam_gpu.descriptor.range = cam_ubo.size * cam_ubo.vecsize;
+    }
+
+    VkDescriptorPoolSize pool_size{
+        .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        .descriptorCount = swapchain_cnt
+    };
+    VkDescriptorPoolCreateInfo pool_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .poolSizeCount = 1,
+        .pPoolSizes = &pool_size,
+        .maxSets = swapchain_cnt
+    };
+    VkDescriptorPool cam_desc_pool;
+    if (vkCreateDescriptorPool(ins.get_device(), &pool_info, nullptr, &cam_desc_pool) != VK_SUCCESS)
+        throw std::runtime_error("failed to create camera descriptor pool");
+
+    std::vector<VkDescriptorSetLayout> cam_layouts(swapchain_cnt, found->second.descriptor_layout);
+    std::vector<VkDescriptorSet> cam_desc_sets(swapchain_cnt);
+    VkDescriptorSetAllocateInfo alloc_info{
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = cam_desc_pool,
+        .descriptorSetCount = swapchain_cnt,
+        .pSetLayouts = cam_layouts.data()
+    };
+    if (vkAllocateDescriptorSets(ins.get_device(), &alloc_info, cam_desc_sets.data()) != VK_SUCCESS)
+        throw std::runtime_error("failed to allocate camera descriptor sets");
+
+    for (uint32_t i = 0; i < swapchain_cnt; ++i) {
+        VkWriteDescriptorSet write{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = cam_desc_sets[i],
+            .dstBinding = cam_gpus[i].binding,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &cam_gpus[i].descriptor
+        };
+        vkUpdateDescriptorSets(ins.get_device(), 1, &write, 0, nullptr);
+    }
+
+    ins.set_update_cbk([&](uint32_t idx, float duration) {
+        cam.update_position(duration);
+        cam.update_orientation();
+        cam_gpus[idx].sync(cam, &ins);
+    });
+
     ins.record_cmds(
         cmd_bufs.bufs,
         ins.get_framebuffers(),
         [&](uint32_t idx) {
             auto& cmd = cmd_bufs[idx];
             vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline);
-            tri_mesh_gpu.emit_draw_cmd(cmd, ppl_layout, nullptr);
+            tri_mesh_gpu.emit_draw_cmd(cmd, ppl_layout, &cam_desc_sets[idx]);
         }
     );
 
     ins.create_sync_objects();
     ins.mainloop(cmd_bufs);
+    vkDestroyDescriptorPool(ins.get_device(), cam_desc_pool, nullptr);
 
     return 0;
 }

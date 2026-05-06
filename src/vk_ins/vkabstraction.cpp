@@ -1168,6 +1168,10 @@ void VkWrappedInstance::record_cmds(std::vector<VkCommandBuffer>& cmd_bufs,
     }
 }
 
+void VkWrappedInstance::bind_graphics_pipeline(VkCommandBuffer cmd_buf, VkPipeline pipeline) const {
+    bind_pipeline<VK_PIPELINE_BIND_POINT_GRAPHICS>(cmd_buf, pipeline);
+}
+
 void VkWrappedInstance::create_sync_objects() {
     image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
     render_finished_semaphores.resize(MAX_FRAMES_IN_FLIGHT);

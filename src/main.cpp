@@ -197,7 +197,7 @@ int main() {
         ins.get_framebuffers(),
         [&](uint32_t idx) {
             auto& cmd = cmd_bufs[idx];
-            vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vk_pipeline);
+            ins.bind_graphics_pipeline(cmd, vk_pipeline);
             tri_mesh_gpu.emit_draw_cmd(cmd, ppl_layout, &cam_desc_sets[idx]);
         }
     );

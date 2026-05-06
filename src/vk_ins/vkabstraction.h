@@ -353,6 +353,9 @@ public:
     void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
     void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
         const std::function<void(uint32_t)>& emit_func);
+    template <VkPipelineBindPoint BindPoint>
+    void bind_pipeline(VkCommandBuffer cmd_buf, VkPipeline pipeline) const;
+    void bind_graphics_pipeline(VkCommandBuffer cmd_buf, VkPipeline pipeline) const;
     void create_sync_objects();
     void draw_frame(const CommandBuffers&);
     void mainloop(const CommandBuffers&);
@@ -554,5 +557,12 @@ public:
 
     std::unordered_map<std::string, MeshGPU>            meshes;
 };
+
+template <VkPipelineBindPoint BindPoint>
+inline void VkWrappedInstance::bind_pipeline(VkCommandBuffer cmd_buf,
+    VkPipeline pipeline) const
+{
+    vkCmdBindPipeline(cmd_buf, BindPoint, pipeline);
+}
 
 }

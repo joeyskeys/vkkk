@@ -4,7 +4,7 @@ add_executable(resource_test cross_tests/resource_test.cpp)
 target_link_libraries(resource_test
     PRIVATE
         Catch2::Catch2WithMain
-        ${SPIRVCROSS_LIBRARIES})
+        spirv-cross::spirv-cross)
 
 add_executable(texture_test uniform_tests/texture_test.cpp)
 target_link_libraries(texture_test

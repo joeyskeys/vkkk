@@ -2,95 +2,38 @@ cmake_minimum_required(VERSION 3.18)
 
 cmake_policy(SET CMP0074 NEW)
 set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
 set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "set build type")
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
 
 project(vkkk)
 
-find_package(Vulkan)
+# Conan CMakeToolchain pins compiler cppstd from profile (often 14); this project uses C++20.
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-if (NOT Vulkan_FOUND)
-    message(FATAL_ERROR "Could not find Vulkan library!")
-else()
-    message(STATUS "Found Vulkan: ${Vulkan_LIBRARY}")
+# Conan CMakeDeps writes *-config.cmake into the output folder (usually ${CMAKE_BINARY_DIR}). If the preset's
+# toolchain path does not point at build/conan_toolchain.cmake, still allow find_package to see those files.
+list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}")
+list(PREPEND CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
+
+# Dependencies via Conan CMakeDeps (also pass -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake from repo root).
+find_package(Vulkan REQUIRED)
+find_package(glfw3 REQUIRED)
+find_package(glm REQUIRED)
+find_package(fmt REQUIRED)
+# OpenColorIO (OIIO dependency) expects MINIZIP::minizip; Conan exposes minizip::minizip.
+find_package(minizip REQUIRED)
+if(NOT TARGET MINIZIP::minizip AND TARGET minizip::minizip)
+    add_library(MINIZIP::minizip INTERFACE IMPORTED)
+    set_property(TARGET MINIZIP::minizip PROPERTY INTERFACE_LINK_LIBRARIES minizip::minizip)
 endif()
+find_package(OpenImageIO REQUIRED)
+find_package(assimp REQUIRED)
+find_package(spirv-cross REQUIRED)
+find_package(shaderc REQUIRED)
 
-find_package(GLFW)
-
-if (NOT GLFW_FOUND)
-    message(FATAL_ERROR "Could not find GLFW library!")
-else()
-    message(STATUS "Found GLFW: ${GLFW_LIBRARY}")
-endif()
-
-find_package(GLM)
-
-if (NOT GLM_FOUND)
-    message(FATAL_ERROR "Could not find GLM library!")
-else()
-    message(STATUS "Found GLM: ${GLM_INCLUDE_DIRS}")
-endif()
-
-find_package(FMT)
-
-if (NOT FMT_FOUND)
-    message(FATAL_ERROR "Could not find fmt library!")
-else()
-    message(STATUS "Found fmt: ${FMT_INCLUDE_DIRS}")
-endif()
-
-find_package(OIIO)
-
-if (NOT OIIO_FOUND)
-    message(FATAL_ERROR "Could not find oiio library!")
-else()
-    message(STATUS "Found oiio: ${OIIO_INCLUDE_DIRS}")
-endif()
-
-find_package(ASSIMP)
-
-if (NOT ASSIMP_FOUND)
-    message(FATAL_ERROR "Could not find assimp library!")
-else()
-    message(STATUS "Found ASSIMP: ${ASSIMP_INCLUDE_DIRS}")
-endif()
-
-find_package(SPIRVCROSS)
-
-if (NOT SPIRVCROSS_FOUND)
-    message(FATAL_ERROR "Could not find spirv-cross library!")
-else()
-    message(STATUS "Found spirv-cross library")
-    message(STATUS ${SPIRVCROSS_INCLUDE_DIRS})
-endif()
-
-find_package(SHADERC)
-
-if (NOT SHADERC_FOUND)
-    message(FATAL_ERROR "Could not find Shaderc library!")
-else()
-    message(STATUS "Found Shaderc: ${SHADERC_INCLUDE_DIRS} ${SHADERC_LIBRARIES}")
-endif()
-
-if (UNIX)
-    find_package(X11)
-
-    if (NOT X11_FOUND)
-        message(FATAL_ERROR "Could not find X11!")
-    else()
-        message(STATUS "Found X11")
-    endif()
-endif()
-
-include_directories(${Vulkan_INCLUDE_DIRS})
-include_directories(${GLFW_INCLUDE_DIRS})
-include_directories(${GLM_INCLUDE_DIRS})
-include_directories(${FMT_INCLUDE_DIRS})
-include_directories(${OIIO_INCLUDE_DIRS})
-include_directories(${ASSIMP_INCLUDE_DIRS})
-include_directories(${SPIRVCROSS_INCLUDE_DIRS})
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 

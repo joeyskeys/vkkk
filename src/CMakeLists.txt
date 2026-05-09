@@ -32,29 +32,27 @@ set(SRCS
     vk_ins/vkubo.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})
-set(PLATFORM_RELATED_LIBS)
-if (UNIX)
-    set(PLATFORM_RELATED_LIBS ${X11_LIBRARIES})
-endif()
-
 target_link_libraries(vkkk
-    ${GLFW_LIBRARIES}
-    ${FMT_LIBRARIES}
-    ${Vulkan_LIBRARIES}
-    ${OIIO_LIBRARIES}
-    ${ASSIMP_LIBRARIES}
-    ${SPIRVCROSS_LIBRARIES}
-    ${PLATFORM_RELATED_LIBS}
-    ${SHADERC_LIBRARIES})
+    PUBLIC
+        Vulkan::Vulkan
+        glfw
+        glm::glm
+        fmt::fmt
+        openimageio::openimageio
+        assimp::assimp
+        spirv-cross::spirv-cross
+        shaderc::shaderc)
 
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti
-    vkkk
-    ${OIIO_LIBRARIES})
+    PRIVATE
+        vkkk
+        openimageio::openimageio)
 
 add_executable(vkdebug debug_main.cpp)
 target_link_libraries(vkdebug
-    vkkk
-    ${OIIO_LIBRARIES})
+    PRIVATE
+        vkkk
+        openimageio::openimageio)
 
 add_subdirectory(binding)

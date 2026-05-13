@@ -410,8 +410,10 @@ private:
         return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
     }
 
+    using FrameClock = std::chrono::steady_clock;
+
     inline void init_time() {
-        time = std::chrono::high_resolution_clock::now();
+        time = FrameClock::now();
     }
 
 private:
@@ -509,7 +511,7 @@ private:
 
     // Window, bound to glfw for now
     GLFWwindow*                     window;
-    std::chrono::time_point<std::chrono::system_clock>  time;
+    std::chrono::time_point<FrameClock>  time;
 
 public:
     VkSampleCountFlagBits           nsample = VK_SAMPLE_COUNT_1_BIT;

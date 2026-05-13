@@ -43,6 +43,12 @@ target_link_libraries(vkkk
         spirv-cross::spirv-cross
         shaderc::shaderc)
 
+add_executable(vkmain main.cpp)
+target_link_libraries(vkmain
+    PRIVATE
+        vkkk
+        openimageio::openimageio)
+
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti
     PRIVATE

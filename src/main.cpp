@@ -154,9 +154,9 @@ int main() {
     };
     VkDescriptorPoolCreateInfo pool_info{
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = swapchain_cnt,
         .poolSizeCount = 1,
         .pPoolSizes = &pool_size,
-        .maxSets = swapchain_cnt
     };
     VkDescriptorPool cam_desc_pool;
     if (vkCreateDescriptorPool(ins.get_device(), &pool_info, nullptr, &cam_desc_pool) != VK_SUCCESS)

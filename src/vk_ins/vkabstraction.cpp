@@ -1211,8 +1211,8 @@ void VkWrappedInstance::draw_frame(const CommandBuffers& cmd_bufs) {
         vkWaitForFences(device, 1, &images_in_flight[image_idx], VK_TRUE, UINT64_MAX);
     images_in_flight[image_idx] = in_flight_fences[current_frame];
 
-    auto now = std::chrono::high_resolution_clock::now();
-    auto duration = std::chrono::duration_cast<std::chrono::seconds>(now - time);
+    auto now = FrameClock::now();
+    auto duration = std::chrono::duration<float>(now - time);
     time = now;
 
     //update_uniform_buffer(image_idx);
@@ -1680,7 +1680,7 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
                 .binding = binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .descriptorCount = array_size,
-                .stageFlags = mod.type,
+                .stageFlags = static_cast<VkShaderStageFlags>(mod.type),
                 .pImmutableSamplers = nullptr
             };
             descriptor_layouts.emplace_back(std::move(desc_layout_binding));
@@ -1704,7 +1704,7 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
                 .binding = tex_binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
                 .descriptorCount = is_cubemap ? uint32_t(6) : uint32_t(1),
-                .stageFlags = mod.type,
+                .stageFlags = static_cast<VkShaderStageFlags>(mod.type),
                 .pImmutableSamplers = nullptr
             };
             descriptor_layouts.emplace_back(std::move(binding));

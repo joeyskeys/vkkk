@@ -10,6 +10,8 @@
 #include "vk_ins/uniform_mgr.h"
 #include "vk_ins/vkabstraction.h"
 
+#include <new>
+
 using namespace vkkk;
 
 void bind_types(nb::module_& m) {
@@ -349,7 +351,11 @@ void bind_types(nb::module_& m) {
 
     nb::class_<Camera> cmcl(m, "Camera");
     cmcl.def(nb::init<>())
-        .def(nb::init<glm::mat4, glm::mat4>())
+        .def("__init__", [](Camera* self, const glm::mat4& view, const glm::mat4& proj) {
+            new (self) Camera();
+            self->gpu.view = view;
+            self->gpu.proj = proj;
+        })
         .def("look_at", &Camera::look_at)
         .def("perspective", &Camera::perspective);
 }

@@ -55,4 +55,6 @@ target_link_libraries(vkdebug
         vkkk
         openimageio::openimageio)
 
-add_subdirectory(binding)
+if(VKKK_BUILD_PYTHON_BINDINGS)
+    add_subdirectory(binding)
+endif()

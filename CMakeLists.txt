@@ -18,6 +18,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}")
 list(PREPEND CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
 
+option(VKKK_BUILD_PYTHON_BINDINGS "Build Python bindings (nanobind module)" ON)
+
 # Dependencies via Conan CMakeDeps (also pass -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake from repo root).
 find_package(Vulkan REQUIRED)
 find_package(glfw3 REQUIRED)
@@ -37,7 +39,9 @@ find_package(shaderc REQUIRED)
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
-add_subdirectory(thirdparty/nanobind)
+if(VKKK_BUILD_PYTHON_BINDINGS)
+    add_subdirectory(thirdparty/nanobind)
+endif()
 add_subdirectory(src)
 add_subdirectory(plugin)
 add_subdirectory(tests)

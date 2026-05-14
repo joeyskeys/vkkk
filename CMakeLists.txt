@@ -8,57 +8,56 @@ set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInf
 
 project(vkkk)
 
-# Conan CMakeToolchain pins compiler cppstd from profile (often 14); this project uses C++20.
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Conan CMakeDeps writes *-config.cmake into the output folder (usually ${CMAKE_BINARY_DIR}). If the preset's
-# toolchain path does not point at build/conan_toolchain.cmake, still allow find_package to see those files.
-list(PREPEND CMAKE_PREFIX_PATH "${CMAKE_BINARY_DIR}")
-list(PREPEND CMAKE_MODULE_PATH "${CMAKE_BINARY_DIR}")
+# Optional vcpkg package root for dependencies installed under installed/x64-windows.
+# Set VKKK_VCPKG_INSTALLED_DIR on machines where vcpkg is installed in a different location.
+set(_vkkk_vcpkg_default "")
+if(DEFINED ENV{VCPKG_ROOT})
+    set(_vkkk_vcpkg_default "$ENV{VCPKG_ROOT}/installed/x64-windows")
+endif()
+set(VKKK_VCPKG_INSTALLED_DIR "${_vkkk_vcpkg_default}" CACHE PATH "Path to vcpkg installed triplet directory")
+unset(_vkkk_vcpkg_default)
+if(VKKK_VCPKG_INSTALLED_DIR)
+    list(PREPEND CMAKE_PREFIX_PATH "${VKKK_VCPKG_INSTALLED_DIR}" "${VKKK_VCPKG_INSTALLED_DIR}/share")
+endif()
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 option(VKKK_BUILD_PYTHON_BINDINGS "Build Python bindings (nanobind module)" ON)
 
-# Dependencies via Conan CMakeDeps (also pass -DCMAKE_TOOLCHAIN_FILE=build/conan_toolchain.cmake from repo root).
+# Optional Python location for nanobind bindings.
+# For Conda, set this to your environment prefix (or rely on CONDA_PREFIX default).
+set(_vkkk_python_root_default "")
+if(DEFINED ENV{CONDA_PREFIX})
+    set(_vkkk_python_root_default "$ENV{CONDA_PREFIX}")
+endif()
+set(VKKK_PYTHON_ROOT_DIR "${_vkkk_python_root_default}" CACHE PATH "Root directory of Python installation")
+unset(_vkkk_python_root_default)
+set(VKKK_PYTHON_EXECUTABLE "" CACHE FILEPATH "Explicit path to Python executable (optional)")
+if(VKKK_PYTHON_ROOT_DIR)
+    set(Python_ROOT_DIR "${VKKK_PYTHON_ROOT_DIR}")
+endif()
+if(VKKK_PYTHON_EXECUTABLE)
+    set(Python_EXECUTABLE "${VKKK_PYTHON_EXECUTABLE}")
+endif()
+
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)
-find_package(fmt REQUIRED)
-# OpenColorIO (OIIO dependency) expects MINIZIP::minizip. Prefer minizip-ng (mz_* API),
-# then fall back to classic minizip if needed.
-find_package(minizip REQUIRED)
-find_package(minizip-ng QUIET CONFIG)
-if(NOT TARGET MINIZIP::minizip)
-    add_library(MINIZIP::minizip INTERFACE IMPORTED)
-    if(TARGET minizip-ng::minizip-ng)
-        set_property(TARGET MINIZIP::minizip PROPERTY INTERFACE_LINK_LIBRARIES minizip-ng::minizip-ng)
-    elseif(TARGET minizip::minizip)
-        set_property(TARGET MINIZIP::minizip PROPERTY INTERFACE_LINK_LIBRARIES minizip::minizip)
-    else()
-        find_library(MINIZIP_NG_LIB NAMES minizip-ng)
-        if(MINIZIP_NG_LIB)
-            set_property(TARGET MINIZIP::minizip PROPERTY INTERFACE_LINK_LIBRARIES "${MINIZIP_NG_LIB}")
-        endif()
-    endif()
-endif()
-find_library(MINIZIP_NG_LIB NAMES minizip-ng)
-if(MINIZIP_NG_LIB AND TARGET MINIZIP::minizip)
-    set_property(TARGET MINIZIP::minizip APPEND PROPERTY INTERFACE_LINK_LIBRARIES "${MINIZIP_NG_LIB}")
-    find_library(ZSTD_STATIC_LIB NAMES zstd_static)
-    if(ZSTD_STATIC_LIB)
-        set_property(TARGET MINIZIP::minizip APPEND PROPERTY INTERFACE_LINK_LIBRARIES "${ZSTD_STATIC_LIB}")
-    endif()
-endif()
-find_package(OpenImageIO REQUIRED)
-find_package(assimp REQUIRED)
-find_package(spirv-cross REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(OpenImageIO CONFIG REQUIRED)
+find_package(assimp CONFIG REQUIRED)
+find_package(spirv_cross_core CONFIG REQUIRED)
 find_package(shaderc REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
+    find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)
     add_subdirectory(thirdparty/nanobind)
 endif()
 add_subdirectory(src)

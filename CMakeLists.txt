@@ -22,9 +22,10 @@ set(VKKK_VCPKG_INSTALLED_DIR "${_vkkk_vcpkg_default}" CACHE PATH "Path to vcpkg 
 unset(_vkkk_vcpkg_default)
 if(VKKK_VCPKG_INSTALLED_DIR)
     list(PREPEND CMAKE_PREFIX_PATH "${VKKK_VCPKG_INSTALLED_DIR}" "${VKKK_VCPKG_INSTALLED_DIR}/share")
+    # Prefer vcpkg headers over SDK headers to avoid ABI mismatches
+    # (e.g. spirv-cross headers from Vulkan SDK vs vcpkg libraries).
+    include_directories(BEFORE SYSTEM "${VKKK_VCPKG_INSTALLED_DIR}/include")
 endif()
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
 option(VKKK_BUILD_PYTHON_BINDINGS "Build Python bindings (nanobind module)" ON)
 
@@ -46,12 +47,44 @@ endif()
 
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
-find_package(spirv_cross_core CONFIG REQUIRED)
-find_package(shaderc REQUIRED)
+find_package(minizip-ng CONFIG REQUIRED)
+
+# Use Vulkan SDK-provided glm / SPIRV-Cross / shaderc.
+set(VKKK_VULKAN_SDK_DIR "$ENV{VULKAN_SDK}" CACHE PATH "Vulkan SDK root directory")
+if(NOT VKKK_VULKAN_SDK_DIR)
+    if(DEFINED Vulkan_INCLUDE_DIR AND Vulkan_INCLUDE_DIR)
+        get_filename_component(VKKK_VULKAN_SDK_DIR "${Vulkan_INCLUDE_DIR}" DIRECTORY)
+    elseif(DEFINED Vulkan_INCLUDE_DIRS AND Vulkan_INCLUDE_DIRS)
+        list(GET Vulkan_INCLUDE_DIRS 0 _vkkk_vk_inc0)
+        get_filename_component(VKKK_VULKAN_SDK_DIR "${_vkkk_vk_inc0}" DIRECTORY)
+        unset(_vkkk_vk_inc0)
+    endif()
+endif()
+
+if(NOT VKKK_VULKAN_SDK_DIR OR NOT EXISTS "${VKKK_VULKAN_SDK_DIR}/Lib")
+    message(FATAL_ERROR "Vulkan SDK root not found. Set VKKK_VULKAN_SDK_DIR or VULKAN_SDK.")
+endif()
+
+include_directories(BEFORE SYSTEM "${VKKK_VULKAN_SDK_DIR}/Include")
+
+add_library(VKKK::glm INTERFACE IMPORTED)
+set_property(TARGET VKKK::glm PROPERTY
+    INTERFACE_INCLUDE_DIRECTORIES "${VKKK_VULKAN_SDK_DIR}/Include")
+
+add_library(VKKK::spirv_cross INTERFACE IMPORTED)
+set_property(TARGET VKKK::spirv_cross PROPERTY INTERFACE_LINK_LIBRARIES
+    "$<$<CONFIG:Debug>:${VKKK_VULKAN_SDK_DIR}/Lib/spirv-cross-glsld.lib>"
+    "$<$<CONFIG:Debug>:${VKKK_VULKAN_SDK_DIR}/Lib/spirv-cross-cored.lib>"
+    "$<$<NOT:$<CONFIG:Debug>>:${VKKK_VULKAN_SDK_DIR}/Lib/spirv-cross-glsl.lib>"
+    "$<$<NOT:$<CONFIG:Debug>>:${VKKK_VULKAN_SDK_DIR}/Lib/spirv-cross-core.lib>")
+
+add_library(VKKK::shaderc INTERFACE IMPORTED)
+set_property(TARGET VKKK::shaderc PROPERTY INTERFACE_LINK_LIBRARIES
+    "$<$<CONFIG:Debug>:${VKKK_VULKAN_SDK_DIR}/Lib/shaderc_combinedd.lib>"
+    "$<$<NOT:$<CONFIG:Debug>>:${VKKK_VULKAN_SDK_DIR}/Lib/shaderc_combined.lib>")
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)

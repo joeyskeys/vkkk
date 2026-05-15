@@ -36,30 +36,30 @@ target_link_libraries(vkkk
     PUBLIC
         Vulkan::Vulkan
         glfw
-        glm::glm
+        VKKK::glm
         fmt::fmt
-        openimageio::openimageio
+        OpenImageIO::OpenImageIO
         assimp::assimp
-        spirv-cross::spirv-cross
-        shaderc::shaderc)
+        VKKK::spirv_cross
+        VKKK::shaderc)
 
 add_executable(vkmain main.cpp)
 target_link_libraries(vkmain
     PRIVATE
         vkkk
-        openimageio::openimageio)
+        OpenImageIO::OpenImageIO)
 
 add_executable(vkmulti multi_pipeline_main.cpp)
 target_link_libraries(vkmulti
     PRIVATE
         vkkk
-        openimageio::openimageio)
+        OpenImageIO::OpenImageIO)
 
 add_executable(vkdebug debug_main.cpp)
 target_link_libraries(vkdebug
     PRIVATE
         vkkk
-        openimageio::openimageio)
+        OpenImageIO::OpenImageIO)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
     add_subdirectory(binding)

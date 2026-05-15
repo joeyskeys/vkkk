@@ -21,14 +21,10 @@ set(SRC_FILES
 nanobind_add_module(pyvkkk ${SRC_FILES})
 target_link_libraries(pyvkkk PRIVATE
     vkkk
-    openimageio::openimageio)
+    OpenImageIO::OpenImageIO)
 
-# OpenColorIO symbols from OpenImageIO may require explicit minizip on Windows static linking.
-if(TARGET MINIZIP::minizip)
-    target_link_libraries(pyvkkk PRIVATE MINIZIP::minizip)
-elseif(TARGET minizip::minizip)
-    target_link_libraries(pyvkkk PRIVATE minizip::minizip)
-endif()
+# OpenColorIO symbols from OpenImageIO require minizip-ng on vcpkg static linking.
+target_link_libraries(pyvkkk PRIVATE MINIZIP::minizip-ng)
 
 add_custom_command(TARGET pyvkkk POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy

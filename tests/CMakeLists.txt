@@ -5,7 +5,7 @@ target_link_libraries(resource_test
     PRIVATE
         Catch2::Catch2WithMain
         Vulkan::Vulkan
-        spirv-cross::spirv-cross)
+        VKKK::spirv_cross)
 
 add_executable(texture_test uniform_tests/texture_test.cpp)
 target_link_libraries(texture_test

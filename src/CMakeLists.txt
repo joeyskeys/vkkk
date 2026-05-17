@@ -36,12 +36,16 @@ target_link_libraries(vkkk
     PUBLIC
         Vulkan::Vulkan
         glfw
-        VKKK::glm
         fmt::fmt
         OpenImageIO::OpenImageIO
         assimp::assimp
-        VKKK::spirv_cross
-        VKKK::shaderc)
+        ${SPIRV_CROSS_LIBRARIES})
+
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(vkkk PRIVATE ${SHADERC_DEBUG_LIBRARIES})
+else()
+    target_link_libraries(vkkk PRIVATE ${SHADERC_RELEASE_LIBRARIES})
+endif()
 
 add_executable(vkmain main.cpp)
 target_link_libraries(vkmain

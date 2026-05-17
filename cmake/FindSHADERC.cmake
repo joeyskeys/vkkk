@@ -1,72 +1,86 @@
+set(_SHADERC_HINTS
+    /usr
+    /usr/local
+    ${SHADERC_ROOT}
+    $ENV{SHADERC_ROOT})
+
 find_path(SHADERC_INCLUDE_DIR shaderc/shaderc.h
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        include)
+    HINTS ${_SHADERC_HINTS}
+    PATH_SUFFIXES include)
 
-find_library(SHADERC_LIB shaderc_combined
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(SHADERC_LIBRARY_RELEASE
+    NAMES shaderc
+    HINTS ${_SHADERC_HINTS}
+    PATH_SUFFIXES lib)
+find_library(SHADERC_LIBRARY_DEBUG
+    NAMES shaderc
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
 
-find_library(GLSLANG_LIB glslang
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(SHADERC_UTIL_LIBRARY_RELEASE
+    NAMES shaderc_util
+    HINTS ${_SHADERC_HINTS}
+    PATH_SUFFIXES lib)
+find_library(SHADERC_UTIL_LIBRARY_DEBUG
+    NAMES shaderc_utild shaderc_util
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
 
-find_library(OGLCOMPILER_LIB OGLCompiler
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(GLSLANG_LIBRARY glslang
+    HINTS ${SHADERC_ROOT}
+    PATH_SUFFIXES lib)
+find_library(GLSLANG_LIBRARY_DEBUG glslangd
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
 
-find_library(SPIRV_LIB SPIRV
-    HITNS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(GLSLANG_LIMIT_LIBRARY glslang-default-resource-limits
+    HINTS ${SHADERC_ROOT}
+    PATH_SUFFIXES lib)
+find_library(GLSLANG_LIMIT_LIBRARY_DEBUG glslang-default-resource-limitsd
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
 
-find_library(SPIRVTOOLS_LIB SPIRV-Tools
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(SPIRV_LIBRARY SPIRV
+    HINTS ${SHADERC_ROOT}
+    PATH_SUFFIXES lib)
+find_library(SPIRV_LIBRARY_DEBUG SPIRVd
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
 
-find_library(SPIRVTOOLSOPT_LIB SPIRV-Tools-opt
-    HINTS
-        /usr
-        /usr/local
-        ${SHADERC_ROOT}
-    PATH_SUFFIXES
-        lib)
+find_library(SPIRV_TOOLS_LIBRARY SPIRV-Tools
+    HINTS ${SHADERC_ROOT}
+    PATH_SUFFIXES lib)
+find_library(SPIRV_TOOLS_LIBRARY_DEBUG SPIRV-Tools
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
+
+find_library(SPIRV_TOOLS_OPT_LIBRARY SPIRV-Tools-opt
+    HINTS ${SHADERC_ROOT}
+    PATH_SUFFIXES lib)
+find_library(SPIRV_TOOLS_OPT_LIBRARY_DEBUG SPIRV-Tools-opt
+    HINTS ${SHADERC_ROOT}/debug
+    PATH_SUFFIXES lib
+    NO_DEFAULT_PATH)
+
+message(STATUS "shaderc debug libraries: ${SHADERC_LIBRARY_DEBUG} ${SHADERC_UTIL_LIBRARY_DEBUG} ${GLSLANG_LIBRARY_DEBUG} ${SPIRV_LIBRARY_DEBUG} ${SPIRV_TOOLS_LIBRARY_DEBUG} ${SPIRV_TOOLS_OPT_LIBRARY_DEBUG}")
+
+set(_SHADERC_MAIN_FOUND FALSE)
+if(SHADERC_LIBRARY_RELEASE OR SHADERC_LIBRARY_DEBUG)
+    set(_SHADERC_MAIN_FOUND TRUE)
+endif()
 
 include(FindPackageHandleStandardArgs)
-find_package_handle_standard_args(SHADERC DEFAULT_MSG
-    SHADERC_INCLUDE_DIR
-    SHADERC_LIB
-    GLSLANG_LIB
-    OGLCOMPILER_LIB
-    SPIRV_LIB
-    SPIRVTOOLS_LIB
-    SPIRVTOOLSOPT_LIB)
+find_package_handle_standard_args(shaderc
+    REQUIRED_VARS SHADERC_INCLUDE_DIR _SHADERC_MAIN_FOUND)
 
-if (SHADERC_FOUND)
+if(shaderc_FOUND)
     set(SHADERC_INCLUDE_DIRS ${SHADERC_INCLUDE_DIR})
-    set(SHADERC_LIBRARIES ${SHADERC_LIB} ${GLSLANG_LIB}
-        ${OGLCOMPILER_LIB} ${SPIRV_LIB} ${SPIRVTOOLS_LIB}
-        ${SPIRVTOOLSOPT_LIB})
+    set(SHADERC_RELEASE_LIBRARIES ${SHADERC_LIBRARY_RELEASE} ${SHADERC_UTIL_LIBRARY_RELEASE} ${GLSLANG_LIBRARY} ${GLSLANG_LIMIT_LIBRARY} ${SPIRV_LIBRARY} ${SPIRV_TOOLS_LIBRARY} ${SPIRV_TOOLS_OPT_LIBRARY})
+    set(SHADERC_DEBUG_LIBRARIES ${SHADERC_LIBRARY_DEBUG} ${SHADERC_UTIL_LIBRARY_DEBUG} ${GLSLANG_LIBRARY_DEBUG} ${GLSLANG_LIMIT_LIBRARY_DEBUG} ${SPIRV_LIBRARY_DEBUG} ${SPIRV_TOOLS_LIBRARY_DEBUG} ${SPIRV_TOOLS_OPT_LIBRARY_DEBUG})
 endif()

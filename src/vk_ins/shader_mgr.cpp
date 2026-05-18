@@ -279,17 +279,32 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
     type = t;
 
     auto abs_path = ensure_abs_path(path);
+    if (!fs::exists(abs_path)) {
+        std::cout << "Shader file " << abs_path << " does not exist" << std::endl;
+        return false;
+    }
     auto extension = abs_path.extension();
 
     if (extension.string().ends_with(".spv")) {
         // Compiled SPRIV
         spirv_code = load_spirv_file(abs_path);
+        if (spirv_code.empty()) {
+            std::cout << "Failed to load SPIR-V file: " << abs_path << std::endl;
+            return false;
+        }
     }
     else {
         source_code = load_file(abs_path);
+        if (source_code.empty()) {
+            std::cout << "Failed to load shader source file: " << abs_path << std::endl;
+            return false;
+        }
 
         shaderc::Compiler compiler;
         shaderc::CompileOptions options;
+        options.SetSourceLanguage(shaderc_source_language_glsl);
+        options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
+        options.SetForcedVersionProfile(450, shaderc_profile_none);
 
         // Make it a static map to lookup?
         shaderc_shader_kind tt;
@@ -320,7 +335,7 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
             }
 
             case VK_SHADER_STAGE_COMPUTE_BIT: {
-                tt = shaderc_glsl_fragment_shader;
+                tt = shaderc_glsl_compute_shader;
                 break;
             }
 
@@ -335,10 +350,11 @@ bool ShaderModule::load(const fs::path& path, const VkShaderStageFlagBits t) {
         //options.SetOptimizationLevel(shaderc_optimization_level_performance);
         //options.SetOptimizationLevel(shaderc_optimization_level_size);
 
-        // entry point default to "main"
+        // Be explicit about entry point for better compatibility across shaderc builds.
+        const std::string source_text(source_code.begin(), source_code.end());
         shaderc::SpvCompilationResult ret =
-            compiler.CompileGlslToSpv(source_code.data(), source_code.size(),
-                tt, abs_path.filename().string().c_str(), options);
+            compiler.CompileGlslToSpv(source_text, tt,
+                abs_path.filename().string().c_str(), "main", options);
         
         if (ret.GetCompilationStatus() != shaderc_compilation_status_success) {
             std::cout << ret.GetErrorMessage();

@@ -90,9 +90,9 @@ int main() {
     ins.create_resources(VK_SAMPLE_COUNT_8_BIT);
 
     std::vector<vkkk::ShaderModule> modules(2);
-    if (!modules[0].load("../resource/shaders/default.vert", VK_SHADER_STAGE_VERTEX_BIT))
+    if (!modules[0].load("../../resource/shaders/default.vert", VK_SHADER_STAGE_VERTEX_BIT))
         throw std::runtime_error("failed to load vertex shader");
-    if (!modules[1].load("../resource/shaders/default.frag", VK_SHADER_STAGE_FRAGMENT_BIT))
+    if (!modules[1].load("../../resource/shaders/default.frag", VK_SHADER_STAGE_FRAGMENT_BIT))
         throw std::runtime_error("failed to load fragment shader");
 
     vkkk::PipelineOption ppl_opt;

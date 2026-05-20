@@ -1,5 +1,7 @@
 set(HEADERS
     built_in_shader/fixed_color.h
+    built_in_shader/phong.h
+    built_in_shader/pbr.h
     asset_mgr/light_mgr.h
     asset_mgr/mesh_mgr.h
     concepts/camera.h

@@ -1,7 +1,20 @@
 #pragma once
 
+#include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
+
 namespace vkkk::built_in_shader
 {
+
+struct FixedColorTransformUBO {
+    glm::mat4 model{1.0f};
+    glm::mat4 view{1.0f};
+    glm::mat4 proj{1.0f};
+};
+
+struct FixedColorUBO {
+    glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+};
 
 inline constexpr const char fixed_color_vert[] = R"(
 #version 450

@@ -58,12 +58,6 @@ target_link_libraries(vkmain
         vkkk
         OpenImageIO::OpenImageIO)
 
-add_executable(vkmulti multi_pipeline_main.cpp)
-target_link_libraries(vkmulti
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
 add_executable(vkdebug debug_main.cpp)
 target_link_libraries(vkdebug
     PRIVATE

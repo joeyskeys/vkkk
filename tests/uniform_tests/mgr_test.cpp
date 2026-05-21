@@ -14,19 +14,3 @@ TEST_CASE("Uniform Manager test", "[single-file]") {
 
     REQUIRE(true);
 }
-
-TEST_CASE("Shader Manager test", "[single_file]") {
-    vkkk::VkWrappedInstance ins;
-    ins.create_surface();
-    ins.create_logical_device();
-    ins.create_swapchain();
-    ins.create_command_pool();
-
-    vkkk::UniformMgr umgr(&ins);
-    vkkk::ShaderModulesDeprecated module(&ins, &umgr);
-    module.add_module("D:/repo/floss/vkkk/resource/shaders/depth_default_vert.spv", VK_SHADER_STAGE_VERTEX_BIT);
-    module.add_module("D:/repo/floss/vkkk/resource/shaders/depth_default_frag.spv", VK_SHADER_STAGE_FRAGMENT_BIT);
-    module.alloc_uniforms();
-
-    REQUIRE(true);
-}

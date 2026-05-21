@@ -247,30 +247,6 @@ void bind_types(nb::module_& m) {
         //.def("find_ubo", &Uniform::find_ubo)
         .def("update_ubos", &UniformMgr::update_ubos);
 
-    nb::class_<ShaderModulesDeprecated> smdcl(m, "ShaderModulesDeprecated");
-
-    smdcl.def(nb::init<VkWrappedInstance*, UniformMgr*>())
-        .def("free_gpu_resources", &ShaderModulesDeprecated::free_gpu_resources)
-        //.def("add_module", &ShaderModulesDeprecated::add_module)
-        .def("assign_tex_image", &ShaderModulesDeprecated::assign_tex_image)
-        .def("alloc_uniforms", &ShaderModulesDeprecated::alloc_uniforms)
-        .def("set_attribute_binding", &ShaderModulesDeprecated::set_attribute_binding)
-        .def("create_input_descriptions", &ShaderModulesDeprecated::create_input_descriptions)
-        .def("create_descriptor_layouts", &ShaderModulesDeprecated::create_descriptor_layouts)
-        .def("create_descriptor_pool", &ShaderModulesDeprecated::create_descriptor_pool)
-        .def("create_descriptor_set", &ShaderModulesDeprecated::create_descriptor_set)
-        .def("valid", &ShaderModulesDeprecated::valid)
-        .def("get_stages_count", &ShaderModulesDeprecated::get_stages_count)
-        .def("get_binding_description_count", &ShaderModulesDeprecated::get_binding_description_count)
-        .def("get_attr_description_count", &ShaderModulesDeprecated::get_attr_description_count);
-
-    nb::class_<PipelineDeprecated> ppcl(m, "Pipeline");
-
-    ppcl.def(nb::init<VkWrappedInstance*>())
-        .def("free_gpu_resources", &PipelineDeprecated::free_gpu_resources)
-        .def_ro("uniforms", &PipelineDeprecated::uniforms)
-        .def_ro("modules", &PipelineDeprecated::modules);
-
     nb::class_<CommandBuffers> cbcl(m, "CommandBuffers");
 
     cbcl.def(nb::init<VkWrappedInstance*>())
@@ -282,12 +258,6 @@ void bind_types(nb::module_& m) {
         .def("free_gpu_resources", &PipelineMgr::free_gpu_resources)
         .def("register_pipeline", &PipelineMgr::register_pipeline)
         .def("create_pipelines", &PipelineMgr::create_pipelines)
-        .def("create_descriptor_layouts", &PipelineMgr::create_descriptor_layouts)
-        .def("create_input_descriptions", &PipelineMgr::create_input_descriptions)
-        .def("create_descriptor_pools", &PipelineMgr::create_descriptor_pools)
-        .def("create_descriptor_sets", &PipelineMgr::create_descriptor_sets)
-        .def("get_pipeline_by_idx", nb::overload_cast<const uint32_t>(&PipelineMgr::get_pipeline))
-        .def("get_pipeline_by_name", nb::overload_cast<const std::string&>(&PipelineMgr::get_pipeline))
         .def("bind", &PipelineMgr::bind);
 
     /*
@@ -342,10 +312,6 @@ void bind_types(nb::module_& m) {
         .def("load_mesh", [](DrawableMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
             const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
                 mgr.load_mesh(name, cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
-        })
-        .def("load_line", [](DrawableMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
-            const uint32_t v, nb::bytes& vbuf) {
-                mgr.load_line(name, cs, v, vbuf.c_str(), vbuf.size());
         })
         .def("add_line", &DrawableMgr::add_line)
         .def("add_plane", &DrawableMgr::add_plane)

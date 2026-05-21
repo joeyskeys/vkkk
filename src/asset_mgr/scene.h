@@ -5,7 +5,6 @@ namespace vkkk
 
 class DrawableMgr;
 class LightMgr;
-class PipelineMgr;
 
 class Scene {
 public:
@@ -13,7 +12,6 @@ public:
 
     DrawableMgr*    drawable_mgr;
     LightMgr*       light_mgr;
-    PipelineMgr*    ppl_mgr;
 };
 
 }

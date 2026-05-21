@@ -18,6 +18,9 @@ public:
     Line(Line&&);
     ~Line();
 
+    Line& operator=(const Line&);
+    Line& operator=(Line&&) noexcept;
+
     void load(const uint32_t v, const char* vdata, const uint32_t vsize);
     void load(const glm::vec3& p0, const glm::vec3& p1);
     void unload();

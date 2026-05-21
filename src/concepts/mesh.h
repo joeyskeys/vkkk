@@ -34,6 +34,8 @@ public:
     Mesh(Mesh&&);
     ~Mesh();
 
+    Mesh& operator=(const Mesh&) = default;
+
     void load(aiMesh *mesh);
     void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
         const uint32_t);

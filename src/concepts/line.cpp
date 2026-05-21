@@ -40,6 +40,44 @@ Line::Line(Line&& rhs)
     }
 }
 
+Line& Line::operator=(const Line& rhs) {
+    if (this == &rhs) {
+        return *this;
+    }
+
+    comps = rhs.comps;
+    comp_size = rhs.comp_size;
+    vcnt = rhs.vcnt;
+    loaded = rhs.loaded;
+
+    if (loaded) {
+        vbuf = std::make_unique<float[]>(vcnt * comp_size);
+        memcpy(vbuf.get(), rhs.vbuf.get(), vcnt * comp_size * sizeof(float));
+    } else {
+        vbuf.reset();
+    }
+
+    return *this;
+}
+
+Line& Line::operator=(Line&& rhs) noexcept {
+    if (this == &rhs) {
+        return *this;
+    }
+
+    comps = std::move(rhs.comps);
+    comp_size = rhs.comp_size;
+    vcnt = rhs.vcnt;
+    loaded = rhs.loaded;
+    vbuf = std::move(rhs.vbuf);
+
+    rhs.comp_size = 0;
+    rhs.vcnt = 0;
+    rhs.loaded = false;
+
+    return *this;
+}
+
 Line::~Line() {}
 
 void Line::load(const uint32_t v, const char* vdata, const uint32_t vsize) {

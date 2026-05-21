@@ -15,7 +15,7 @@ set(HEADERS
     utils/singleton.h
     vk_ins/cmd_buf.h
     vk_ins/misc.h
-    vk_ins/pipeline_mgr.h
+    #vk_ins/pipeline_mgr.h
     vk_ins/shader_mgr.h
     vk_ins/uniform_mgr.h
     vk_ins/vkabstraction.h
@@ -33,7 +33,7 @@ set(SRCS
     gui/gui.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
-    vk_ins/pipeline_mgr.cpp
+    #vk_ins/pipeline_mgr.cpp
     vk_ins/shader_mgr.cpp
     vk_ins/uniform_mgr.cpp
     vk_ins/vkabstraction.cpp

@@ -349,7 +349,6 @@ public:
         );
     }
 
-    void create_descriptors(const ShaderModulesDeprecated& modules);
     void alloc_commandbuffers(std::vector<VkCommandBuffer>& bufs);
     void record_cmds(std::vector<VkCommandBuffer>& cmd_bufs, std::vector<VkFramebuffer>& fbs,
         const std::function<void(uint32_t)>& emit_func);

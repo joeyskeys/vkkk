@@ -3,6 +3,7 @@ set(HEADERS
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
     built_in_shader/pbr.h
+    asset_mgr/scene.h
     asset_mgr/light_mgr.h
     asset_mgr/drawable_mgr.h
     concepts/camera.h
@@ -23,6 +24,7 @@ set(HEADERS
 
 set(SRCS
     built_in_shader/built_in_shader_mgr.cpp
+    asset_mgr/scene.cpp
     asset_mgr/light_mgr.cpp
     asset_mgr/drawable_mgr.cpp
     concepts/camera.cpp
@@ -56,6 +58,12 @@ endif()
 
 add_executable(vkmain main.cpp)
 target_link_libraries(vkmain
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
+add_executable(vkcornell cornell_main.cpp)
+target_link_libraries(vkcornell
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

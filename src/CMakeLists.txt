@@ -4,8 +4,9 @@ set(HEADERS
     built_in_shader/phong.h
     built_in_shader/pbr.h
     asset_mgr/light_mgr.h
-    asset_mgr/mesh_mgr.h
+    asset_mgr/drawable_mgr.h
     concepts/camera.h
+    concepts/line.h
     concepts/mesh.h
     gui/gui.h
     utils/common.h
@@ -23,8 +24,9 @@ set(HEADERS
 set(SRCS
     built_in_shader/built_in_shader_mgr.cpp
     asset_mgr/light_mgr.cpp
-    asset_mgr/mesh_mgr.cpp
+    asset_mgr/drawable_mgr.cpp
     concepts/camera.cpp
+    concepts/line.cpp
     concepts/mesh.cpp
     gui/gui.cpp
     vk_ins/cmd_buf.cpp

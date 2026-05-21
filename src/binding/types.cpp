@@ -1,7 +1,8 @@
 #include "asset_mgr/light_mgr.h"
-#include "asset_mgr/mesh_mgr.h"
+#include "asset_mgr/drawable_mgr.h"
 #include "binding/utils.h"
 #include "concepts/camera.h"
+#include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "vk_ins/cmd_buf.h"
 #include "vk_ins/pipeline_mgr.h"
@@ -328,13 +329,28 @@ void bind_types(nb::module_& m) {
         })
         .def("unload", &Mesh::unload);
 
-    nb::class_<MeshMgr>(m, "MeshMgr")
-        .def_static("Instance", nb::overload_cast<>(&MeshMgr::instance_ptr<>))
-        .def("load", [](MeshMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
-            const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
-                mgr.load(name, cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+    nb::class_<Line>(m, "Line")
+        .def(nb::init<const std::vector<VERT_COMP>&>())
+        .def(nb::init<const Line&>())
+        .def("load", [](Line& line, uint32_t v, nb::bytes& vbuf) {
+            line.load(v, vbuf.c_str(), vbuf.size());
         })
-        .def("upload_gpu", &MeshMgr::upload_gpu);        
+        .def("unload", &Line::unload);
+
+    nb::class_<DrawableMgr>(m, "DrawableMgr")
+        .def_static("Instance", nb::overload_cast<>(&DrawableMgr::instance_ptr<>))
+        .def("load_mesh", [](DrawableMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
+            const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
+                mgr.load_mesh(name, cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
+        })
+        .def("load_line", [](DrawableMgr& mgr, const std::string& name, const std::vector<VERT_COMP>& cs,
+            const uint32_t v, nb::bytes& vbuf) {
+                mgr.load_line(name, cs, v, vbuf.c_str(), vbuf.size());
+        })
+        .def("add_line", &DrawableMgr::add_line)
+        .def("add_cube", &DrawableMgr::add_cube)
+        .def("add_sphere", &DrawableMgr::add_sphere)
+        .def("upload_gpu", &DrawableMgr::upload_gpu);
 
     nb::class_<LightInfo> licl(m, "LightInfo");
 

@@ -3,7 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include "asset_mgr/light_mgr.h"
-#include "asset_mgr/mesh_mgr.h"
+#include "asset_mgr/drawable_mgr.h"
 #include "concepts/camera.h"
 #include "concepts/lights.h"
 #include "vk_ins/cmd_buf.h"

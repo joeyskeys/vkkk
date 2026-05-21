@@ -1,11 +1,11 @@
-#include <iostream>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <vector>
 
 #include <fmt/format.h>
 
-#include "asset_mgr/mesh_mgr.h"
+#include "asset_mgr/drawable_mgr.h"
 #include "vk_ins/vkabstraction.h"
 
 namespace vkkk
@@ -53,21 +53,21 @@ void append_vertex(std::vector<float>& out, const std::vector<VERT_COMP>& comps,
 
 } // namespace
 
-void MeshMgr::process_node(const std::string& name, aiNode *node, const aiScene *scene,
+void DrawableMgr::process_node(const std::string& name, aiNode* node, const aiScene* scene,
     const std::vector<VERT_COMP>& cs)
 {
     for (int i = 0; i < node->mNumMeshes; ++i) {
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         Mesh m{cs};
         m.load(mesh);
-        meshes.emplace(name, std::move(m));
+        meshes.insert_or_assign(name, std::move(m));
     }
 
     for (int i = 0; i < node->mNumChildren; ++i)
         process_node(name, node->mChildren[i], scene, cs);
 }
 
-void MeshMgr::load_file(const fs::path& path, const std::string& name,
+void DrawableMgr::load_file(const fs::path& path, const std::string& name,
     const std::vector<VERT_COMP>& cs)
 {
     if (!fs::exists(fs::absolute(path))) {
@@ -76,25 +76,26 @@ void MeshMgr::load_file(const fs::path& path, const std::string& name,
     }
 
     Assimp::Importer importer;
-    const aiScene *scene = importer.ReadFile(path.string().c_str(), aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
+    const aiScene* scene = importer.ReadFile(path.string().c_str(),
+        aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
+        aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
 
     if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
         return;
 
-    auto idx = meshes.size();
     process_node(name, scene->mRootNode, scene, cs);
 }
 
-void MeshMgr::load(const std::string& name, const std::vector<VERT_COMP>& cs,
+void DrawableMgr::load_mesh(const std::string& name, const std::vector<VERT_COMP>& cs,
     const uint32_t v, const char* vbuf, const uint32_t vs, const uint32_t i,
     const char* ibuf, const uint32_t is)
 {
     Mesh m{cs};
     m.load(v, vbuf, vs, i, ibuf, is);
-    meshes.emplace(name, std::move(m));
+    meshes.insert_or_assign(name, std::move(m));
 }
 
-void MeshMgr::add_cube(const std::string& name, const std::vector<VERT_COMP>& cs, float size) {
+void DrawableMgr::add_cube(const std::string& name, const std::vector<VERT_COMP>& cs, float size) {
     const float h = size * 0.5f;
 
     const std::array<ProcVertex, 24> vertices = {{
@@ -155,7 +156,7 @@ void MeshMgr::add_cube(const std::string& name, const std::vector<VERT_COMP>& cs
     meshes.insert_or_assign(name, std::move(m));
 }
 
-void MeshMgr::add_sphere(const std::string& name, const std::vector<VERT_COMP>& cs,
+void DrawableMgr::add_sphere(const std::string& name, const std::vector<VERT_COMP>& cs,
     float radius, uint32_t stacks, uint32_t slices)
 {
     if (stacks < 2) stacks = 2;
@@ -222,13 +223,37 @@ void MeshMgr::add_sphere(const std::string& name, const std::vector<VERT_COMP>& 
     meshes.insert_or_assign(name, std::move(m));
 }
 
-void MeshMgr::upload_gpu(VkWrappedInstance* ins, const std::string& name) const {
-    auto found = meshes.find(name);
-    if (found == meshes.end()) {
-        std::cout << "Mesh with name " << name << " not found.." << std::endl;
-        return;
-    }
-    ins->load_mesh(name, found->second);
+void DrawableMgr::load_line(const std::string& name, const std::vector<VERT_COMP>& cs,
+    const uint32_t v, const char* vbuf, const uint32_t vs)
+{
+    Line line(cs);
+    line.load(v, vbuf, vs);
+    lines.insert_or_assign(name, std::move(line));
 }
 
+void DrawableMgr::add_line(const std::string& name, const std::vector<VERT_COMP>& cs,
+    const glm::vec3& p0, const glm::vec3& p1)
+{
+    Line line(cs);
+    line.load(p0, p1);
+    lines.insert_or_assign(name, std::move(line));
 }
+
+void DrawableMgr::upload_gpu(VkWrappedInstance* ins, const std::string& name) const {
+    auto m_found = meshes.find(name);
+    if (m_found != meshes.end()) {
+        ins->load_mesh(name, m_found->second);
+        return;
+    }
+
+    auto l_found = lines.find(name);
+    if (l_found != lines.end()) {
+        std::cout << "Drawable " << name << " is a line. "
+            << "Line GPU upload path is not implemented yet." << std::endl;
+        return;
+    }
+
+    std::cout << "Drawable with name " << name << " not found.." << std::endl;
+}
+
+} // namespace vkkk

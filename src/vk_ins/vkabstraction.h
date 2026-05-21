@@ -19,7 +19,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "concepts/mesh.h"
-#include "asset_mgr/mesh_mgr.h"
+#include "asset_mgr/drawable_mgr.h"
 #include "vk_ins/cmd_buf.h"
 #include "vk_ins/render_target.h"
 #include "vk_ins/shader_mgr.h"

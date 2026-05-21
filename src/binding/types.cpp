@@ -348,6 +348,7 @@ void bind_types(nb::module_& m) {
                 mgr.load_line(name, cs, v, vbuf.c_str(), vbuf.size());
         })
         .def("add_line", &DrawableMgr::add_line)
+        .def("add_plane", &DrawableMgr::add_plane)
         .def("add_cube", &DrawableMgr::add_cube)
         .def("add_sphere", &DrawableMgr::add_sphere)
         .def("upload_gpu", &DrawableMgr::upload_gpu);

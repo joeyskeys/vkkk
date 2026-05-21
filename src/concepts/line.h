@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -24,7 +25,7 @@ public:
     std::vector<VERT_COMP>      comps;
     uint32_t                    comp_size = 0;
     uint32_t                    vcnt = 0;
-    float*                      vbuf = nullptr;
+    std::unique_ptr<float[]>    vbuf;
     bool                        loaded = false;
 };
 

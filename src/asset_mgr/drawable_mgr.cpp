@@ -95,6 +95,39 @@ void DrawableMgr::load_mesh(const std::string& name, const std::vector<VERT_COMP
     meshes.insert_or_assign(name, std::move(m));
 }
 
+void DrawableMgr::add_plane(const std::string& name, const std::vector<VERT_COMP>& cs, float size) {
+    const float h = size * 0.5f;
+
+    // XZ-plane centered at origin, facing +Y.
+    const std::array<ProcVertex, 4> vertices = {{
+        {{-h, 0.0f, -h}, {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+        {{ h, 0.0f, -h}, {0.0f, 1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 1.0f, 1.0f}},
+        {{ h, 0.0f,  h}, {0.0f, 1.0f, 0.0f}, {1.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+        {{-h, 0.0f,  h}, {0.0f, 1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f, 1.0f}},
+    }};
+
+    const std::array<uint32_t, 6> indices = {{
+        0, 1, 2,
+        0, 2, 3
+    }};
+
+    std::vector<float> packed_vertices;
+    packed_vertices.reserve(vertices.size() * Mesh(cs).comp_size);
+    for (const auto& v : vertices)
+        append_vertex(packed_vertices, cs, v);
+
+    Mesh m{cs};
+    m.load(
+        static_cast<uint32_t>(vertices.size()),
+        reinterpret_cast<const char*>(packed_vertices.data()),
+        static_cast<uint32_t>(packed_vertices.size() * sizeof(float)),
+        static_cast<uint32_t>(indices.size() / 3),
+        reinterpret_cast<const char*>(indices.data()),
+        static_cast<uint32_t>(indices.size() * sizeof(uint32_t))
+    );
+    meshes.insert_or_assign(name, std::move(m));
+}
+
 void DrawableMgr::add_cube(const std::string& name, const std::vector<VERT_COMP>& cs, float size) {
     const float h = size * 0.5f;
 
@@ -221,14 +254,6 @@ void DrawableMgr::add_sphere(const std::string& name, const std::vector<VERT_COM
         static_cast<uint32_t>(indices.size() * sizeof(uint32_t))
     );
     meshes.insert_or_assign(name, std::move(m));
-}
-
-void DrawableMgr::load_line(const std::string& name, const std::vector<VERT_COMP>& cs,
-    const uint32_t v, const char* vbuf, const uint32_t vs)
-{
-    Line line(cs);
-    line.load(v, vbuf, vs);
-    lines.insert_or_assign(name, std::move(line));
 }
 
 void DrawableMgr::add_line(const std::string& name, const std::vector<VERT_COMP>& cs,

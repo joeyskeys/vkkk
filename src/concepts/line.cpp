@@ -23,8 +23,8 @@ Line::Line(const Line& rhs)
     , loaded(rhs.loaded)
 {
     if (loaded) {
-        vbuf = new float[vcnt * comp_size];
-        memcpy(vbuf, rhs.vbuf, vcnt * comp_size * sizeof(float));
+        vbuf = std::make_unique<float[]>(vcnt * comp_size);
+        memcpy(vbuf.get(), rhs.vbuf.get(), vcnt * comp_size * sizeof(float));
     }
 }
 
@@ -35,16 +35,12 @@ Line::Line(Line&& rhs)
     , loaded(rhs.loaded)
 {
     if (loaded) {
-        vbuf = rhs.vbuf;
-        rhs.vbuf = nullptr;
+        vbuf = std::move(rhs.vbuf);
         rhs.loaded = false;
     }
 }
 
-Line::~Line() {
-    if (loaded)
-        delete[] vbuf;
-}
+Line::~Line() {}
 
 void Line::load(const uint32_t v, const char* vdata, const uint32_t vsize) {
     const auto required_size = v * comp_size * sizeof(float);
@@ -57,8 +53,8 @@ void Line::load(const uint32_t v, const char* vdata, const uint32_t vsize) {
         unload();
 
     vcnt = v;
-    vbuf = new float[vcnt * comp_size];
-    memcpy(vbuf, vdata, required_size);
+    vbuf = std::make_unique<float[]>(vcnt * comp_size);
+    memcpy(vbuf.get(), vdata, required_size);
     loaded = true;
 }
 
@@ -104,8 +100,7 @@ void Line::load(const glm::vec3& p0, const glm::vec3& p1) {
 
 void Line::unload() {
     vcnt = 0;
-    delete[] vbuf;
-    vbuf = nullptr;
+    vbuf.reset();
     loaded = false;
 }
 

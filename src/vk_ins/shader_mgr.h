@@ -141,6 +141,8 @@ public:
     AttrInfoMap                                     attr_infos;
     TexImgPairs                                     tex_img_pairs;
 
+    bool load(const char* source, const VkShaderStageFlagBits t,
+        const std::string& source_name="inline_shader");
     bool load(const fs::path& path, const VkShaderStageFlagBits t);
     
     std::tuple<std::string, uint32_t, uint32_t, uint32_t>

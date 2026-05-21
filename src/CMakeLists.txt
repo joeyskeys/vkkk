@@ -1,4 +1,5 @@
 set(HEADERS
+    built_in_shader/built_in_shader_mgr.h
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
     built_in_shader/pbr.h
@@ -20,6 +21,7 @@ set(HEADERS
     vk_ins/vkubo.h)
 
 set(SRCS
+    built_in_shader/built_in_shader_mgr.cpp
     asset_mgr/light_mgr.cpp
     asset_mgr/mesh_mgr.cpp
     concepts/camera.cpp

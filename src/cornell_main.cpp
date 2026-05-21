@@ -8,6 +8,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "asset_mgr/scene.h"
+#include "asset_mgr/light_mgr.h"
+#include "asset_mgr/drawable_mgr.h"
 #include "built_in_shader/built_in_shader_mgr.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"

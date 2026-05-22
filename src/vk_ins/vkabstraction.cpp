@@ -1765,6 +1765,13 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     }
 
     // Create pipeline
+    option.input_info.vertexBindingDescriptionCount =
+        static_cast<uint32_t>(input_descriptions.size());
+    option.input_info.pVertexBindingDescriptions = input_descriptions.data();
+    option.input_info.vertexAttributeDescriptionCount =
+        static_cast<uint32_t>(attr_descriptions.size());
+    option.input_info.pVertexAttributeDescriptions = attr_descriptions.data();
+
     VkGraphicsPipelineCreateInfo pipeline_info{
         .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
         .stageCount = static_cast<uint32_t>(shader_infos.size()),

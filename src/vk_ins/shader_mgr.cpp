@@ -1,5 +1,6 @@
 #include <fmt/format.h>
 #include <shaderc/shaderc.hpp>
+#include <algorithm>
 #include <cstring>
 
 #include "utils/io.h"
@@ -32,6 +33,10 @@ static bool reflect_shader_module(ShaderModule& mod, const VkShaderStageFlagBits
     // UBOs
     for (auto& ubo : res.uniform_buffers) {
         auto name = comp.get_name(ubo.id);
+        if (name.empty())
+            name = comp.get_name(ubo.base_type_id);
+        if (name.empty())
+            name = fmt::format("ubo_{}", comp.get_decoration(ubo.id, spv::DecorationBinding));
         auto type_info = comp.get_type(ubo.type_id);
         auto base_type_info = comp.get_type(ubo.base_type_id);
         auto binding_idx = comp.get_decoration(ubo.id, spv::DecorationBinding);
@@ -48,13 +53,16 @@ static bool reflect_shader_module(ShaderModule& mod, const VkShaderStageFlagBits
     }
 
     if (t == VK_SHADER_STAGE_VERTEX_BIT) {
+        auto& binding_attrs = mod.input_brefs[0];
         for (auto& input : res.stage_inputs) {
             auto name = comp.get_name(input.id);
             auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
             mod.attr_infos.emplace(loc, std::make_tuple(name, vectype));
+            binding_attrs.push_back(loc);
         }
+        std::sort(binding_attrs.begin(), binding_attrs.end());
     }
 
     return true;

@@ -11,6 +11,7 @@
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/drawable_mgr.h"
 #include "built_in_shader/built_in_shader_mgr.h"
+#include "built_in_shader/fixed_color.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
 #include "vk_ins/cmd_buf.h"
@@ -106,12 +107,18 @@ namespace
 using vkkk::built_in_shader::PhongLightUBO;
 using vkkk::built_in_shader::PhongMaterialUBO;
 using vkkk::built_in_shader::PhongTransformUBO;
+using vkkk::built_in_shader::FixedColorUBO;
+using vkkk::built_in_shader::FixedColorTransformUBO;
 
 struct CornellRenderable {
+    vkkk::built_in_shader::BuiltInShaderType shader_type{
+        vkkk::built_in_shader::BuiltInShaderType::Phong
+    };
     std::string mesh_name;
     std::string pipeline_name;
     glm::mat4 model{1.0f};
     PhongMaterialUBO material{};
+    FixedColorUBO fixed_color{};
     VkPipeline pipeline{VK_NULL_HANDLE};
     VkPipelineLayout layout{VK_NULL_HANDLE};
     VkDescriptorPool descriptor_pool{VK_NULL_HANDLE};
@@ -135,9 +142,23 @@ void create_descriptor_sets_for_pipeline(vkkk::VkWrappedInstance& ins, CornellRe
     renderable.pipeline = ppl_found->second.pipeline;
     renderable.layout = ppl_found->second.ppl_layout;
 
-    auto& transform = require_ubo(ins, renderable.pipeline_name + ":UniformBufferObject");
-    auto& material = require_ubo(ins, renderable.pipeline_name + ":PhongMaterial");
-    auto& light = require_ubo(ins, renderable.pipeline_name + ":PhongLight");
+    auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
+    vkkk::UBO* material = nullptr;
+    vkkk::UBO* light = nullptr;
+    vkkk::UBO* fixed_color = nullptr;
+    uint32_t ubo_count = 0;
+    if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::Phong) {
+        material = &require_ubo(ins, renderable.pipeline_name + ":material");
+        light = &require_ubo(ins, renderable.pipeline_name + ":light");
+        ubo_count = 3;
+    }
+    else if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::FixedColor) {
+        fixed_color = &require_ubo(ins, renderable.pipeline_name + ":fixed_color");
+        ubo_count = 2;
+    }
+    else {
+        throw std::runtime_error("unsupported shader type for descriptor setup");
+    }
 
     const uint32_t swapchain_cnt = ins.get_swapchain_cnt();
     renderable.descriptor_sets.resize(swapchain_cnt);
@@ -145,7 +166,7 @@ void create_descriptor_sets_for_pipeline(vkkk::VkWrappedInstance& ins, CornellRe
     const std::array<VkDescriptorPoolSize, 1> pool_sizes{{
         VkDescriptorPoolSize{
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = swapchain_cnt * 3
+            .descriptorCount = swapchain_cnt * ubo_count
         }
     }};
 
@@ -176,43 +197,62 @@ void create_descriptor_sets_for_pipeline(vkkk::VkWrappedInstance& ins, CornellRe
             .offset = 0,
             .range = transform.size * transform.vecsize
         };
-        VkDescriptorBufferInfo material_info{
-            .buffer = material.gpu_bufs[i],
-            .offset = 0,
-            .range = material.size * material.vecsize
-        };
-        VkDescriptorBufferInfo light_info{
-            .buffer = light.gpu_bufs[i],
-            .offset = 0,
-            .range = light.size * light.vecsize
-        };
+        std::vector<VkWriteDescriptorSet> writes;
+        writes.push_back(VkWriteDescriptorSet{
+            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+            .dstSet = renderable.descriptor_sets[i],
+            .dstBinding = transform.binding,
+            .descriptorCount = 1,
+            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .pBufferInfo = &transform_info
+        });
 
-        std::array<VkWriteDescriptorSet, 3> writes{{
-            VkWriteDescriptorSet{
+        VkDescriptorBufferInfo material_info{};
+        VkDescriptorBufferInfo light_info{};
+        VkDescriptorBufferInfo fixed_color_info{};
+        if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::Phong) {
+            material_info = VkDescriptorBufferInfo{
+                .buffer = material->gpu_bufs[i],
+                .offset = 0,
+                .range = material->size * material->vecsize
+            };
+            light_info = VkDescriptorBufferInfo{
+                .buffer = light->gpu_bufs[i],
+                .offset = 0,
+                .range = light->size * light->vecsize
+            };
+            writes.push_back(VkWriteDescriptorSet{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = transform.binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &transform_info
-            },
-            VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = material.binding,
+                .dstBinding = material->binding,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .pBufferInfo = &material_info
-            },
-            VkWriteDescriptorSet{
+            });
+            writes.push_back(VkWriteDescriptorSet{
                 .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
                 .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = light.binding,
+                .dstBinding = light->binding,
                 .descriptorCount = 1,
                 .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
                 .pBufferInfo = &light_info
-            }
-        }};
+            });
+        }
+        else {
+            fixed_color_info = VkDescriptorBufferInfo{
+                .buffer = fixed_color->gpu_bufs[i],
+                .offset = 0,
+                .range = fixed_color->size * fixed_color->vecsize
+            };
+            writes.push_back(VkWriteDescriptorSet{
+                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                .dstSet = renderable.descriptor_sets[i],
+                .dstBinding = fixed_color->binding,
+                .descriptorCount = 1,
+                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                .pBufferInfo = &fixed_color_info
+            });
+        }
         vkUpdateDescriptorSets(ins.get_device(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
     }
 }
@@ -220,18 +260,32 @@ void create_descriptor_sets_for_pipeline(vkkk::VkWrappedInstance& ins, CornellRe
 void update_renderable_uniforms(vkkk::VkWrappedInstance& ins, const CornellRenderable& renderable,
     uint32_t swapchain_idx, const PhongLightUBO& light_ubo)
 {
-    PhongTransformUBO transform_ubo{};
-    transform_ubo.model = renderable.model;
-    transform_ubo.view = cam.get_view_mat();
-    transform_ubo.proj = cam.get_proj_mat();
+    if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::Phong) {
+        PhongTransformUBO transform_ubo{};
+        transform_ubo.model = renderable.model;
+        transform_ubo.view = cam.get_view_mat();
+        transform_ubo.proj = cam.get_proj_mat();
 
-    auto& transform = require_ubo(ins, renderable.pipeline_name + ":UniformBufferObject");
-    auto& material = require_ubo(ins, renderable.pipeline_name + ":PhongMaterial");
-    auto& light = require_ubo(ins, renderable.pipeline_name + ":PhongLight");
+        auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
+        auto& material = require_ubo(ins, renderable.pipeline_name + ":material");
+        auto& light = require_ubo(ins, renderable.pipeline_name + ":light");
 
-    ins.sync_uniform(transform.memos[swapchain_idx], &transform_ubo, sizeof(transform_ubo));
-    ins.sync_uniform(material.memos[swapchain_idx], &renderable.material, sizeof(renderable.material));
-    ins.sync_uniform(light.memos[swapchain_idx], &light_ubo, sizeof(light_ubo));
+        ins.sync_uniform(transform.memos[swapchain_idx], &transform_ubo, sizeof(transform_ubo));
+        ins.sync_uniform(material.memos[swapchain_idx], &renderable.material, sizeof(renderable.material));
+        ins.sync_uniform(light.memos[swapchain_idx], &light_ubo, sizeof(light_ubo));
+    }
+    else if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::FixedColor) {
+        FixedColorTransformUBO transform_ubo{};
+        transform_ubo.model = renderable.model;
+        transform_ubo.view = cam.get_view_mat();
+        transform_ubo.proj = cam.get_proj_mat();
+
+        auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
+        auto& fixed_color = require_ubo(ins, renderable.pipeline_name + ":fixed_color");
+
+        ins.sync_uniform(transform.memos[swapchain_idx], &transform_ubo, sizeof(transform_ubo));
+        ins.sync_uniform(fixed_color.memos[swapchain_idx], &renderable.fixed_color, sizeof(renderable.fixed_color));
+    }
 }
 
 PhongMaterialUBO make_material(const glm::vec3& color, float shininess = 16.0f) {
@@ -293,7 +347,8 @@ int main() {
             .pipeline_name = "cornell_left",
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) *
                 glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-            .material = make_material(glm::vec3(0.72f, 0.12f, 0.12f), 8.0f)
+            .material = make_material(glm::vec3(0.72f, 0.12f, 0.12f), 8.0f),
+            .fixed_color = FixedColorUBO{glm::vec4(0.0f, 1.0f, 0.0f, 1.0f)}
         },
         CornellRenderable{
             .mesh_name = "cornell_plane",
@@ -319,11 +374,13 @@ int main() {
             .material = make_material(glm::vec3(0.82f, 0.82f, 0.82f), 24.0f)
         }
     };
+    renderables[3].shader_type = vkkk::built_in_shader::BuiltInShaderType::FixedColor;
 
     for (auto& renderable : renderables) {
+        const auto shader_type = renderable.shader_type;
         if (!shader_mgr.create_pipeline(
             renderable.pipeline_name,
-            vkkk::built_in_shader::BuiltInShaderType::Phong,
+            shader_type,
             {vkkk::VERTEX, vkkk::NORMAL},
             ppl_opt))
         {

@@ -96,9 +96,11 @@ enum AttachmentType {
 };
 
 struct Pipeline {
-    VkPipeline                              pipeline;
-    VkPipelineLayout                        ppl_layout;
-    VkDescriptorSetLayout                   descriptor_layout;
+    VkPipeline                              pipeline = VK_NULL_HANDLE;
+    VkPipelineLayout                        ppl_layout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout                   descriptor_layout = VK_NULL_HANDLE;
+    VkDescriptorPool                        descriptor_pool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet>            descriptor_sets;
 };
 
 struct MeshGPU {
@@ -371,6 +373,7 @@ public:
     std::pair<VkBuffer, VkDeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
     void delete_buffer(VkBuffer buf, VkDeviceMemory memo) const;
     void sync_uniform(VkDeviceMemory memo, const void* data, uint32_t size) const;
+    UBO& require_ubo(const std::string& full_name);
 
 private:
     // Private methods

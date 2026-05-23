@@ -43,37 +43,37 @@ vkkk::Camera cam{
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
     if (key == GLFW_KEY_E) {
         if (action == GLFW_PRESS)
-            cam.y = 1.f;
+            cam.y = .01f;
         else
             cam.y = 0.f;
     }
     else if (key == GLFW_KEY_Q) {
         if (action == GLFW_PRESS)
-            cam.y = -1.f;
+            cam.y = -.01f;
         else
             cam.y = 0.f;
     }
     else if (key == GLFW_KEY_W) {
         if (action == GLFW_PRESS)
-            cam.z = 1.f;
+            cam.z = .01f;
         else
             cam.z = 0.f;
     }
     else if (key == GLFW_KEY_S) {
         if (action == GLFW_PRESS)
-            cam.z = -1.f;
+            cam.z = -.01f;
         else
             cam.z = 0.f;
     }
     else if (key == GLFW_KEY_A) {
         if (action == GLFW_PRESS)
-            cam.x = -1.f;
+            cam.x = -.01f;
         else
             cam.x = 0.f;
     }
     else if (key == GLFW_KEY_D) {
         if (action == GLFW_PRESS)
-            cam.x = 1.f;
+            cam.x = .01f;
         else
             cam.x = 0.f;
     }
@@ -119,143 +119,7 @@ struct CornellRenderable {
     glm::mat4 model{1.0f};
     PhongMaterialUBO material{};
     FixedColorUBO fixed_color{};
-    VkPipeline pipeline{VK_NULL_HANDLE};
-    VkPipelineLayout layout{VK_NULL_HANDLE};
-    VkDescriptorPool descriptor_pool{VK_NULL_HANDLE};
-    std::vector<VkDescriptorSet> descriptor_sets;
 };
-
-vkkk::UBO& require_ubo(vkkk::VkWrappedInstance& ins, const std::string& full_name) {
-    auto found = ins.ubos.find(full_name);
-    if (found == ins.ubos.end()) {
-        throw std::runtime_error("ubo not found: " + full_name);
-    }
-    return found->second;
-}
-
-void create_descriptor_sets_for_pipeline(vkkk::VkWrappedInstance& ins, CornellRenderable& renderable) {
-    const auto ppl_found = ins.pipelines.find(renderable.pipeline_name);
-    if (ppl_found == ins.pipelines.end()) {
-        throw std::runtime_error("pipeline not found: " + renderable.pipeline_name);
-    }
-
-    renderable.pipeline = ppl_found->second.pipeline;
-    renderable.layout = ppl_found->second.ppl_layout;
-
-    auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
-    vkkk::UBO* material = nullptr;
-    vkkk::UBO* light = nullptr;
-    vkkk::UBO* fixed_color = nullptr;
-    uint32_t ubo_count = 0;
-    if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::Phong) {
-        material = &require_ubo(ins, renderable.pipeline_name + ":material");
-        light = &require_ubo(ins, renderable.pipeline_name + ":light");
-        ubo_count = 3;
-    }
-    else if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::FixedColor) {
-        fixed_color = &require_ubo(ins, renderable.pipeline_name + ":fixed_color");
-        ubo_count = 2;
-    }
-    else {
-        throw std::runtime_error("unsupported shader type for descriptor setup");
-    }
-
-    const uint32_t swapchain_cnt = ins.get_swapchain_cnt();
-    renderable.descriptor_sets.resize(swapchain_cnt);
-
-    const std::array<VkDescriptorPoolSize, 1> pool_sizes{{
-        VkDescriptorPoolSize{
-            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .descriptorCount = swapchain_cnt * ubo_count
-        }
-    }};
-
-    VkDescriptorPoolCreateInfo pool_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
-        .maxSets = swapchain_cnt,
-        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
-        .pPoolSizes = pool_sizes.data()
-    };
-    if (vkCreateDescriptorPool(ins.get_device(), &pool_info, nullptr, &renderable.descriptor_pool) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor pool for " + renderable.pipeline_name);
-    }
-
-    std::vector<VkDescriptorSetLayout> layouts(swapchain_cnt, ppl_found->second.descriptor_layout);
-    VkDescriptorSetAllocateInfo alloc_info{
-        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-        .descriptorPool = renderable.descriptor_pool,
-        .descriptorSetCount = swapchain_cnt,
-        .pSetLayouts = layouts.data()
-    };
-    if (vkAllocateDescriptorSets(ins.get_device(), &alloc_info, renderable.descriptor_sets.data()) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate descriptor sets for " + renderable.pipeline_name);
-    }
-
-    for (uint32_t i = 0; i < swapchain_cnt; ++i) {
-        VkDescriptorBufferInfo transform_info{
-            .buffer = transform.gpu_bufs[i],
-            .offset = 0,
-            .range = transform.size * transform.vecsize
-        };
-        std::vector<VkWriteDescriptorSet> writes;
-        writes.push_back(VkWriteDescriptorSet{
-            .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-            .dstSet = renderable.descriptor_sets[i],
-            .dstBinding = transform.binding,
-            .descriptorCount = 1,
-            .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            .pBufferInfo = &transform_info
-        });
-
-        VkDescriptorBufferInfo material_info{};
-        VkDescriptorBufferInfo light_info{};
-        VkDescriptorBufferInfo fixed_color_info{};
-        if (renderable.shader_type == vkkk::built_in_shader::BuiltInShaderType::Phong) {
-            material_info = VkDescriptorBufferInfo{
-                .buffer = material->gpu_bufs[i],
-                .offset = 0,
-                .range = material->size * material->vecsize
-            };
-            light_info = VkDescriptorBufferInfo{
-                .buffer = light->gpu_bufs[i],
-                .offset = 0,
-                .range = light->size * light->vecsize
-            };
-            writes.push_back(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = material->binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &material_info
-            });
-            writes.push_back(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = light->binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &light_info
-            });
-        }
-        else {
-            fixed_color_info = VkDescriptorBufferInfo{
-                .buffer = fixed_color->gpu_bufs[i],
-                .offset = 0,
-                .range = fixed_color->size * fixed_color->vecsize
-            };
-            writes.push_back(VkWriteDescriptorSet{
-                .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
-                .dstSet = renderable.descriptor_sets[i],
-                .dstBinding = fixed_color->binding,
-                .descriptorCount = 1,
-                .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-                .pBufferInfo = &fixed_color_info
-            });
-        }
-        vkUpdateDescriptorSets(ins.get_device(), static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
-    }
-}
 
 void update_renderable_uniforms(vkkk::VkWrappedInstance& ins, const CornellRenderable& renderable,
     uint32_t swapchain_idx, const PhongLightUBO& light_ubo)
@@ -266,9 +130,9 @@ void update_renderable_uniforms(vkkk::VkWrappedInstance& ins, const CornellRende
         transform_ubo.view = cam.get_view_mat();
         transform_ubo.proj = cam.get_proj_mat();
 
-        auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
-        auto& material = require_ubo(ins, renderable.pipeline_name + ":material");
-        auto& light = require_ubo(ins, renderable.pipeline_name + ":light");
+        auto& transform = ins.require_ubo(renderable.pipeline_name + ":ubo");
+        auto& material = ins.require_ubo(renderable.pipeline_name + ":material");
+        auto& light = ins.require_ubo(renderable.pipeline_name + ":light");
 
         ins.sync_uniform(transform.memos[swapchain_idx], &transform_ubo, sizeof(transform_ubo));
         ins.sync_uniform(material.memos[swapchain_idx], &renderable.material, sizeof(renderable.material));
@@ -280,8 +144,8 @@ void update_renderable_uniforms(vkkk::VkWrappedInstance& ins, const CornellRende
         transform_ubo.view = cam.get_view_mat();
         transform_ubo.proj = cam.get_proj_mat();
 
-        auto& transform = require_ubo(ins, renderable.pipeline_name + ":ubo");
-        auto& fixed_color = require_ubo(ins, renderable.pipeline_name + ":fixed_color");
+        auto& transform = ins.require_ubo(renderable.pipeline_name + ":ubo");
+        auto& fixed_color = ins.require_ubo(renderable.pipeline_name + ":fixed_color");
 
         ins.sync_uniform(transform.memos[swapchain_idx], &transform_ubo, sizeof(transform_ubo));
         ins.sync_uniform(fixed_color.memos[swapchain_idx], &renderable.fixed_color, sizeof(renderable.fixed_color));
@@ -386,7 +250,6 @@ int main() {
         {
             throw std::runtime_error("failed to create pipeline: " + renderable.pipeline_name);
         }
-        create_descriptor_sets_for_pipeline(ins, renderable);
     }
 
     ins.setup_key_cbk(key_callback);
@@ -402,7 +265,7 @@ int main() {
 
         PhongLightUBO light{};
         light.lightPos = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);
-        light.lightColor = glm::vec4(18.0f, 18.0f, 18.0f, 1.0f);
+        light.lightColor = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f);
         light.viewPos = glm::vec4(cam.pos, 1.0f);
 
         for (const auto& renderable : renderables) {
@@ -419,11 +282,16 @@ int main() {
                 if (mesh_found == ins.meshes.end()) {
                     continue;
                 }
-                ins.bind_graphics_pipeline(cmd_bufs[idx], renderable.pipeline);
+                const auto pipeline_found = ins.pipelines.find(renderable.pipeline_name);
+                if (pipeline_found == ins.pipelines.end()) {
+                    continue;
+                }
+                const auto& pipeline = pipeline_found->second;
+                ins.bind_graphics_pipeline(cmd_bufs[idx], pipeline.pipeline);
                 mesh_found->second.emit_draw_cmd(
                     cmd_bufs[idx],
-                    renderable.layout,
-                    &renderable.descriptor_sets[idx]
+                    pipeline.ppl_layout,
+                    &pipeline.descriptor_sets[idx]
                 );
             }
         }
@@ -431,12 +299,6 @@ int main() {
 
     ins.create_sync_objects();
     ins.mainloop(cmd_bufs);
-    for (auto& renderable : renderables) {
-        if (renderable.descriptor_pool != VK_NULL_HANDLE) {
-            vkDestroyDescriptorPool(ins.get_device(), renderable.descriptor_pool, nullptr);
-            renderable.descriptor_pool = VK_NULL_HANDLE;
-        }
-    }
 
     return 0;
 }

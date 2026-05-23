@@ -170,6 +170,17 @@ VkWrappedInstance::~VkWrappedInstance() {
         vkFreeMemory(device, mesh.ibuf_memo, nullptr);
     }
 
+    for (auto& [name, pipeline] : pipelines) {
+        if (pipeline.descriptor_pool != VK_NULL_HANDLE)
+            vkDestroyDescriptorPool(device, pipeline.descriptor_pool, nullptr);
+        if (pipeline.pipeline != VK_NULL_HANDLE)
+            vkDestroyPipeline(device, pipeline.pipeline, nullptr);
+        if (pipeline.ppl_layout != VK_NULL_HANDLE)
+            vkDestroyPipelineLayout(device, pipeline.ppl_layout, nullptr);
+        if (pipeline.descriptor_layout != VK_NULL_HANDLE)
+            vkDestroyDescriptorSetLayout(device, pipeline.descriptor_layout, nullptr);
+    }
+
     for (auto& [name, rt] : render_targets) {
         vkDestroyImageView(device, rt.view, nullptr);
         vkDestroyImage(device, rt.image, nullptr);
@@ -1396,6 +1407,14 @@ void VkWrappedInstance::sync_uniform(VkDeviceMemory memo, const void* data, uint
     vkUnmapMemory(device, memo);
 }
 
+UBO& VkWrappedInstance::require_ubo(const std::string& full_name) {
+    auto found = ubos.find(full_name);
+    if (found == ubos.end()) {
+        throw std::runtime_error("ubo not found: " + full_name);
+    }
+    return found->second;
+}
+
 bool VkWrappedInstance::add_ubo(const std::string& name, const uint32_t binding,
     uint32_t size, uint32_t vecsize)
 {
@@ -1508,6 +1527,12 @@ bool VkWrappedInstance::add_texture(const std::string& name, const uint32_t bind
         std::cout << "Create sampler for texture " << name << " failed" << std::endl;
         return false;
     }
+
+    tex.descriptor = VkDescriptorImageInfo{
+        .sampler = tex.sampler,
+        .imageView = tex.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
 
     textures.emplace(name, std::move(tex));
 
@@ -1630,6 +1655,12 @@ bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t bind
         return false;
     }
 
+    tex.descriptor = VkDescriptorImageInfo{
+        .sampler = tex.sampler,
+        .imageView = tex.view,
+        .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+    };
+
     textures.emplace(name, std::move(tex));
 
     return true;
@@ -1646,6 +1677,8 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     std::vector<VkVertexInputAttributeDescription>  attr_descriptions;
     std::vector<VkDescriptorSetLayoutBinding>       descriptor_layouts;
     std::vector<VkPipelineShaderStageCreateInfo>    shader_infos;
+    std::map<uint32_t, std::string>                 ubo_binding_to_name;
+    std::map<uint32_t, std::string>                 tex_binding_to_name;
 
     for (auto& mod : modules) {
         // Create vk shadermodules
@@ -1675,6 +1708,7 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
             auto& [struct_size, array_size, binding] = ubo_info;
             auto ppl_ubo_name = name + ":" + ubo_name;
             add_ubo(ppl_ubo_name, binding, struct_size, array_size);
+            ubo_binding_to_name[binding] = ppl_ubo_name;
 
             VkDescriptorSetLayoutBinding desc_layout_binding {
                 .binding = binding,
@@ -1699,6 +1733,7 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
                 add_texture(ppl_tex_name, tex_binding, path);
             else
                 add_cubemap(ppl_tex_name, tex_binding, path);
+            tex_binding_to_name[tex_binding] = ppl_tex_name;
 
             VkDescriptorSetLayoutBinding binding {
                 .binding = tex_binding,
@@ -1796,6 +1831,103 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
     {
         std::cout << "Pipeline " << name << " creation failed" << std::endl;
         return false;
+    }
+
+    uint32_t uniform_desc_count = 0;
+    for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+        auto& ubo = require_ubo(ubo_name);
+        uniform_desc_count += static_cast<uint32_t>(ubo.vecsize);
+    }
+    uint32_t image_desc_count = 0;
+    for (const auto& [binding, tex_name] : tex_binding_to_name) {
+        auto tex_found = textures.find(tex_name);
+        if (tex_found != textures.end())
+            image_desc_count += static_cast<uint32_t>(tex_found->second.vecsize);
+    }
+
+    std::vector<VkDescriptorPoolSize> pool_sizes;
+    if (uniform_desc_count > 0) {
+        pool_sizes.push_back(VkDescriptorPoolSize{
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = uniform_desc_count * swapchain_cnt
+        });
+    }
+    if (image_desc_count > 0) {
+        pool_sizes.push_back(VkDescriptorPoolSize{
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = image_desc_count * swapchain_cnt
+        });
+    }
+
+    if (!pool_sizes.empty()) {
+        VkDescriptorPoolCreateInfo pool_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+            .maxSets = swapchain_cnt,
+            .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+            .pPoolSizes = pool_sizes.data()
+        };
+        if (vkCreateDescriptorPool(device, &pool_info, nullptr, &ppl.descriptor_pool) != VK_SUCCESS) {
+            std::cout << "Descriptor pool creation failed for pipeline " << name << std::endl;
+            return false;
+        }
+
+        ppl.descriptor_sets.resize(swapchain_cnt);
+        std::vector<VkDescriptorSetLayout> set_layouts(swapchain_cnt, ppl.descriptor_layout);
+        VkDescriptorSetAllocateInfo alloc_info{
+            .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+            .descriptorPool = ppl.descriptor_pool,
+            .descriptorSetCount = swapchain_cnt,
+            .pSetLayouts = set_layouts.data()
+        };
+        if (vkAllocateDescriptorSets(device, &alloc_info, ppl.descriptor_sets.data()) != VK_SUCCESS) {
+            std::cout << "Descriptor set allocation failed for pipeline " << name << std::endl;
+            return false;
+        }
+
+        for (uint32_t i = 0; i < swapchain_cnt; ++i) {
+            std::vector<VkDescriptorBufferInfo> buffer_infos;
+            std::vector<VkDescriptorImageInfo> image_infos;
+            std::vector<VkWriteDescriptorSet> writes;
+            buffer_infos.reserve(ubo_binding_to_name.size());
+            image_infos.reserve(tex_binding_to_name.size());
+            writes.reserve(ubo_binding_to_name.size() + tex_binding_to_name.size());
+
+            for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+                auto& ubo = require_ubo(ubo_name);
+                buffer_infos.push_back(VkDescriptorBufferInfo{
+                    .buffer = ubo.gpu_bufs[i],
+                    .offset = 0,
+                    .range = ubo.size * ubo.vecsize
+                });
+                writes.push_back(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = ppl.descriptor_sets[i],
+                    .dstBinding = binding,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+                    .pBufferInfo = &buffer_infos.back()
+                });
+            }
+
+            for (const auto& [binding, tex_name] : tex_binding_to_name) {
+                auto tex_found = textures.find(tex_name);
+                if (tex_found == textures.end()) {
+                    continue;
+                }
+                image_infos.push_back(tex_found->second.descriptor);
+                writes.push_back(VkWriteDescriptorSet{
+                    .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+                    .dstSet = ppl.descriptor_sets[i],
+                    .dstBinding = binding,
+                    .descriptorCount = 1,
+                    .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+                    .pImageInfo = &image_infos.back()
+                });
+            }
+
+            if (!writes.empty())
+                vkUpdateDescriptorSets(device, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+        }
     }
 
     pipelines.emplace(name, ppl);

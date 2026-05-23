@@ -19,7 +19,6 @@
 #include <glm/glm.hpp>
 
 #include "vk_ins/cmd_buf.h"
-#include "vk_ins/pipeline_mgr.h"
 #include "vk_ins/types.h"
 
 namespace vkkk

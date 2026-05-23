@@ -235,61 +235,10 @@ void bind_types(nb::module_& m) {
         .def("find_depth_format", &VkWrappedInstance::find_depth_format)
         .def("load_mesh", &VkWrappedInstance::load_mesh);
 
-    nb::class_<UniformMgr> umcl(m, "UniformMgr");
-
-    umcl.def(nb::init<VkWrappedInstance*>())
-        .def("free_gpu_resources", &UniformMgr::free_gpu_resources)
-        //.def("add_buffer", &UniformMgr::add_buffer)
-        //.def("add_texture", &UniformMgr::add_texture)
-        //.def("add_cubemap", &UniformMgr::add_cubemap)
-        .def("generate_writes", &UniformMgr::generate_writes)
-        .def("set_dest_set", &UniformMgr::set_dest_set)
-        //.def("find_ubo", &Uniform::find_ubo)
-        .def("update_ubos", &UniformMgr::update_ubos);
-
     nb::class_<CommandBuffers> cbcl(m, "CommandBuffers");
 
     cbcl.def(nb::init<VkWrappedInstance*>())
         .def("alloc", &CommandBuffers::alloc);
-
-    nb::class_<PipelineMgr> pycl(m, "PipelineMgr");
-
-    pycl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&PipelineMgr::instance<VkWrappedInstance*>))
-        .def("free_gpu_resources", &PipelineMgr::free_gpu_resources)
-        .def("register_pipeline", &PipelineMgr::register_pipeline)
-        .def("create_pipelines", &PipelineMgr::create_pipelines)
-        .def("bind", &PipelineMgr::bind);
-
-    /*
-    nb::class_<MeshDeprecated> mecl(m, "MeshDeprecated");
-
-    mecl.def(nb::init<VkWrappedInstance*, const std::vector<VERT_COMP>&, bool>())
-        .def(nb::init<const MeshDeprecated&>())
-        .def("load", [](MeshDeprecated& m, uint32_t v, nb::bytes& vbuf, uint32_t i, nb::bytes& ibuf) {
-            m.load(v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
-        })
-        .def("unload", &MeshDeprecated::unload)
-        .def("set_view", &MeshDeprecated::set_view)
-        .def("load_gpu", &MeshDeprecated::load_gpu)
-        .def("unload_gpu", &MeshDeprecated::unload_gpu)
-        .def("emit_draw_cmd", nb::overload_cast<CommandBuffers&, const uint32_t,
-            PipelineMgr&, const std::string&>(&MeshDeprecated::emit_draw_cmd))
-        .def("get_vert", [](const MeshDeprecated& m, size_t idx) {
-            if (idx >= m.vcnt * 3)
-                throw nb::index_error();
-            return m.vbuf[idx];
-        });
-
-    nb::class_<MeshMgrDeprecated> mmcl(m, "MeshMgrDeprecated");
-
-    mmcl.def_static("Instance", nb::overload_cast<VkWrappedInstance*>(&MeshMgrDeprecated::instance<VkWrappedInstance*>))
-        .def("load", [](MeshMgrDeprecated& mgr, const std::vector<VERT_COMP>& cs, const uint32_t v, nb::bytes& vbuf, const uint32_t i, nb::bytes& ibuf) {
-            mgr.load(cs, v, vbuf.c_str(), vbuf.size(), i, ibuf.c_str(), ibuf.size());
-        })
-        .def("pour_info_gpu", &MeshMgrDeprecated::pour_into_gpu)
-        .def("free_gpu_resources", &MeshMgrDeprecated::free_gpu_resources);
-        //.def("emit_draw_cmds", &MeshMgrDeprecated::emit_draw_cmds);
-    */
 
     nb::class_<Mesh>(m, "Mesh")
         .def(nb::init<const std::vector<VERT_COMP>&, bool>())

@@ -12,7 +12,6 @@
 #include <spirv_cross/spirv_glsl.hpp>
 
 #include "vk_ins/types.h"
-#include "vk_ins/uniform_mgr.h"
 
 namespace fs = std::filesystem;
 

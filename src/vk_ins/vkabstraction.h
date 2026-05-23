@@ -271,8 +271,20 @@ public:
         return device;
     }
 
+    inline VkInstance get_instance() const {
+        return instance;
+    }
+
+    inline VkPhysicalDevice get_physical_device() const {
+        return physical_device;
+    }
+
     inline VkQueue get_graphic_queue() {
         return graphic_queue;
+    }
+
+    inline uint32_t get_graphic_queue_family_index() const {
+        return queue_family_idx.graphic_family.value();
     }
 
     inline auto get_swapchain() {

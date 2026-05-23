@@ -1184,6 +1184,8 @@ void VkWrappedInstance::bind_graphics_pipeline(VkCommandBuffer cmd_buf, VkPipeli
 }
 
 void VkWrappedInstance::create_sync_objects() {
+    init_time();
+
     image_available_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
     render_finished_semaphores.resize(MAX_FRAMES_IN_FLIGHT);
     in_flight_fences.resize(MAX_FRAMES_IN_FLIGHT);

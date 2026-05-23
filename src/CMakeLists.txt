@@ -22,6 +22,12 @@ set(HEADERS
     vk_ins/shader_mgr.h)
 
 set(SRCS
+    ../thirdparty/imgui/imgui.cpp
+    ../thirdparty/imgui/imgui_draw.cpp
+    ../thirdparty/imgui/imgui_tables.cpp
+    ../thirdparty/imgui/imgui_widgets.cpp
+    ../thirdparty/imgui/backends/imgui_impl_glfw.cpp
+    ../thirdparty/imgui/backends/imgui_impl_vulkan.cpp
     built_in_shader/built_in_shader_mgr.cpp
     asset_mgr/scene.cpp
     asset_mgr/light_mgr.cpp
@@ -36,6 +42,10 @@ set(SRCS
     vk_ins/shader_mgr.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})
+target_include_directories(vkkk
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/thirdparty/imgui
+        ${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
 target_link_libraries(vkkk
     PUBLIC
         Vulkan::Vulkan

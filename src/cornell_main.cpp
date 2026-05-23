@@ -1,11 +1,14 @@
 #include <array>
+#include <chrono>
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "asset_mgr/scene.h"
 #include "asset_mgr/light_mgr.h"
@@ -14,6 +17,7 @@
 #include "built_in_shader/fixed_color.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
+#include "gui/gui.h"
 #include "vk_ins/cmd_buf.h"
 #include "vk_ins/vkabstraction.h"
 
@@ -41,40 +45,43 @@ vkkk::Camera cam{
 };
 
 void key_callback(GLFWwindow* win, int key, int code, int action, int mods) {
+    const bool key_down = action == GLFW_PRESS || action == GLFW_REPEAT;
+    const bool key_up = action == GLFW_RELEASE;
+
     if (key == GLFW_KEY_E) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.y = .01f;
-        else
+        else if (key_up)
             cam.y = 0.f;
     }
     else if (key == GLFW_KEY_Q) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.y = -.01f;
-        else
+        else if (key_up)
             cam.y = 0.f;
     }
     else if (key == GLFW_KEY_W) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.z = .01f;
-        else
+        else if (key_up)
             cam.z = 0.f;
     }
     else if (key == GLFW_KEY_S) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.z = -.01f;
-        else
+        else if (key_up)
             cam.z = 0.f;
     }
     else if (key == GLFW_KEY_A) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.x = -.01f;
-        else
+        else if (key_up)
             cam.x = 0.f;
     }
     else if (key == GLFW_KEY_D) {
-        if (action == GLFW_PRESS)
+        if (key_down)
             cam.x = .01f;
-        else
+        else if (key_up)
             cam.x = 0.f;
     }
 }
@@ -252,6 +259,11 @@ int main() {
         }
     }
 
+    vkkk::ImGuiHud hud;
+    if (!hud.init(&ins)) {
+        throw std::runtime_error("failed to initialize imgui hud");
+    }
+
     ins.setup_key_cbk(key_callback);
     ins.setup_mouse_btn_cbk(mouse_btn_callback);
     ins.setup_mouse_pos_cbk(mouse_pos_callback);
@@ -259,8 +271,16 @@ int main() {
     vkkk::CommandBuffers cmd_bufs(&ins);
     cmd_bufs.alloc();
 
+    bool limit_fps_enabled = true;
+    float target_fps = 60.0f;
+    float current_fps = 0.0f;
+    float frame_dt = 0.0f;
+    float raw_frame_dt = 0.0f;
+
     ins.set_update_cbk([&](uint32_t idx, float duration) {
-        cam.update_position(duration);
+        raw_frame_dt = duration;
+
+        cam.update_position(frame_dt);
         cam.update_orientation();
 
         PhongLightUBO light{};
@@ -271,34 +291,103 @@ int main() {
         for (const auto& renderable : renderables) {
             update_renderable_uniforms(ins, renderable, idx, light);
         }
+
+        hud.begin_frame();
+        ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        constexpr ImGuiWindowFlags hud_flags =
+            ImGuiWindowFlags_NoDecoration
+            | ImGuiWindowFlags_AlwaysAutoResize
+            | ImGuiWindowFlags_NoSavedSettings
+            | ImGuiWindowFlags_NoFocusOnAppearing
+            | ImGuiWindowFlags_NoNav;
+        ImGui::Begin("FPS HUD", nullptr, hud_flags);
+        ImGui::Checkbox("Limit FPS", &limit_fps_enabled);
+        ImGui::SliderFloat("Target FPS", &target_fps, 15.0f, 240.0f, "%.0f");
+        ImGui::Text("FPS: %.1f", current_fps);
+        ImGui::Text("Frame: %.2f ms", frame_dt * 1000.0f);
+        ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
+        ImGui::End();
+
+        auto& cmd = cmd_bufs[idx];
+        VkCommandBufferBeginInfo begin_info{};
+        begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        if (vkBeginCommandBuffer(cmd, &begin_info) != VK_SUCCESS) {
+            throw std::runtime_error("failed to begin recording command buffer");
+        }
+
+        VkRenderPassBeginInfo renderpass_info{};
+        renderpass_info.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        renderpass_info.renderPass = ins.get_renderpass();
+        renderpass_info.framebuffer = ins.get_framebuffers()[idx];
+        renderpass_info.renderArea.offset = {0, 0};
+        renderpass_info.renderArea.extent = ins.get_swapchain_extent();
+
+        std::array<VkClearValue, 2> clear_values{};
+        clear_values[0].color = {{0.f, 0.f, 0.f, 1.f}};
+        clear_values[1].depthStencil = {1.f, 0};
+        renderpass_info.clearValueCount = static_cast<uint32_t>(clear_values.size());
+        renderpass_info.pClearValues = clear_values.data();
+
+        vkCmdBeginRenderPass(cmd, &renderpass_info, VK_SUBPASS_CONTENTS_INLINE);
+        for (const auto& renderable : renderables) {
+            auto mesh_found = ins.meshes.find(renderable.mesh_name);
+            if (mesh_found == ins.meshes.end()) {
+                continue;
+            }
+            const auto pipeline_found = ins.pipelines.find(renderable.pipeline_name);
+            if (pipeline_found == ins.pipelines.end()) {
+                continue;
+            }
+            const auto& pipeline = pipeline_found->second;
+            ins.bind_graphics_pipeline(cmd, pipeline.pipeline);
+            mesh_found->second.emit_draw_cmd(
+                cmd,
+                pipeline.ppl_layout,
+                &pipeline.descriptor_sets[idx]
+            );
+        }
+        hud.render(cmd);
+        vkCmdEndRenderPass(cmd);
+
+        if (vkEndCommandBuffer(cmd) != VK_SUCCESS) {
+            throw std::runtime_error("failed to record command buffer");
+        }
     });
 
-    ins.record_cmds(
-        cmd_bufs.bufs,
-        ins.get_framebuffers(),
-        [&](uint32_t idx) {
-            for (const auto& renderable : renderables) {
-                auto mesh_found = ins.meshes.find(renderable.mesh_name);
-                if (mesh_found == ins.meshes.end()) {
-                    continue;
-                }
-                const auto pipeline_found = ins.pipelines.find(renderable.pipeline_name);
-                if (pipeline_found == ins.pipelines.end()) {
-                    continue;
-                }
-                const auto& pipeline = pipeline_found->second;
-                ins.bind_graphics_pipeline(cmd_bufs[idx], pipeline.pipeline);
-                mesh_found->second.emit_draw_cmd(
-                    cmd_bufs[idx],
-                    pipeline.ppl_layout,
-                    &pipeline.descriptor_sets[idx]
-                );
+    ins.create_sync_objects();
+
+    using Clock = std::chrono::steady_clock;
+    auto next_frame_tick = Clock::now();
+    while (!glfwWindowShouldClose(ins.get_window())) {
+        glfwPollEvents();
+
+        const auto frame_begin = Clock::now();
+        ins.draw_frame(cmd_bufs);
+        auto frame_end = Clock::now();
+
+        if (limit_fps_enabled && target_fps > 1.0f) {
+            const auto frame_period = std::chrono::duration<float>(1.0f / target_fps);
+            next_frame_tick += std::chrono::duration_cast<Clock::duration>(frame_period);
+            if (frame_end < next_frame_tick) {
+                std::this_thread::sleep_until(next_frame_tick);
+                frame_end = Clock::now();
+            }
+            else {
+                // Running behind schedule; resync to avoid compounding drift.
+                next_frame_tick = frame_end;
             }
         }
-    );
+        else {
+            next_frame_tick = frame_end;
+        }
 
-    ins.create_sync_objects();
-    ins.mainloop(cmd_bufs);
+        frame_dt = std::chrono::duration<float>(frame_end - frame_begin).count();
+        current_fps = frame_dt > 0.0f ? 1.0f / frame_dt : 0.0f;
+    }
+
+    vkDeviceWaitIdle(ins.get_device());
+    hud.shutdown();
 
     return 0;
 }

@@ -10,6 +10,9 @@ set(HEADERS
     concepts/line.h
     concepts/mesh.h
     gui/gui.h
+    renderer/renderer.h
+    renderer/forward.h
+    renderer/deferred.h
     utils/common.h
     utils/io.h
     utils/singleton.h

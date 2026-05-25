@@ -6,6 +6,7 @@
 #include <vector>
 #include <utility>
 #include <tuple>
+#include <unordered_map>
 
 #include <vulkan/vulkan.h>
 #include <spirv_cross/spirv.hpp>

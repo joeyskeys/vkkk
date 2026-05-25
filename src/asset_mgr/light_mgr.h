@@ -42,6 +42,9 @@ public:
     void update_uniform(void* data) const;
     void update_uniform(LightInfo& infos) const;
 
+    inline const std::vector<PointLight>& point_lights() const { return pt_lights; }
+    inline const std::vector<DirectionalLight>& directional_lights() const { return dir_lights; }
+
 private:
     // since the lights.h header is shared for shader code, we cannot
     // have a traditional OOP design, and hence here in the manager,

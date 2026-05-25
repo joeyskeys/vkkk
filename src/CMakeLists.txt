@@ -36,6 +36,7 @@ set(SRCS
     concepts/line.cpp
     concepts/mesh.cpp
     gui/gui.cpp
+    renderer/forward.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
     vk_ins/vkabstraction.cpp

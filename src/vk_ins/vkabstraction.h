@@ -539,8 +539,12 @@ public:
         const fs::path& path);
     bool add_cubemap(const std::string& name, const uint32_t binding,
         const fs::path& path);
+    bool add_sampled_image(const std::string& name, uint32_t binding, VkImageView view,
+        VkFormat format, VkImageAspectFlags aspect, VkImageLayout layout,
+        bool depth_compare = false);
     bool create_pipeline(const std::string&, std::vector<ShaderModule>&,
-        const std::vector<VERT_COMP>&, PipelineOption& option);
+        const std::vector<VERT_COMP>&, PipelineOption& option,
+        VkRenderPass render_pass_override = VK_NULL_HANDLE);
 
     bool create_render_target(const std::string&, const VkFormat,
         const VkSampleCountFlagBits=VK_SAMPLE_COUNT_1_BIT,

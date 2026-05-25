@@ -1668,10 +1668,45 @@ bool VkWrappedInstance::add_cubemap(const std::string& name, const uint32_t bind
     return true;
 }
 
+bool VkWrappedInstance::add_sampled_image(const std::string& name, const uint32_t binding,
+    VkImageView view, const VkFormat format, const VkImageAspectFlags aspect,
+    const VkImageLayout layout, const bool depth_compare)
+{
+    Texture tex{.binding = binding, .vecsize = 1, .layout = layout};
+
+    VkSamplerCreateInfo sampler_info{};
+    sampler_info.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    sampler_info.magFilter = VK_FILTER_LINEAR;
+    sampler_info.minFilter = VK_FILTER_LINEAR;
+    sampler_info.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    sampler_info.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    sampler_info.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
+    sampler_info.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+    sampler_info.compareEnable = depth_compare ? VK_TRUE : VK_FALSE;
+    sampler_info.compareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+    sampler_info.unnormalizedCoordinates = VK_FALSE;
+
+    if (vkCreateSampler(device, &sampler_info, nullptr, &tex.sampler) != VK_SUCCESS) {
+        std::cout << "Create sampler for sampled image " << name << " failed" << std::endl;
+        return false;
+    }
+
+    tex.view = view;
+    tex.descriptor = VkDescriptorImageInfo{
+        .sampler = tex.sampler,
+        .imageView = tex.view,
+        .imageLayout = layout
+    };
+
+    textures.emplace(name, std::move(tex));
+    return true;
+}
+
 bool VkWrappedInstance::create_pipeline(const std::string& name,
     std::vector<ShaderModule>& modules,
     const std::vector<VERT_COMP>& comps,
-    PipelineOption& option)
+    PipelineOption& option,
+    const VkRenderPass render_pass_override)
 {
     // Pipeline creation resources
     std::vector<VkShaderModule>                     vkmodules;
@@ -1723,24 +1758,36 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
         }
 
         for (auto& [tex_name, tex_binding] : mod.img_infos) {
-            auto tex_path_info = mod.tex_img_pairs.find(tex_name);
-            if (tex_path_info == mod.tex_img_pairs.end()) {
-                std::cout << "No texture assigned for sampler " << tex_name
-                    << std::endl;
-            }
+            const auto ppl_tex_name = name + ":" + tex_name;
+            uint32_t descriptor_count = 1;
+            if (textures.find(ppl_tex_name) == textures.end()) {
+                auto tex_path_info = mod.tex_img_pairs.find(tex_name);
+                if (tex_path_info == mod.tex_img_pairs.end()) {
+                    std::cout << "No texture assigned for sampler " << tex_name
+                        << std::endl;
+                    continue;
+                }
 
-            auto& [path, is_cubemap] = tex_path_info->second;
-            auto ppl_tex_name = name + ":" + tex_name;
-            if (!is_cubemap)
-                add_texture(ppl_tex_name, tex_binding, path);
-            else
-                add_cubemap(ppl_tex_name, tex_binding, path);
+                auto& [path, is_cubemap] = tex_path_info->second;
+                descriptor_count = is_cubemap ? 6u : 1u;
+                if (!is_cubemap) {
+                    if (!add_texture(ppl_tex_name, tex_binding, path)) {
+                        continue;
+                    }
+                }
+                else if (!add_cubemap(ppl_tex_name, tex_binding, path)) {
+                    continue;
+                }
+            }
+            else {
+                descriptor_count = static_cast<uint32_t>(textures.at(ppl_tex_name).vecsize);
+            }
             tex_binding_to_name[tex_binding] = ppl_tex_name;
 
             VkDescriptorSetLayoutBinding binding {
                 .binding = tex_binding,
                 .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-                .descriptorCount = is_cubemap ? uint32_t(6) : uint32_t(1),
+                .descriptorCount = descriptor_count,
                 .stageFlags = static_cast<VkShaderStageFlags>(mod.type),
                 .pImmutableSamplers = nullptr
             };
@@ -1821,7 +1868,9 @@ bool VkWrappedInstance::create_pipeline(const std::string& name,
         .pDepthStencilState = &option.depth_stencil,
         .pColorBlendState = &option.blend_state,
         .layout = ppl.ppl_layout,
-        .renderPass = get_renderpass(),
+        .renderPass = render_pass_override != VK_NULL_HANDLE
+            ? render_pass_override
+            : get_renderpass(),
         .subpass = 0,
         .basePipelineHandle = VK_NULL_HANDLE
     };

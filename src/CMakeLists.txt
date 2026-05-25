@@ -41,11 +41,10 @@ set(SRCS
     vk_ins/vkabstraction.cpp
     vk_ins/shader_mgr.cpp)
 
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
+
 add_library(vkkk ${HEADERS} ${SRCS})
-target_include_directories(vkkk
-    PRIVATE
-        ${CMAKE_SOURCE_DIR}/thirdparty/imgui
-        ${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
 target_link_libraries(vkkk
     PUBLIC
         Vulkan::Vulkan

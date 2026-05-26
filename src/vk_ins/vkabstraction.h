@@ -346,6 +346,8 @@ public:
         create_logical_device();
         create_swapchain();
         create_imageviews();
+        width = swapchain_extent.width;
+        height = swapchain_extent.height;
         nsample = ns;
         create_renderpass_deprecated();
         create_command_pool();

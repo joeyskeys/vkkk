@@ -19,6 +19,7 @@ set(HEADERS
     vk_ins/cmd_buf.h
     vk_ins/misc.h
     vk_ins/vkabstraction.h
+    vk_ins/vk_abc.h
     vk_ins/shader_mgr.h)
 
 set(SRCS
@@ -40,6 +41,7 @@ set(SRCS
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
     vk_ins/vkabstraction.cpp
+    vk_ins/vk_abc.cpp
     vk_ins/shader_mgr.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
@@ -73,8 +75,8 @@ target_link_libraries(vkcornell
         vkkk
         OpenImageIO::OpenImageIO)
 
-add_executable(vkdebug debug_main.cpp)
-target_link_libraries(vkdebug
+add_executable(vkrenderer renderer_main.cpp)
+target_link_libraries(vkrenderer
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

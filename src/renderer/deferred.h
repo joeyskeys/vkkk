@@ -20,11 +20,8 @@ public:
         scene_ = scene;
     }
 
-    void render(const RenderView& view) override {
+    void update(const RenderView& view) override {
         (void)view;
-        // Deferred path placeholder:
-        // 1) Geometry pass to G-buffer
-        // 2) Lighting pass to final target
     }
 
     void on_resize(uint32_t width, uint32_t height) override {

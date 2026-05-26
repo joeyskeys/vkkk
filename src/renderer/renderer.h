@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <string>
 
+#include <vulkan/vulkan.h>
+
 namespace vkkk
 {
 
@@ -28,7 +30,10 @@ public:
     virtual void set_scene(Scene* scene) = 0;
 
     // Called once per frame before command buffer submission.
-    virtual void render(const RenderView& view) = 0;
+    virtual void update(const RenderView& view) = 0;
+
+    // Record draw commands into the active swapchain command buffer.
+    virtual void record_commands(VkCommandBuffer cmd, const RenderView& view) {}
 
     // Called when swapchain extent or render targets change.
     virtual void on_resize(uint32_t width, uint32_t height) = 0;

@@ -701,6 +701,8 @@ void VkWrappedInstance::recreate_swapchain() {
 
     create_swapchain();
     create_imageviews();
+    width = swapchain_extent.width;
+    height = swapchain_extent.height;
     create_renderpass_deprecated();
     create_color_resource(swapchain_surface_format.format);
     create_depth_resource();
@@ -973,6 +975,7 @@ bool VkWrappedInstance::create_framebuffer_from_swapchain_target(const std::stri
 void VkWrappedInstance::create_command_pool() {
     VkCommandPoolCreateInfo pool_info{};
     pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     pool_info.queueFamilyIndex = queue_family_idx.graphic_family.value();
 
     if (vkCreateCommandPool(device, &pool_info, nullptr, &command_pool) != VK_SUCCESS)
@@ -1229,6 +1232,10 @@ void VkWrappedInstance::draw_frame(const CommandBuffers& cmd_bufs) {
     time = now;
 
     //update_uniform_buffer(image_idx);
+    if (vkResetCommandBuffer(cmd_bufs.bufs[image_idx], 0) != VK_SUCCESS) {
+        throw std::runtime_error("failed to reset command buffer");
+    }
+
     if (update_cbk)
         update_cbk(image_idx, duration.count());
 
@@ -1990,10 +1997,13 @@ bool VkWrappedInstance::create_render_target(const std::string& name, const VkFo
     const VkSampleCountFlagBits ns, const VkImageUsageFlags usage,
     const VkImageAspectFlagBits aspect)
 {
+    const uint32_t target_width = swapchain_created ? swapchain_extent.width : width;
+    const uint32_t target_height = swapchain_created ? swapchain_extent.height : height;
+
     RenderTarget target {
         .format = format
     };
-    create_vk_image(width, height, 1, ns, format,
+    create_vk_image(target_width, target_height, 1, ns, format,
         VK_IMAGE_TILING_OPTIMAL, usage, 0, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
         target.image, target.memo);
     target.view = create_imageview(target.image, format, aspect);

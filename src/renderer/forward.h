@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
@@ -62,6 +63,8 @@ public:
     static constexpr const char* kShaderShadowDepthFrag = "shadow_depth.frag";
     static constexpr const char* kShaderOpaqueShadowVert = "opaque_shadow.vert";
     static constexpr const char* kShaderOpaqueShadowFrag = "opaque_shadow.frag";
+    static constexpr const char* kShaderTransparentVert = "transparent.vert";
+    static constexpr const char* kShaderTransparentFrag = "transparent.frag";
     static constexpr const char* kShaderPostVert = "post.vert";
     static constexpr const char* kShaderPostFrag = "post.frag";
 
@@ -73,11 +76,16 @@ public:
     void set_scene(Scene* scene) override;
     void set_camera(Camera* camera) { camera_ = camera; }
 
+    // Optional draw recorded after the post pass, still inside the swapchain render pass.
+    void set_overlay_draw(std::function<void(VkCommandBuffer)> draw) {
+        overlay_draw_ = std::move(draw);
+    }
+
     void add_draw_item(const ForwardDrawItem& item);
     void clear_draw_items();
 
-    void render(const RenderView& view) override;
-    void record_commands(VkCommandBuffer cmd, const RenderView& view);
+    void update(const RenderView& view) override;
+    void record_commands(VkCommandBuffer cmd, const RenderView& view) override;
 
     void on_resize(uint32_t width, uint32_t height) override;
 
@@ -145,6 +153,8 @@ private:
 
     uint32_t width_ = 0;
     uint32_t height_ = 0;
+
+    std::function<void(VkCommandBuffer)> overlay_draw_;
 };
 
 } // namespace vkkk

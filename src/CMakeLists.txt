@@ -9,6 +9,7 @@ set(HEADERS
     concepts/camera.h
     concepts/line.h
     concepts/mesh.h
+    concepts/context.h
     gui/gui.h
     renderer/renderer.h
     renderer/forward.h
@@ -36,6 +37,7 @@ set(SRCS
     concepts/camera.cpp
     concepts/line.cpp
     concepts/mesh.cpp
+    concepts/context.cpp
     gui/gui.cpp
     renderer/forward.cpp
     vk_ins/cmd_buf.cpp
@@ -80,6 +82,11 @@ target_link_libraries(vkrenderer
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)
+
+add_executable(vktest test_main.cpp)
+target_link_libraries(vktest
+    PUBLIC
+        Vulkan::Vulkan)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
     add_subdirectory(binding)

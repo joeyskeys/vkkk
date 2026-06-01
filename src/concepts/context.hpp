@@ -37,6 +37,8 @@ class WrappedContext {
         bool enable_debug_messenger = true
       ) noexcept;
 
+    void init(GLFWwindow* window);
+
   private:
     void setup_debug_messenger();
 
@@ -44,6 +46,11 @@ class WrappedContext {
     vk::raii::Context context;
     vk::raii::Instance instance = nullptr;
     vk::raii::DebugUtilMessenger debug_messenger = nullptr;
-}
+
+    vk::raii::SurfaceKHR surface = nullptr;
+    vk::raii::PhysicalDevice physical_device = nullptr;
+    vk::raii::Device device = nullptr;
+    vk::raii::Queue queue = nullptr;
+};
 
 }

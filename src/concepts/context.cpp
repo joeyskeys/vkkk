@@ -1,3 +1,5 @@
+#include <GLFW/glfw3.h>
+
 #include "concepts/context.hpp"
 
 namespace vkkk
@@ -24,6 +26,7 @@ WrappedContext::WrappedContext(
     const std::vector<const char*>& extra_validation_layers,
     const std::vector<const char*>& extra_extensions)
 {
+    // 1. create the instance
     constexpr vk::ApplicationInfo app_info(app_name, app_version, engine_name, api_version);
 
     std::vector<const char*> validation_layers;
@@ -76,6 +79,14 @@ WrappedContext::setup_debug_messenger() {
         .pfnUserCallback = &debug_callback
     };
     debug_messenger = vk::raii::DebugUtilsMessenger(instance, debug_utils_messenger_create_info);
+}
+
+WrappedContext::init(GLFWwindow* window) {
+    VkSurfaceKHR surface = nullptr;
+    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create window surface!");
+    }
+    surface = vk::raii::SurfaceKHR(instance, surface);
 }
 
 }

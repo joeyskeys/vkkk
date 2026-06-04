@@ -43,6 +43,10 @@ class WrappedContext {
     void setup_debug_messenger();
 
   private:
+    std::vector<const char*> required_extensions = {
+        vk::KHRSwapchainExtensionName
+    };
+
     vk::raii::Context context;
     vk::raii::Instance instance = nullptr;
     vk::raii::DebugUtilMessenger debug_messenger = nullptr;
@@ -51,6 +55,12 @@ class WrappedContext {
     vk::raii::PhysicalDevice physical_device = nullptr;
     vk::raii::Device device = nullptr;
     vk::raii::Queue queue = nullptr;
+
+    vk::raii::SwapchainKHR swapchain = nullptr;
+    std::vector<vk::Image> swapchain_images;
+    std::vector<vk::raii::ImageView> swapchain_image_views;
+    vk::Extent2D swapchain_extent;
+    vk::SurfaceFormatKHR swapchain_surface_format;
 };
 
 }

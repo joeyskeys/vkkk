@@ -9,7 +9,6 @@ set(HEADERS
     concepts/camera.h
     concepts/line.h
     concepts/mesh.h
-    concepts/context.h
     gui/gui.h
     renderer/renderer.h
     renderer/forward.h
@@ -21,7 +20,8 @@ set(HEADERS
     vk_ins/misc.h
     vk_ins/vkabstraction.h
     vk_ins/vk_abc.h
-    vk_ins/shader_mgr.h)
+    vk_ins/shader_mgr.h
+    vk_ins/context.hpp)
 
 set(SRCS
     ../thirdparty/imgui/imgui.cpp
@@ -44,7 +44,8 @@ set(SRCS
     vk_ins/misc.cpp
     vk_ins/vkabstraction.cpp
     vk_ins/vk_abc.cpp
-    vk_ins/shader_mgr.cpp)
+    vk_ins/shader_mgr.cpp
+    vk_ins/context.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)

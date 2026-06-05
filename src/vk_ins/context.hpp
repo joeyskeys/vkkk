@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "vk_ins/shader_mgr.h"
+
 namespace vkkk
 {
 
@@ -38,6 +40,8 @@ class WrappedContext {
       ) noexcept;
 
     void init(GLFWwindow* window);
+
+    [[nodiscard]] vk::raii::ShaderModule
 
   private:
     void setup_debug_messenger();

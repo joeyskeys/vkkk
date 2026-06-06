@@ -82,6 +82,41 @@ WrappedContext::setup_debug_messenger() {
     debug_messenger = vk::raii::DebugUtilsMessenger(instance, debug_utils_messenger_create_info);
 }
 
+void WrappedContext::transit_image_layout(
+    uint32_t image_index,
+    vk::ImageLayout old_layout,
+    vk::ImageLayout new_layout,
+    vk::AccessFlags2 src_access_mask,
+    vk::AccessFlags2 dst_access_mask,
+    vk::PipelineStageFlags2 src_stage_mask,
+    vk::PipelineStageFlags2 dst_stage_mask,
+) {
+    vk::ImageMemoryBarrier2 barrier{
+        .srcStageMask = src_stage_mask,
+        .dstStageMask = dst_stage_mask,
+        .srcAccessMask = src_access_mask,
+        .dstAccessMask = dst_access_mask,
+        .oldLayout = old_layout,
+        .newLayout = new_layout,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = swapchain_images[image_index],
+        .subresourceRange = {
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1
+        }
+    };
+    vk::DependencyInfo dependency_info{
+        .dependencyFlags = {},
+        .imageMemoryBarrierCount = 1,
+        .pImageMemoryBarriers = &barrier
+    };
+    command_buffers[image_index].pipelineBarrier2(dependency_info);
+}
+
 static bool is_device_suitable(const vk::raii::PhysicalDevice& device, const std::vector<const char*>& required_extensions) {
     bool support_vk_1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
 
@@ -238,6 +273,22 @@ WrappedContext::init(GLFWwindow* window) {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer
     };
     command_pool = vk::raii::CommandPool(device, command_pool_create_info);
+
+    // create the command buffers
+    vk::CommandBufferAllocateInfo alloc_info{.commandPool = command_pool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = max_frames_in_flight};
+    command_buffers = vk::raii::CommandBuffers(device, alloc_info);
+
+    // create sync objects
+    assert(present_complete_semaphores.empty() && render_complete_semaphores.empty() && in_flight_fences.empty());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+    }
+    for (size_t i = 0; i < max_frames_in_flight; ++i) {
+        present_complete_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+        in_flight_fences.emplace_back(device, vk::FenceCreateInfo{
+            .flags = vk::FenceCreateFlagBits::eSignaled
+        });
+    }
 }
 
 bool WrappedContext::create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option) {
@@ -293,6 +344,87 @@ bool WrappedContext::create_pipeline(const std::string& name, const ShaderModule
     pipeline.vk_pipeline_layout = vk::raii::PipelineLayout(device, shader_module_pack.modules);
     pipelines[name] = std::move(pipeline);
     return true;
+}
+
+void WrappedContext::record_cmds(uint32_t image_index, const std::function<void(uint32_t)>& emit_func) {
+    auto& cmd_buf = command_buffers[image_index];
+    cmd_buf.begin({});
+    transit_image_layout(
+        image_index,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eColorAttachmentOptimal,
+        {},
+        vk::AccessFlags2::eColorAttachmentWrite,
+        vk::PipelineStageFlags2::eColorAttachmentOutput,
+        vk::PipelineStageFlags2::eColorAttachmentOutput);
+
+    // TODO: clear color needs to be customizable
+    vk::ClearValue clear_value = vk::ClearColorValue(0.f, 0.f, 0.f, 1.f);
+    vk::RenderingAttachmentInfo attachment_info = {
+        .imageView = swapchain_image_views[image_index],
+        .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eStore,
+        .clearValue = clear_value
+    };
+    vk::RenderingInfo rendering_info{
+        .renderArea = {
+            .offset = {0, 0},
+            .extent = swapchain_extent
+        },
+        .layerCount = 1,
+        .colorAttachmentCount = 1,
+        .pColorAttachments = &attachment_info
+    };
+    cmd_buf.beginRendering(rendering_info);
+    cmd_buf.setViewport(0, {
+        .x = 0,
+        .y = 0,
+        .width = swapchain_extent.width,
+        .height = swapchain_extent.height,
+        .minDepth = 0,
+        .maxDepth = 1
+    });
+    cmd_buf.setScissor(0, {
+        .offset = {0, 0},
+        .extent = swapchain_extent
+    });
+    emit_func(image_index);
+    cmd_buf.endRendering();
+}
+
+void WrappedContext::draw_frame() {
+    auto fence_ret = device.waitForFences(*in_flight_fences[current_frame], vk::True, UINT64_MAX);
+    if (fence_ret != vk::Result::eSuccess) {
+        throw std::runtime_error("failed to wait for fence");
+    }
+    device.resetFences(*in_flight_fences[current_frame]);
+
+    auto [result, image_index] = swapchain.acquireNextImageKHR(UINT64_MAX, *present_complete_semaphores[current_frame], nullptr);
+
+    //command_buffers[current_frame].reset();
+
+    vk::PipelineStageFlags wait_stage_mask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
+    vk::SubmitInfo submit_info{
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = present_complete_semaphores[current_frame],
+        .pWaitDstStageMask = &wait_stage_mask,
+        .commandBufferCount = 1,
+        .pCommandBuffers = command_buffers[current_frame],
+        .signalSemaphoreCount = 1,
+        .pSignalSemaphores = render_finished_semaphores[image_index]
+    };
+    queue.submit(submit_info, *in_flight_fences[current_frame]);
+
+    vk::PresentInfoKHR present_info{
+        .waitSemaphoreCount = 1,
+        .pWaitSemaphores = render_finished_semaphores[image_index],
+        .swapchainCount = 1,
+        .pSwapchains = swapchain,
+        .pImageIndices = &image_index
+    };
+    queue.presentKHR(present_info);
+    current_frame = (current_frame + 1) % max_frames_in_flight;
 }
 
 }

@@ -21,6 +21,7 @@ constexpr char* default_app_name = "vkkk";
 constexpr char* default_engine_name = "vulkan";
 constexpr uint32_t default_app_version = VK_MAKE_VERSION(1, 0, 0);
 constexpr uint32_t default_api_version = vk::ApiVersion14;
+constexpr uint32_t max_frames_in_flight = 2;
 
 }
 
@@ -59,9 +60,20 @@ public:
     void init(GLFWwindow* window);
 
     bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option);
+    void record_cmds(const std::function<void(uint32_t)>& emit_func);
+    void draw_frame();
 
 private:
     void setup_debug_messenger();
+    void transit_image_layout(
+        uint32_t image_index,
+        vk::ImageLayout old_layout,
+        vk::ImageLayout new_layout,
+        vk::AccessFlags2 src_access_mask,
+        vk::AccessFlags2 dst_access_mask,
+        vk::PipelineStageFlags2 src_stage_mask,
+        vk::PipelineStageFlags2 dst_stage_mask,
+    );
 
 private:
     std::vector<const char*> required_extensions = {
@@ -86,8 +98,15 @@ private:
 
     vk::raii::CommandPool command_pool = nullptr;
 
+    std::vector<vk::raii::Semaphore> present_complete_semaphores;
+    std::vector<vk::raii::Semaphore> render_finished_semaphores;
+    std::vector<vk::raii::Fence> in_flight_fences;
+
+    uint32_t current_frame = 0;
+
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
+    std::vector<vk::raii::CommandBuffer> command_buffers;
 };
 
 }

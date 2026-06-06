@@ -156,7 +156,6 @@ WrappedContext::init(GLFWwindow* window) {
 
     // create the logical device
     std::vector<vk:QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
-    uint32_t queue_idx = ~0;
     for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
         if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) && (physical_device.getSurfaceSupportKHR(i, *surface))) {
             queue_idx = i;
@@ -228,6 +227,72 @@ WrappedContext::init(GLFWwindow* window) {
         image_view_create_info.image = image;
         swapchain_image_views.emplace_back(device, image_view_create_info);
     }
+    
+    // create the command pool
+    // TODO: eResetCommandBuffer is a mode the command pool kinda persists
+    // there's also another flag eTransient that is more like a one-time use pool
+    // maybe needed in the future. Might need more methods and fields to 
+    // manage the command pool.
+    vk::CommandPoolCreateInfo command_pool_create_info{
+        .queueFamilyIndex = queue_idx,
+        .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer
+    };
+    command_pool = vk::raii::CommandPool(device, command_pool_create_info);
+}
+
+bool WrappedContext::create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option) {
+    if (pipelines.find(name) != pipelines.end()) {
+        std::cout << "Pipeline " << name << " already exists" << std::endl;
+        return false;
+    }
+
+    std::vector<vk::ShaderModule> shader_modules;
+    std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos;
+    for (auto& [stage, module] : shader_module_pack.modules) {
+        vk::ShaderModuleCreateInfo shader_module_create_info{
+            .codeSize = module.spirv_code.size() * sizeof(uint32_t),
+            .pCode = module.spirv_code.data()
+        };
+        vk::ShaderModule shader_module = vk::raii::ShaderModule(device, shader_module_create_info);
+        shader_modules.emplace_back(std::move(shader_module));
+
+        vk::PipelineShaderStageCreateInfo shader_stage_info{
+            .stage = stage,
+            .module = shader_modules.back(),
+            .pName = "main"
+        };
+        shader_stage_infos.emplace_back(std::move(shader_stage_info));
+    }
+
+    vk::PipelineLayoutCreateInfo pipeline_layout_info{.setLayoutCount = 0, .pushConstantRangeCount = 0};
+    pipeline_layout = vk::raii::PipelineLayout(device, pipeline_layout_info);
+
+    vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipeline_create_info{
+        {
+            .stageCount = static_cast<uint32_t>(shader_stage_infos.size()),
+            .pStages = shader_stage_infos.data(),
+            .pVertexInputState = &option.vert_info,
+            .pInputAssemblyState = &option.assembly_info,
+            .pViewportState = &option.viewport_info,
+            .pRasterizationState = &option.raster_info,
+            .pMultisampleState = &option.multisample_info,
+            .pDepthStencilState = &option.depth_info,
+            .pColorBlendState = &option.blend_info,
+            .pDynamicState = &option.dynamic_info,
+            .layout = pipeline_layout,
+            .renderPass = nullptr
+        },
+        {
+            .colorAttachmentCount = 1,
+            .pColorAttachmentFormats = &swapchain_surface_format.format
+        }
+    };
+
+    Pipeline pipeline;
+    pipeline.vk_pipeline = vk::raii::Pipeline(device, shader_module_pack.modules);
+    pipeline.vk_pipeline_layout = vk::raii::PipelineLayout(device, shader_module_pack.modules);
+    pipelines[name] = std::move(pipeline);
+    return true;
 }
 
 }

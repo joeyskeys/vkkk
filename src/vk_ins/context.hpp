@@ -5,7 +5,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#include "vk_ins/shader_mgr.h"
+#include "vk_ins/shader_module_pack.hpp"
 
 namespace vkkk
 {
@@ -24,10 +24,27 @@ constexpr uint32_t default_api_version = vk::ApiVersion14;
 
 }
 
+struct Pipeline {
+    vk::raii::Pipeline vk_pipeline;
+    vk::raii::PipelineLayout vk_pipeline_layout;
+};
+
+struct PipelineOption {
+    vk::PipelineVertexInputStateCreateInfo vert_info;
+    vk::PipelineInputAssemblyStateCreateInfo assembly_info;
+    vk::PipelineViewportStateCreateInfo viewport_info;
+    vk::PipelineRasterizationStateCreateInfo raster_info;
+    vk::PipelineMultisampleStateCreateInfo multisample_info;
+    vk::PipelineDepthStencilStateCreateInfo depth_info;
+    vk::PipelineColorBlendAttachmentState blend_attachment_info;
+    vk::PipelineColorBlendStateCreateInfo blend_info;
+    vk::PipelineDynamicStateCreateInfo dynamic_info;
+};
+
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
 class WrappedContext {
-  public:
+public:
     WrappedContext(
         const char* app_name = default_app_name,
         uint32_t app_version = default_app_version,
@@ -41,12 +58,12 @@ class WrappedContext {
 
     void init(GLFWwindow* window);
 
-    [[nodiscard]] vk::raii::ShaderModule
+    bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option);
 
-  private:
+private:
     void setup_debug_messenger();
 
-  private:
+private:
     std::vector<const char*> required_extensions = {
         vk::KHRSwapchainExtensionName
     };
@@ -59,12 +76,18 @@ class WrappedContext {
     vk::raii::PhysicalDevice physical_device = nullptr;
     vk::raii::Device device = nullptr;
     vk::raii::Queue queue = nullptr;
+    uint32_t queue_idx = ~0;
 
     vk::raii::SwapchainKHR swapchain = nullptr;
     std::vector<vk::Image> swapchain_images;
     std::vector<vk::raii::ImageView> swapchain_image_views;
     vk::Extent2D swapchain_extent;
     vk::SurfaceFormatKHR swapchain_surface_format;
+
+    vk::raii::CommandPool command_pool = nullptr;
+
+public:
+    std::unordered_map<std::string, Pipeline> pipelines;
 };
 
 }

@@ -62,6 +62,7 @@ public:
     bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option);
     void record_cmds(const std::function<void(uint32_t)>& emit_func);
     void draw_frame();
+    void recreate_swapchain();
 
 private:
     void setup_debug_messenger();
@@ -74,6 +75,8 @@ private:
         vk::PipelineStageFlags2 src_stage_mask,
         vk::PipelineStageFlags2 dst_stage_mask,
     );
+    void create_swapchain();
+    void create_imageviews();
 
 private:
     std::vector<const char*> required_extensions = {
@@ -107,6 +110,7 @@ private:
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
     std::vector<vk::raii::CommandBuffer> command_buffers;
+    bool frame_buffer_resized = false;
 };
 
 }

@@ -117,6 +117,54 @@ void WrappedContext::transit_image_layout(
     command_buffers[image_index].pipelineBarrier2(dependency_info);
 }
 
+void WrappedContext::create_swapchain() {
+    // create the swapchain
+    vk::SurfaceCapabilitiesKHR surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
+    swapchain_extent = choose_swap_extent(surface_capabilities);
+    uint32_t min_image_count = choose_min_image_count(surface_capabilities);
+
+    std::vector<vk::SurfaceFormatKHR> surface_formats = physical_device.getSurfaceFormatsKHR(*surface);
+    swapchain_surface_format = choose_swap_surface_format(surface_formats);
+
+    std::vector<vk::PresentModeKHR> present_modes = physical_device.getSurfacePresentModesKHR(*surface);
+    vk::PresentModeKHR present_mode = choose_present_mode(present_modes);
+
+    vk::SwapchainCreateInfoKHR swapchain_create_info{
+        .surface = *surface,
+        .minImageCount = min_image_count,
+        .imageFormat = swapchain_surface_format.format,
+        .imageColorSpace = swapchain_surface_format.colorSpace,
+        .imageExtent = swapchain_extent,
+        .imageArrayLayers = 1,
+        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
+        .imageSharingMode = vk::SharingMode::eExclusive,
+        .preTransform = surface_capabilities.currentTransform,
+        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
+        .presentMode = present_mode,
+        .clipped = true
+    };
+    swapchain = vk::raii::SwapchainKHR(device, swapchain_create_info);
+    swapchain_images = swapchain.getImages();
+}
+
+void WrappedContext::create_imageviews() {
+    // create the image views
+    assert(swapchain_image_views.empty());
+    vk::ImageViewCreateInfo image_view_create_info{
+        .viewType = vk::ImageViewType::e2D,
+        .format = swapchain_surface_format.format,
+        .subresourceRange = {
+            .aspectMask = vk::ImageAspectFlagBits::eColor,
+            .levelCount = 1,
+            .layerCount = 1
+        }
+    };
+    for (auto& image : swapchain_images) {
+        image_view_create_info.image = image;
+        swapchain_image_views.emplace_back(device, image_view_create_info);
+    }
+}
+
 static bool is_device_suitable(const vk::raii::PhysicalDevice& device, const std::vector<const char*>& required_extensions) {
     bool support_vk_1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
 
@@ -219,50 +267,9 @@ WrappedContext::init(GLFWwindow* window) {
     device = vk::raii::Device(physical_device, device_create_info);
     queue = vk::raii::Queue(device, queue_idx, 0);
 
-    // create the swapchain
-    vk::SurfaceCapabilitiesKHR surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-    swapchain_extent = choose_swap_extent(surface_capabilities);
-    uint32_t min_image_count = choose_min_image_count(surface_capabilities);
+    create_swapchain();
+    create_imageviews();
 
-    std::vector<vk::SurfaceFormatKHR> surface_formats = physical_device.getSurfaceFormatsKHR(*surface);
-    swapchain_surface_format = choose_swap_surface_format(surface_formats);
-
-    std::vector<vk::PresentModeKHR> present_modes = physical_device.getSurfacePresentModesKHR(*surface);
-    vk::PresentModeKHR present_mode = choose_present_mode(present_modes);
-
-    vk::SwapchainCreateInfoKHR swapchain_create_info{
-        .surface = *surface,
-        .minImageCount = min_image_count,
-        .imageFormat = swapchain_surface_format.format,
-        .imageColorSpace = swapchain_surface_format.colorSpace,
-        .imageExtent = swapchain_extent,
-        .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .imageSharingMode = vk::SharingMode::eExclusive,
-        .preTransform = surface_capabilities.currentTransform,
-        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = present_mode,
-        .clipped = true
-    };
-    swapchain = vk::raii::SwapchainKHR(device, swapchain_create_info);
-    swapchain_images = swapchain.getImages();
-
-    // create the image views
-    assert(swapchain_image_views.empty());
-    vk::ImageViewCreateInfo image_view_create_info{
-        .viewType = vk::ImageViewType::e2D,
-        .format = swapchain_surface_format.format,
-        .subresourceRange = {
-            .aspectMask = vk::ImageAspectFlagBits::eColor,
-            .levelCount = 1,
-            .layerCount = 1
-        }
-    };
-    for (auto& image : swapchain_images) {
-        image_view_create_info.image = image;
-        swapchain_image_views.emplace_back(device, image_view_create_info);
-    }
-    
     // create the command pool
     // TODO: eResetCommandBuffer is a mode the command pool kinda persists
     // there's also another flag eTransient that is more like a one-time use pool
@@ -402,6 +409,12 @@ void WrappedContext::draw_frame() {
 
     auto [result, image_index] = swapchain.acquireNextImageKHR(UINT64_MAX, *present_complete_semaphores[current_frame], nullptr);
 
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || frame_buffer_resized) {
+        frame_buffer_resized = false;
+        recreate_swapchain();
+        return;
+    }
+
     //command_buffers[current_frame].reset();
 
     vk::PipelineStageFlags wait_stage_mask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
@@ -423,8 +436,27 @@ void WrappedContext::draw_frame() {
         .pSwapchains = swapchain,
         .pImageIndices = &image_index
     };
-    queue.presentKHR(present_info);
+    result = queue.presentKHR(present_info);
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+        recreate_swapchain();
+    }
+
     current_frame = (current_frame + 1) % max_frames_in_flight;
+}
+
+void WrappedContext::recreate_swapchain() {
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(window, &width, &height);
+        glfwWaitEvents();
+    }
+    device.waitIdle();
+
+    swapchain_image_views.clear();
+    swapchain = nullptr;
+    create_swapchain();
+    create_imageviews();
 }
 
 }

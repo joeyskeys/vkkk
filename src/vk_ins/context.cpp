@@ -298,15 +298,24 @@ WrappedContext::init(GLFWwindow* window) {
     }
 }
 
-bool WrappedContext::create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option) {
+bool WrappedContext::create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option, bool interleaved) {
     if (pipelines.find(name) != pipelines.end()) {
         std::cout << "Pipeline " << name << " already exists" << std::endl;
         return false;
     }
 
+    // resources
+    std::vector<vk::VertexInputBindingDescription> input_binding_descriptions;
+    std::vector<vk::VertexInputAttributeDescription> input_attr_descriptions;
+    std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
+    std::map<uint32_t, std::string> ubo_binding_to_name;
+    std::map<uint32_t, std::string> tex_binding_to_name;
+
+    // shader modules
     std::vector<vk::ShaderModule> shader_modules;
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos;
     for (auto& [stage, module] : shader_module_pack.modules) {
+        // handle shader itself
         vk::ShaderModuleCreateInfo shader_module_create_info{
             .codeSize = module.spirv_code.size() * sizeof(uint32_t),
             .pCode = module.spirv_code.data()
@@ -320,6 +329,30 @@ bool WrappedContext::create_pipeline(const std::string& name, const ShaderModule
             .pName = "main"
         };
         shader_stage_infos.emplace_back(std::move(shader_stage_info));
+
+        // shader input infos
+        // input attrs
+        // input attribute layout is defined by input data
+        if (stage == vk::ShaderStageFlagBits::eVertex) {
+            uint32_t attr_binding = 0;
+
+        }
+        // ubos
+        for (auto& [ubo_name, ubo_info] : module.buf_infos) {
+            auto& [struct_size, array_size, binding] = ubo_info;
+            auto ppl_ubo_name = name + ":" + ubo_name;
+            ubo_binding_to_name[binding] = ppl_ubo_name;
+
+            vk::DescriptorSetLayoutBinding descriptor_layout{
+                .binding = binding,
+                .descriptorType = vk::DescriptorType::eUniformBuffer,
+                .descriptorCount = array_size,
+            };
+            descriptor_layouts.emplace_back(std::move(descriptor_layout));
+        }
+
+        // texes
+
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_info{.setLayoutCount = 0, .pushConstantRangeCount = 0};
@@ -459,4 +492,16 @@ void WrappedContext::recreate_swapchain() {
     create_imageviews();
 }
 
+bool WrappedContext::add_ubo(const std::string& name, const uint32_t binding,
+    uint32_t size, uint32_t vecsize) {
+    if (ubos.find(name) != ubos.end()) {
+        std::cout << "UBO " << name << " already exists" << std::endl;
+        return false;
+    }
+
+    UBO ubo{.size = size, .vecsize = vecsize, .binding = binding};
+    ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
+    ubo.gpu_bufs.resize(swapchain_images.size());
+    ubo.memos.resize(swapchain_images.size());
+    ubo.descriptors.resize(swapchain_images.size());
 }

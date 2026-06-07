@@ -42,6 +42,27 @@ struct PipelineOption {
     vk::PipelineDynamicStateCreateInfo dynamic_info;
 };
 
+struct UBO {
+    size_t                                  size;
+    size_t                                  vecsize;
+    uint32_t                                binding;
+    std::shared_ptr<char[]>                 cpu_buf;
+    std::vector<vk::raii::Buffer>           gpu_bufs;
+    std::vector<vk::raii::DeviceMemory>     memos;
+    std::vector<vk::DescriptorBufferInfo>   descriptors;
+};
+
+struct Texture {
+    uint32_t                                binding;
+    size_t                                  vecsize;
+    vk::raii::Image                         image;
+    vk::raii::DeviceMemory                  memo;
+    vk::raii::ImageView                     view;
+    vk::ImageLayout                         layout;
+    vk::DescriptorImageInfo                 descriptor;
+    vk::raii::Sampler                       sampler;
+};
+
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
 class WrappedContext {
@@ -59,10 +80,15 @@ public:
 
     void init(GLFWwindow* window);
 
-    bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option);
+    bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option, bool interleaved=true);
     void record_cmds(const std::function<void(uint32_t)>& emit_func);
     void draw_frame();
     void recreate_swapchain();
+
+    bool add_ubo(const std::string& name, const uint32_t binding,
+        uint32_t size, uint32_t vecsize=1);
+    bool add_texture(const std::string& name, const uint32_t binding,
+        const fs::path& path);
 
 private:
     void setup_debug_messenger();
@@ -111,6 +137,9 @@ public:
     std::unordered_map<std::string, Pipeline> pipelines;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
+
+    std::unordered_map<std::string, UBO> ubos;
+    std::unordered_map<std::string, Texture> textures;
 };
 
 }

@@ -10,7 +10,7 @@ namespace vkkk
 using BufInfoMap = std::unordered_map<std::string, std::tuple<uint32_t,
     uint32_t, uint32_t>>;
 using ImgInfoMap = std::unordered_map<std::string, uint32_t>;
-using AttrInfoMap = std::unordered_map<uint32_t, std::tuple<std::string, uint32_t>>;
+using AttrInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, uint32_t>>;
 using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
 
 class ShaderModule {
@@ -20,7 +20,6 @@ public:
     std::vector<uint32_t>                           spirv_code;
     BufInfoMap                                      buf_infos;
     ImgInfoMap                                      img_infos;
-    std::map<uint32_t, std::vector<uint32_t>>       input_brefs;
     AttrInfoMap                                     attr_infos;
     TexImgPairs                                     tex_img_pairs;
 

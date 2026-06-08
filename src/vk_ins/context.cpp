@@ -393,6 +393,7 @@ bool WrappedContext::create_pipeline(const std::string& name,
                 .binding = binding,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
                 .descriptorCount = array_size,
+                .stageFlags = stage
             };
             descriptor_layouts.emplace_back(std::move(descriptor_layout));
         }

@@ -61,56 +61,82 @@ Mesh::~Mesh() {
     }
 }
 
-void Mesh::load(aiMesh* mesh) {
+void Mesh::load(aiMesh* mesh, bool interleaved) {
     vcnt = mesh->mNumVertices;
     icnt = mesh->mNumFaces;
 
     vbuf = new float[vcnt * comp_size];
     ibuf = new uint32_t[icnt * 3];
+    strides.resize(comps.size());
 
     uint32_t prev = 0;
-    for (const auto& comp : comps) {
-        switch (comp) {
-            case VERTEX: {
-                for (int i = 0; i < vcnt; ++i) {
-                    vbuf[i * comp_size + prev    ] = mesh->mVertices[i].x;
-                    vbuf[i * comp_size + prev + 1] = mesh->mVertices[i].y;
-                    vbuf[i * comp_size + prev + 2] = mesh->mVertices[i].z;
-                }
-                prev += 3;
-                break;
-            }
+    for (int i = 0; i < comps.size(); ++i) {
+        const auto& comp = comps[i];
 
-            case NORMAL: {
-                for (int i = 0; i < vcnt; ++i) {
-                    vbuf[i * comp_size + prev    ] = mesh->mNormals[i].x;
-                    vbuf[i * comp_size + prev + 1] = mesh->mNormals[i].y;
-                    vbuf[i * comp_size + prev + 2] = mesh->mNormals[i].z;
+        if (interleaved) {
+            switch (comp) {
+                case VERTEX: {
+                    for (int i = 0; i < vcnt; ++i) {
+                        vbuf[i * comp_size + prev    ] = mesh->mVertices[i].x;
+                        vbuf[i * comp_size + prev + 1] = mesh->mVertices[i].y;
+                        vbuf[i * comp_size + prev + 2] = mesh->mVertices[i].z;
+                    }
+                    break;
                 }
-                prev += 3;
-                break;
-            }
 
-            case UV: {
-                for (int i = 0; i < vcnt; ++i) {
-                    const auto uv = mesh->mTextureCoords[0][i];
-                    vbuf[i * comp_size + prev    ] = uv.x;
-                    vbuf[i * comp_size + prev + 1] = uv.y;
+                case NORMAL: {
+                    for (int i = 0; i < vcnt; ++i) {
+                        vbuf[i * comp_size + prev    ] = mesh->mNormals[i].x;
+                        vbuf[i * comp_size + prev + 1] = mesh->mNormals[i].y;
+                        vbuf[i * comp_size + prev + 2] = mesh->mNormals[i].z;
+                    }
+                    break;
                 }
-                prev += 2;
-                break;
-            }
 
-            case COLOR: {
-                for (int i = 0; i < vcnt; ++i) {
-                    const auto vcolor = mesh->mColors[0][i];
-                    vbuf[i * comp_size + prev    ] = vcolor.r;
-                    vbuf[i * comp_size + prev + 1] = vcolor.g;
-                    vbuf[i * comp_size + prev + 2] = vcolor.b;
+                case UV: {
+                    for (int i = 0; i < vcnt; ++i) {
+                        const auto uv = mesh->mTextureCoords[0][i];
+                        vbuf[i * comp_size + prev    ] = uv.x;
+                        vbuf[i * comp_size + prev + 1] = uv.y;
+                    }
+                    break;
                 }
-                prev += 3;
-                break;
+
+                case COLOR: {
+                    for (int i = 0; i < vcnt; ++i) {
+                        const auto vcolor = mesh->mColors[0][i];
+                        vbuf[i * comp_size + prev    ] = vcolor.r;
+                        vbuf[i * comp_size + prev + 1] = vcolor.g;
+                        vbuf[i * comp_size + prev + 2] = vcolor.b;
+                    }
+                    break;
+                }
             }
+            strides[i] = prev;
+            prev += comp_sizes[comp];
+
+        }
+        else {
+            switch (comp) {
+                case VERTEX: {
+                    memcpy(vbuf + prev, mesh->mVertices, vcnt * comp_sizes[comp] * sizeof(float));
+                    break;
+                }
+                case NORMAL: {
+                    memcpy(vbuf + prev, mesh->mNormals, vcnt * comp_sizes[comp] * sizeof(float));
+                    break;
+                }
+                case UV: {
+                    memcpy(vbuf + prev, mesh->mTextureCoords[0], vcnt * comp_sizes[comp] * sizeof(float));
+                    break;
+                }
+                case COLOR: {
+                    memcpy(vbuf + prev, mesh->mColors[0], vcnt * comp_sizes[comp] * sizeof(float));
+                    break;
+                }
+            }
+            strides[i] = prev;
+            prev += comp_sizes[comp] * vcnt;
         }
     }
 

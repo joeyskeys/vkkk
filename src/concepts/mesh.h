@@ -35,9 +35,11 @@ public:
 
     Mesh& operator=(const Mesh&) = default;
 
-    void load(aiMesh *mesh);
+    void load(aiMesh *mesh, bool interleaved=true);
+
     void load(const uint32_t, const char*, const uint32_t, const uint32_t, const char*,
         const uint32_t);
+
     void unload();
 
     std::vector<VERT_COMP>      comps;
@@ -45,6 +47,7 @@ public:
     uint32_t                    comp_size = 0;
     uint32_t                    vcnt = 0;
     float*                      vbuf = nullptr;
+    std::vector<uint32_t>       strides;
     uint32_t                    icnt = 0;
     uint32_t*                   ibuf = nullptr;
     bool                        loaded = false;

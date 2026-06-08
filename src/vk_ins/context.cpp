@@ -298,15 +298,38 @@ WrappedContext::init(GLFWwindow* window) {
     }
 }
 
-bool WrappedContext::create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option, bool interleaved) {
+static std::vector<vk::VertexInputBindingDescription> gen_binding_desc(const std::vector<VERT_COMP>& comps, bool interleaved) {
+    // a vertex binding itself being interleaved or not is irrelavent to others
+    // the mesh format can be quite flexible, for example, vertices being a single buf,
+    // uv and color interleaved being another buf. Each binding desc is related to its
+    // attr desc.
+    // Here we assume the mesh being either all interleaved or all separated.
+    std::vector<vk::VertexInputBindingDescription> binding_descriptions;
+    if (interleaved) {
+        binding_descriptions.emplace_back(0, get_mesh_component_size(comps) * sizeof(float), vk::VertexInputRate::eVertex);
+    }
+    else {
+        for (const auto& comp : comps) {
+            binding_descriptions.emplace_back(0, comp_sizes[comp] * sizeof(float), vk::VertexInputRate::eVertex);
+        }
+    }
+    return binding_descriptions;
+}
+
+bool WrappedContext::create_pipeline(const std::string& name,
+    const ShaderModulePack& shader_module_pack,
+    const PipelineOption& option,
+    const std::vector<VERT_COMP>& comps,
+    bool interleaved)
+{
     if (pipelines.find(name) != pipelines.end()) {
         std::cout << "Pipeline " << name << " already exists" << std::endl;
         return false;
     }
 
     // resources
-    std::vector<vk::VertexInputBindingDescription> input_binding_descriptions;
-    std::vector<vk::VertexInputAttributeDescription> input_attr_descriptions;
+    std::vector<vk::VertexInputBindingDescription> input_binding_descs;
+    std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
     std::map<uint32_t, std::string> ubo_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
@@ -332,11 +355,34 @@ bool WrappedContext::create_pipeline(const std::string& name, const ShaderModule
 
         // shader input infos
         // input attrs
-        // input attribute layout is defined by input data
         if (stage == vk::ShaderStageFlagBits::eVertex) {
-            uint32_t attr_binding = 0;
+            input_binding_descs = gen_binding_desc(option.comps, interleaved);
 
+            uint32_t offset = 0;
+            for (int i = 0; const auto& [attr_loc, glsl_type, attr_name] : module.attr_infos) {
+                if (interleaved) {
+                    vk::VertexInputAttributeDescription attr_desc{
+                        .location = attr_loc,
+                        .binding = 0,
+                        .format = glsl_type_macro[glsl_type],
+                        .offset = offset
+                    };
+                    input_attr_descs.emplace_back(std::move(attr_desc));
+                    offset += glsl_type_sizes[glsl_type];
+                }
+                else {
+                    vk::VertexInputAttributeDescription attr_desc{
+                        .location = attr_loc,
+                        .binding = i,
+                        .format = glsl_type_macro[glsl_type],
+                        .offset = 0
+                    };
+                    input_attr_descs.emplace_back(std::move(attr_desc));
+                }
+                ++i;
+            }
         }
+
         // ubos
         for (auto& [ubo_name, ubo_info] : module.buf_infos) {
             auto& [struct_size, array_size, binding] = ubo_info;
@@ -352,7 +398,42 @@ bool WrappedContext::create_pipeline(const std::string& name, const ShaderModule
         }
 
         // texes
+        for (auto& [tex_name, tex_info] : module.img_infos) {
+            const auto ppl_tex_name = name + ":" + tex_name;
+            uint32_t descriptor_count = 1;
+            if (textures.find(ppl_tex_name) == textures.end()) {
+                auto tex_path_info = module.tex_img_pairs.find(tex_name);
+                if (tex_path_info == module.tex_img_pairs.end()) {
+                    std::cout << "No texture assigned for sampler " << tex_name
+                        << std::endl;
+                    continue;
+                }
 
+                auto& [path, is_cubemap] = tex_path_info->second;
+                descriptor_count = is_cubemap ? 6u : 1u;
+                if (!is_cubemap) {
+                    if (!add_texture(ppl_tex_name, tex_binding, path)) {
+                        continue;
+                    }
+                }
+                else if (!add_cubemap(ppl_tex_name, tex_binding, path)) {
+                    continue;
+                }
+            }
+            else {
+                descriptor_count = static_cast<uint32_t>(textures.at(ppl_tex_name).vecsize);
+            }
+            tex_binding_to_name[tex_binding] = ppl_tex_name;
+
+            vk::DescriptorSetLayoutBinding binding {
+                .binding = tex_binding,
+                .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                .descriptorCount = descriptor_count,
+                .stageFlags = stage,
+                .pImmutableSamplers = nullptr
+            };
+            descriptor_layouts.emplace_back(std::move(binding));
+        }
     }
 
     vk::PipelineLayoutCreateInfo pipeline_layout_info{.setLayoutCount = 0, .pushConstantRangeCount = 0};

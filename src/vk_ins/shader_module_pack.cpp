@@ -49,14 +49,19 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
         mod.img_infos.emplace(img.name, binding_idx);
     }
 
+    // input attrs
     if (t == VK_SHADER_STAGE_VERTEX_BIT) {
         for (auto& input : res.stage_inputs) {
             auto name = comp.get_name(input.id);
             auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
-            mod.attr_infos.emplace(name, std::make_tuple(loc, vectype));
+            mod.attr_infos.emplace(loc, vectype, name);
         }
+        // sort by location index
+        std::sort(mod.attr_infos.begin(), mod.attr_infos.end(), [](const auto& a, const auto& b) {
+            return std::get<0>(a) < std::get<0>(b);
+        });
     }
 
     return true;

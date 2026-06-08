@@ -80,7 +80,11 @@ public:
 
     void init(GLFWwindow* window);
 
-    bool create_pipeline(const std::string& name, const ShaderModulePack& shader_module_pack, const PipelineOption& option, bool interleaved=true);
+    bool create_pipeline(const std::string& name,
+        const ShaderModulePack& shader_module_pack,
+        const PipelineOption& option,
+        const std::vector<VERT_COMP>& comps,
+        bool interleaved=true);
     void record_cmds(const std::function<void(uint32_t)>& emit_func);
     void draw_frame();
     void recreate_swapchain();

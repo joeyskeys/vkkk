@@ -64,6 +64,27 @@ struct Texture {
     vk::raii::Sampler                       sampler;
 };
 
+struct MeshGPU {
+    vk::raii::Buffer                        vbuf;
+    vk::raii::DeviceMemory                  vbuf_memo;
+    vk::raii::Buffer                        ibuf;
+    vk::raii::DeviceMemory                  ibuf_memo;
+    uint32_t                                icnt = 0;
+    
+    void sync(const Mesh& mesh, Context* ctx);
+    void emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
+        const vk::DescriptorSet* desc_set=nullptr) const;
+};
+
+struct CameraGPU {
+    uint32_t                                binding;
+    vk::raii::Buffer                        buf;
+    vk::raii::DeviceMemory                  memo;
+    vk::DescriptorBufferInfo                descriptor;
+
+    void sync(Camera& cam, Context* ctx) const;
+};
+
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
 class WrappedContext {
@@ -94,6 +115,7 @@ public:
         uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, const uint32_t binding,
         const fs::path& path);
+    bool add_mesh(const std::string& name, const Mesh& mesh);
 
 private:
     void setup_debug_messenger();
@@ -108,6 +130,19 @@ private:
     );
     void create_swapchain();
     void create_imageviews();
+
+    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size,
+        vk::BufferUsageFlags usage,
+        vk::MemoryPropertyFlags properties) const;
+
+    void copy_buffer(vk::raii::Buffer src, vk::raii::Buffer dst, vk::DeviceSize size) const;
+
+    template <vk::BufferUsageFlagBits buf_type>
+    void create_input_attr_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
+        size_t comp_size, size_t elem_cnt) const
+    {
+
+    }
 
 private:
     std::vector<const char*> required_extensions = {

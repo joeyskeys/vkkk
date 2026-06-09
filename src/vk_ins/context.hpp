@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <vector>
 #include <memory>
+#include <tuple>
 
 #include <vulkan/vulkan_raii.hpp>
 
@@ -115,6 +116,8 @@ public:
         uint32_t size, uint32_t vecsize=1);
     bool add_texture(const std::string& name, const uint32_t binding,
         const fs::path& path);
+    bool add_cubemap(const std::string& name, const uint32_t binding,
+        const fs::path& path);
     bool add_mesh(const std::string& name, const Mesh& mesh);
 
 private:
@@ -135,14 +138,31 @@ private:
         vk::BufferUsageFlags usage,
         vk::MemoryPropertyFlags properties) const;
 
-    void copy_buffer(vk::raii::Buffer src, vk::raii::Buffer dst, vk::DeviceSize size) const;
+    vk::raii::CommandBuffer begin_single_commands() const;
+    void end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const;
+    void copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const;
+    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
 
     template <vk::BufferUsageFlagBits buf_type>
     void create_input_attr_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
         size_t comp_size, size_t elem_cnt) const
     {
-
+        vk::DeviceSize buf_size = comp_size * elem_cnt;
+        auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        void* data = staging_buf.mapMemory(0, buf_size);
+        std::memcpy(data, src, buf_size);
+        staging_buf.unmapMemory();
+        std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | buf_type, vk::MemoryPropertyFlagBits::eDeviceLocal);
+        copy_buffer(staging_buf, buf, buf_size);
     }
+
+    using create_vertex_buffer = create_input_attr_buffer<vk::BufferUsageFlagBits::eVertexBuffer>;
+    using create_index_buffer = create_input_attr_buffer<vk::BufferUsageFlagBits::eIndexBuffer>;
+
+    void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout) const;
+    void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;
+    std::pair<vk::raiiImage, vk::raii::DeviceMemory> create_vk_image(uint32_t width, uint32_t height, uint32_t layers, vk::SampleCountFlagBits samples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags flags, vk::MemoryPropertyFlags properties) const;
+    vk::raii::ImageView create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format) const;
 
 private:
     std::vector<const char*> required_extensions = {

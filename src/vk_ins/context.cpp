@@ -1,9 +1,14 @@
-#include <GLFW/glfw3.h>
-#include <vector>
-#include <stdexcept>
+#include <array>
 #include <cstring>
+#include <iostream>
+#include <stdexcept>
+#include <vector>
 
-#include "concepts/context.hpp"
+#include <GLFW/glfw3.h>
+#include <OpenImageIO/imagebuf.h>
+#include <OpenImageIO/imagebufalgo.h>
+
+#include "vk_ins/context.hpp"
 
 namespace vkkk
 {
@@ -714,41 +719,115 @@ bool WrappedContext::add_texture(const std::string& name, const uint32_t binding
     transit_image_layout(cmd_buf, tex.image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal);
     end_single_commands(std::move(cmd_buf));
 
-    // create image view
-    create_vk_imageview(tex.image, vk::Format::eR8G8B8A8Srgb);
+    tex.view = create_vk_imageview(tex.image, vk::Format::eR8G8B8A8Srgb);
 
     // create image sampler
-    vk::PhysicalDeviceProperties props = physical_device.getProperties();
-    vk::SamplerCreateInfo sampler_info{
-        .magFilter = vk::Filter::eLinear,
-        .minFilter = vk::Filter::eLinear,
-        .mipmapMode = vk::SamplerMipmapMode::eLinear,
-        .addressModeU = vk::SamplerAddressMode::eRepeat,
-        .addressModeV = vk::SamplerAddressMode::eRepeat,
-        .addressModeW = vk::SamplerAddressMode::eRepeat,
-        .mipLodBias = 0.f,
-        .anisotropyEnable = vk::True,
-        .maxAnisotropy = props.limits.maxSamplerAnisotropy,
-        .compareEnable = vk::False,
-        .compareOp = vk::CompareOp::eAlways
-    };
-    tex.sampler = vk::raii::Sampler(device, sampler_info);
+    tex.sampler = create_vk_sampler();
+
+    tex.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    tex.descriptor = vk::DescriptorImageInfo{*tex.sampler, *tex.view, tex.layout};
 
     textures.emplace(name, std::move(tex));
+    return true;
 }
 
 bool WrappedContext::add_cubemap(const std::string& name, const uint32_t binding,
-    const fs::path& path) {
+    const fs::path& path)
+{
     if (textures.find(name) != textures.end()) {
-        std::cout << "Cubemap " << name << " already exists" << std::endl;
+        std::cout << "Texture " << name << " already exists" << std::endl;
         return false;
     }
+
     Texture tex{.binding = binding, .vecsize = 6};
-    tex.image = vk::raii::Image(device, vk::ImageCreateInfo{.imageType = vk::ImageType::e2D, .format = vk::Format::eR8G8B8A8Srgb, .extent = {1, 1, 1}, .mipLevels = 1, .arrayLayers = 6, .samples = vk::SampleCountFlagBits::e1, .tiling = vk::ImageTiling::eOptimal, .usage = vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst, .sharingMode = vk::SharingMode::eExclusive, .initialLayout = vk::ImageLayout::eUndefined});
-    tex.memo = vk::raii::DeviceMemory(device, vk::MemoryAllocateInfo{.allocationSize = 1, .memoryTypeIndex = 0});
+
+    fs::path abs_path = path;
+    if (path.is_relative()) {
+        abs_path = fs::absolute(path);
+    }
+    if (!fs::exists(abs_path)) {
+        std::cout << "path for cubemap " << name << " does not exist" << std::endl;
+        return false;
+    }
+
+    OIIO::ImageBuf oiio_buf(abs_path.string().c_str());
+    if (!oiio_buf.init_spec(oiio_buf.name(), 0, 0)) {
+        std::cout << "[OIIO] Cubemap spec initialization for " << name << " failed" << std::endl;
+        return false;
+    }
+
+    oiio_buf.read();
+    const auto spec = oiio_buf.spec();
+    const uint32_t face_size = spec.width / 4;
+
+    const auto top_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size, face_size * 2, 0, face_size));
+    const auto bottom_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size, face_size * 2, face_size * 2, face_size * 3));
+    const auto left_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(0, face_size, face_size, face_size * 2));
+    const auto right_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size * 2, face_size * 3, face_size, face_size * 2));
+    const auto front_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size, face_size * 2, face_size, face_size * 2));
+    const auto back_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size * 3, face_size * 4, face_size, face_size * 2));
+    const std::array<OIIO::ImageBuf, 6> face_bufs = {right_buf, left_buf, top_buf, bottom_buf, front_buf, back_buf};
+
+    std::vector<float> pixel_pool;
+    pixel_pool.reserve(face_size * face_size * 6);
+    const vk::DeviceSize image_size = static_cast<vk::DeviceSize>(face_size) * face_size * sizeof(float) * 6;
+
+    int ch_ords[] = {0, 1, 2, -1};
+    float ch_vals[] = {0, 0, 0, 1.f};
+    std::string ch_names[] = {"R", "G", "B", "A"};
+    for (const auto& face_buf : face_bufs) {
+        const OIIO::ImageBuf with_alpha_buf = OIIO::ImageBufAlgo::channels(face_buf, 4, ch_ords,
+            ch_vals, ch_names);
+
+        std::vector<float> pixels(face_size * face_size);
+        with_alpha_buf.get_pixels(OIIO::ROI::All(), OIIO::TypeDesc::UINT8, pixels.data());
+        pixel_pool.insert(pixel_pool.end(), std::make_move_iterator(pixels.begin()), std::make_move_iterator(pixels.end()));
+    }
+
+    auto [staging_buf, staging_memo] = load_into_staging_buffer(pixel_pool.data(), static_cast<uint32_t>(image_size));
+
+    // create image
+    std::tie(tex.image, tex.memo) = create_vk_image(face_size, face_size, 6, vk::SampleCountFlagBits::e1,
+        vk::Format::eR8G8B8A8Srgb, vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eSampled | vk::ImageUsageFlagBits::eTransferDst,
+        vk::ImageCreateFlagBits::eCubeCompatible, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+    vk::raii::CommandBuffer cmd_buf = begin_single_commands();
+
+    transit_image_layout(cmd_buf, tex.image, vk::ImageLayout::eUndefined, vk::ImageLayout::eTransferDstOptimal, 6);
+
+    std::vector<vk::BufferImageCopy> regions;
+    regions.reserve(6);
+    vk::DeviceSize offset = 0;
+    const vk::DeviceSize face_bytes = static_cast<vk::DeviceSize>(face_size) * face_size * sizeof(float);
+    for (uint32_t layer = 0; layer < 6; ++layer) {
+        vk::BufferImageCopy region{};
+        region.bufferOffset = offset;
+        region.imageSubresource = {vk::ImageAspectFlagBits::eColor, 0, layer, 1};
+        region.imageOffset = vk::Offset3D{0, 0, 0};
+        region.imageExtent = vk::Extent3D{face_size, face_size, 1};
+        regions.push_back(region);
+        offset += face_bytes;
+    }
+    cmd_buf.copyBufferToImage(*staging_buf, *tex.image, vk::ImageLayout::eTransferDstOptimal, regions);
+
+    transit_image_layout(cmd_buf, tex.image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, 6);
+    end_single_commands(std::move(cmd_buf));
+
+    // create image view
+    tex.view = create_vk_imageview(tex.image, vk::Format::eR8G8B8A8Srgb, vk::Format::eR8G8B8A8Srgb, 6);
+
+    // create sampler
+    tex.sampler = create_vk_sampler();
+
+    tex.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
+    tex.descriptor = vk::DescriptorImageInfo{*tex.sampler, *tex.view, tex.layout};
+
+    textures.emplace(name, std::move(tex));
+    return true;
 }
 
-void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout) const {
+void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t layer_count) const {
     vk::ImageMemoryBarrier barrier{
         .oldLayout = old_layout,
         .newLayout = new_layout,
@@ -782,7 +861,7 @@ void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, cons
     cmd_buf.pipelineBarrier(src_stage, dst_stage, {}, {}, {}, barrier);
 }
 
-void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const {
+void WrappedContext::copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const {
     vk::BufferImageCopy region{
         .bufferOffset = 0,
         .bufferRowLength = 0,
@@ -823,14 +902,32 @@ std::pair<vk::raii::Image, vk::raii::DeviceMemory> WrappedContext::create_vk_ima
     return {std::move(image), std::move(memo)};
 }
 
-vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format) const {
+vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count) const {
     vk::ImageViewCreateInfo view_info{
         .image = img,
-        .viewType = vk::ImageViewType::e2D,
+        .viewType = layer_count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::eCube,
         .format = format,
-        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = 1}
+        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = layer_count}
     };
     return vk::raii::ImageView(device, view_info);
+}
+
+vk::raii::Sampler WrappedContext::create_vk_sampler(vk::Filter mag_filter, vk::Filter min_filter, vk::SamplerMipmapMode mipmap_mode, vk::SamplerAddressMode address_mode, bool anisotropy_enable, bool compare_enable, vk::CompareOp compare_op) const {
+    vk::PhysicalDeviceProperties props = physical_device.getProperties();
+    vk::SamplerCreateInfo sampler_info{
+        .magFilter = mag_filter,
+        .minFilter = min_filter,
+        .mipmapMode = mipmap_mode,
+        .addressModeU = address_mode,
+        .addressModeV = address_mode,
+        .addressModeW = address_mode,
+        .mipLodBias = 0.f,
+        .anisotropyEnable = anisotropy_enable,
+        .maxAnisotropy = props.limits.maxSamplerAnisotropy,
+        .compareEnable = compare_enable,
+        .compareOp = compare_op
+    };
+    return vk::raii::Sampler(device, sampler_info);
 }
 
 }

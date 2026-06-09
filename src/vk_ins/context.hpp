@@ -1,13 +1,21 @@
 #pragma once
 
 #include <cstdint>
-#include <vector>
+#include <filesystem>
+#include <functional>
 #include <memory>
+#include <string>
 #include <tuple>
+#include <unordered_map>
+#include <vector>
 
 #include <vulkan/vulkan_raii.hpp>
 
+#include "concepts/mesh.h"
 #include "vk_ins/shader_module_pack.hpp"
+#include "vk_ins/types.h"
+
+namespace fs = std::filesystem;
 
 namespace vkkk
 {
@@ -130,6 +138,7 @@ private:
         vk::AccessFlags2 dst_access_mask,
         vk::PipelineStageFlags2 src_stage_mask,
         vk::PipelineStageFlags2 dst_stage_mask,
+        uint32_t layer_count=1
     );
     void create_swapchain();
     void create_imageviews();
@@ -162,7 +171,14 @@ private:
     void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout) const;
     void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;
     std::pair<vk::raiiImage, vk::raii::DeviceMemory> create_vk_image(uint32_t width, uint32_t height, uint32_t layers, vk::SampleCountFlagBits samples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags flags, vk::MemoryPropertyFlags properties) const;
-    vk::raii::ImageView create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format) const;
+    vk::raii::ImageView create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count) const;
+    vk::raii::Sampler create_vk_sampler(vk::Filter mag_filter=vk::Filter::eLinear,
+        vk::Filter min_filter=vk::Filter::eLinear,
+        vk::SamplerMipmapMode mipmap_mode=vk::SamplerMipmapMode::eLinear,
+        vk::SamplerAddressMode address_mode=vk::SamplerAddressMode::eRepeat,
+        bool anisotropy_enable=vk::True,
+        bool compare_enable=vk::False,
+        vk::CompareOp compare_op=vk::CompareOp::eAlways) const;
 
 private:
     std::vector<const char*> required_extensions = {

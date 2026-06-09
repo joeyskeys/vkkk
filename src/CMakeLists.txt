@@ -37,7 +37,6 @@ set(SRCS
     concepts/camera.cpp
     concepts/line.cpp
     concepts/mesh.cpp
-    concepts/context.cpp
     gui/gui.cpp
     renderer/forward.cpp
     vk_ins/cmd_buf.cpp

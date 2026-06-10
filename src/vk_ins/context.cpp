@@ -424,34 +424,6 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> WrappedContext::load_into_st
     return std::make_pair(std::move(staging_buf), std::move(staging_memo));
 }
 
-void WrappedContext::create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-    size_t comp_size, size_t vcnt) const
-{
-    const vk::DeviceSize buf_size = static_cast<vk::DeviceSize>(comp_size * vcnt * sizeof(float));
-    auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    void* data = device.mapMemory(*staging_memo, 0, buf_size);
-    std::memcpy(data, src, static_cast<size_t>(buf_size));
-    device.unmapMemory(*staging_memo);
-    std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
-        vk::MemoryPropertyFlagBits::eDeviceLocal);
-    copy_buffer(staging_buf, buf, buf_size);
-}
-
-void WrappedContext::create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-    size_t idx_cnt) const
-{
-    const vk::DeviceSize buf_size = static_cast<vk::DeviceSize>(sizeof(uint32_t) * idx_cnt);
-    auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
-        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    void* data = staging_buf.mapMemory(0, buf_size);
-    std::memcpy(data, src, static_cast<size_t>(buf_size));
-    staging_buf.unmapMemory();
-    std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
-        vk::MemoryPropertyFlagBits::eDeviceLocal);
-    copy_buffer(staging_buf, buf, buf_size);
-}
-
 void WrappedContext::init(GLFWwindow* window) {
     window_ = window;
 

@@ -18,9 +18,9 @@ set(HEADERS
     utils/singleton.h
     vk_ins/cmd_buf.h
     vk_ins/misc.h
-    vk_ins/vkabstraction.h
-    vk_ins/vk_abc.h
-    vk_ins/shader_mgr.h
+    #vk_ins/vkabstraction.h
+    #vk_ins/shader_mgr.h
+    vk_ins/shader_module_pack.hpp
     vk_ins/context.hpp)
 
 set(SRCS
@@ -41,9 +41,8 @@ set(SRCS
     renderer/forward.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
-    vk_ins/vkabstraction.cpp
-    vk_ins/vk_abc.cpp
-    vk_ins/shader_mgr.cpp
+    #vk_ins/vkabstraction.cpp
+    #vk_ins/shader_mgr.cpp
     vk_ins/shader_module_pack.cpp
     vk_ins/context.cpp)
 
@@ -66,17 +65,17 @@ else()
     target_link_libraries(vkkk PRIVATE ${SHADERC_RELEASE_LIBRARIES})
 endif()
 
-add_executable(vkmain main.cpp)
-target_link_libraries(vkmain
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+#add_executable(vkmain main.cpp)
+#target_link_libraries(vkmain
+    #PRIVATE
+        #vkkk
+        #OpenImageIO::OpenImageIO)
 
-add_executable(vkcornell cornell_main.cpp)
-target_link_libraries(vkcornell
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+#add_executable(vkcornell cornell_main.cpp)
+#target_link_libraries(vkcornell
+    #PRIVATE
+        #vkkk
+        #OpenImageIO::OpenImageIO)
 
 add_executable(vkcornellpp cornal_mainpp.cpp)
 target_link_libraries(vkcornellpp
@@ -84,16 +83,16 @@ target_link_libraries(vkcornellpp
         vkkk
         OpenImageIO::OpenImageIO)
 
-add_executable(vkrenderer renderer_main.cpp)
-target_link_libraries(vkrenderer
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+#add_executable(vkrenderer renderer_main.cpp)
+#target_link_libraries(vkrenderer
+    #PRIVATE
+        #vkkk
+        #OpenImageIO::OpenImageIO)
 
-add_executable(vktest test_main.cpp)
-target_link_libraries(vktest
-    PUBLIC
-        Vulkan::Vulkan)
+#add_executable(vktest test_main.cpp)
+#target_link_libraries(vktest
+    #PUBLIC
+        #Vulkan::Vulkan)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
     add_subdirectory(binding)

@@ -1,8 +1,11 @@
 #include <fmt/format.h>
 #include <shaderc/shaderc.hpp>
+#include <spirv_cross/spirv.hpp>
+#include <spirv_cross/spirv_glsl.hpp>
 #include <algorithm>
 #include <cstring>
 
+#include "utils/io.h"
 #include "vk_ins/shader_module_pack.hpp"
 
 namespace vkkk
@@ -21,7 +24,6 @@ static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {
 static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBits t) {
     mod.buf_infos.clear();
     mod.img_infos.clear();
-    mod.input_brefs.clear();
     mod.attr_infos.clear();
 
     spirv_cross::CompilerGLSL comp(mod.spirv_code);
@@ -50,13 +52,13 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
     }
 
     // input attrs
-    if (t == VK_SHADER_STAGE_VERTEX_BIT) {
+    if (t == vk::ShaderStageFlagBits::eVertex) {
         for (auto& input : res.stage_inputs) {
             auto name = comp.get_name(input.id);
             auto type_info = comp.get_type(input.base_type_id);
             auto vectype = find_vec_type(type_info);
             auto loc = comp.get_decoration(input.id, spv::DecorationLocation);
-            mod.attr_infos.emplace(loc, vectype, name);
+            mod.attr_infos.emplace_back(loc, static_cast<uint32_t>(vectype), name);
         }
         // sort by location index
         std::sort(mod.attr_infos.begin(), mod.attr_infos.end(), [](const auto& a, const auto& b) {
@@ -69,32 +71,32 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
 
 static bool shader_kind_from_stage(const vk::ShaderStageFlagBits t, shaderc_shader_kind& out_kind) {
     switch (t) {
-        case VK_SHADER_STAGE_VERTEX_BIT: {
+        case vk::ShaderStageFlagBits::eVertex: {
             out_kind = shaderc_glsl_vertex_shader;
             return true;
         }
 
-        case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT: {
+        case vk::ShaderStageFlagBits::eTessellationControl: {
             out_kind = shaderc_glsl_tess_control_shader;
             return true;
         }
 
-        case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT: {
+        case vk::ShaderStageFlagBits::eTessellationEvaluation: {
             out_kind = shaderc_glsl_tess_evaluation_shader;
             return true;
         }
 
-        case VK_SHADER_STAGE_GEOMETRY_BIT: {
+        case vk::ShaderStageFlagBits::eGeometry: {
             out_kind = shaderc_glsl_geometry_shader;
             return true;
         }
 
-        case VK_SHADER_STAGE_FRAGMENT_BIT: {
+        case vk::ShaderStageFlagBits::eFragment: {
             out_kind = shaderc_glsl_fragment_shader;
             return true;
         }
 
-        case VK_SHADER_STAGE_COMPUTE_BIT: {
+        case vk::ShaderStageFlagBits::eCompute: {
             out_kind = shaderc_glsl_compute_shader;
             return true;
         }
@@ -124,7 +126,7 @@ bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
 
     shaderc_shader_kind tt;
     if (!shader_kind_from_stage(t, tt)) {
-        std::cout << "Shader type " << t << " not supported yet.." << std::endl;
+        std::cout << "Shader type " << static_cast<uint32_t>(t) << " not supported yet.." << std::endl;
         return false;
     }
 
@@ -179,7 +181,7 @@ bool ShaderModule::load(const fs::path& path, const vk::ShaderStageFlagBits t) {
 
 bool ShaderModulePack::add_shader_module(const ShaderModule& module, bool replace) {
     if (modules.find(module.type) != modules.end() && !replace) {
-        std::cout << "Shader module for stage " << module.type << " already exists" << std::endl;
+        std::cout << "Shader module for stage " << static_cast<uint32_t>(module.type) << " already exists" << std::endl;
         return false;
     }
     modules[module.type] = module;

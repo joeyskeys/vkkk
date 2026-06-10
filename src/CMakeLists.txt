@@ -44,6 +44,7 @@ set(SRCS
     vk_ins/vkabstraction.cpp
     vk_ins/vk_abc.cpp
     vk_ins/shader_mgr.cpp
+    vk_ins/shader_module_pack.cpp
     vk_ins/context.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
@@ -73,6 +74,12 @@ target_link_libraries(vkmain
 
 add_executable(vkcornell cornell_main.cpp)
 target_link_libraries(vkcornell
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
+add_executable(vkcornellpp cornal_mainpp.cpp)
+target_link_libraries(vkcornellpp
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

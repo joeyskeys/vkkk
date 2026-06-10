@@ -281,4 +281,9 @@ void DrawableMgr::upload_gpu(VkWrappedInstance* ins, const std::string& name) co
     std::cout << "Drawable with name " << name << " not found.." << std::endl;
 }
 
+const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
+    const auto found = meshes.find(name);
+    return found != meshes.end() ? &found->second : nullptr;
+}
+
 } // namespace vkkk

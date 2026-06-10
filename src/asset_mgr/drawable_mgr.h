@@ -40,6 +40,7 @@ public:
 
     // Upload mesh drawable by name. (Line upload path can be added later.)
     void upload_gpu(VkWrappedInstance*, const std::string&) const;
+    const Mesh* find_mesh(const std::string& name) const;
 
 private:
     std::unordered_map<std::string, Mesh>   meshes;

@@ -1,6 +1,10 @@
+#include <algorithm>
 #include <array>
+#include <chrono>
 #include <cstring>
 #include <iostream>
+#include <map>
+#include <ranges>
 #include <stdexcept>
 #include <vector>
 
@@ -12,6 +16,77 @@
 
 namespace vkkk
 {
+
+namespace
+{
+
+bool is_device_suitable(const vk::raii::PhysicalDevice& device, vk::raii::SurfaceKHR& surface,
+    const std::vector<const char*>& required_extensions)
+{
+    const bool support_vk_1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
+
+    const auto queue_families = device.getQueueFamilyProperties();
+    bool support_graphics = false;
+    bool support_present = false;
+    for (uint32_t i = 0; i < queue_families.size(); ++i) {
+        if (queue_families[i].queueFlags & vk::QueueFlagBits::eGraphics) {
+            support_graphics = true;
+            if (device.getSurfaceSupportKHR(i, *surface)) {
+                support_present = true;
+                break;
+            }
+        }
+    }
+
+    const auto available_extensions = device.enumerateDeviceExtensionProperties();
+    const bool supports_all_required_extensions = std::ranges::all_of(required_extensions, [&available_extensions](const auto& extension) {
+        return std::ranges::any_of(available_extensions, [extension](const auto& available_extension) {
+            return std::strcmp(available_extension.extensionName, extension) == 0;
+        });
+    });
+
+    return support_vk_1_3 && support_graphics && support_present && supports_all_required_extensions;
+}
+
+uint32_t choose_min_image_count(const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
+    uint32_t min_image_count = surface_capabilities.minImageCount + 1;
+    if (surface_capabilities.maxImageCount > 0 && min_image_count > surface_capabilities.maxImageCount) {
+        min_image_count = surface_capabilities.maxImageCount;
+    }
+    return min_image_count;
+}
+
+vk::SurfaceFormatKHR choose_swap_surface_format(const std::vector<vk::SurfaceFormatKHR>& surface_formats) {
+    const auto format_iter = std::ranges::find_if(surface_formats, [](const auto& surface_format) {
+        return surface_format.format == vk::Format::eB8G8R8A8Srgb
+            && surface_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
+    });
+    return format_iter != surface_formats.end() ? *format_iter : surface_formats.front();
+}
+
+vk::PresentModeKHR choose_present_mode(const std::vector<vk::PresentModeKHR>& present_modes) {
+    const bool has_mailbox = std::ranges::any_of(present_modes, [](const auto& present_mode) {
+        return present_mode == vk::PresentModeKHR::eMailbox;
+    });
+    return has_mailbox ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
+}
+
+vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& surface_capabilities, GLFWwindow* window) {
+    if (surface_capabilities.currentExtent.width != UINT32_MAX) {
+        return surface_capabilities.currentExtent;
+    }
+    int framebuffer_width = 0;
+    int framebuffer_height = 0;
+    glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
+    return vk::Extent2D{
+        std::clamp<uint32_t>(static_cast<uint32_t>(framebuffer_width),
+            surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width),
+        std::clamp<uint32_t>(static_cast<uint32_t>(framebuffer_height),
+            surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height)
+    };
+}
+
+} // namespace
 
 PipelineOption::PipelineOption() {
     vert_info = vk::PipelineVertexInputStateCreateInfo{};
@@ -66,11 +141,11 @@ PipelineOption::PipelineOption() {
     dynamic_info.pDynamicStates = dynamic_states.data();
 }
 
-void MeshGPU::sync(const Mesh& mesh, Context* ctx) {
+void MeshGPU::sync(const Mesh& mesh, WrappedContext* ctx) {
     if (!mesh.loaded)
         throw std::runtime_error("cannot sync unloaded mesh");
-    ctx->create_vertex_buffer(mesh.vbuf, vbuf, vbuf_memo, mesh.comp_size * sizeof(float), mesh.vcnt);
-    ctx->create_index_buffer(mesh.ibuf, ibuf, ibuf_memo, 3 * sizeof(uint32_t), mesh.icnt);
+    ctx->create_vertex_buffer(mesh.vbuf, vbuf, vbuf_memo, mesh.comp_size, mesh.vcnt);
+    ctx->create_index_buffer(reinterpret_cast<const uint32_t*>(mesh.ibuf), ibuf, ibuf_memo, mesh.icnt * 3);
     icnt = mesh.icnt;
 }
 
@@ -78,8 +153,11 @@ void MeshGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_la
     const vk::DescriptorSet* desc_set) const
 {
     cmd_buf.bindVertexBuffers(0, *vbuf, {0});
+    if (desc_set != nullptr) {
+        cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, ppl_layout, 0, {*desc_set}, {});
+    }
     cmd_buf.bindIndexBuffer(*ibuf, 0, vk::IndexType::eUint32);
-    cmd_buf.drawIndexed(icnt, 1, 0, 0, 0);
+    cmd_buf.drawIndexed(icnt * 3, 1, 0, 0, 0);
 }
 
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
@@ -94,71 +172,109 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
     return vk::False;
 }
 
+std::vector<const char*> WrappedContext::get_glfw_instance_extensions() {
+    uint32_t count = 0;
+    const char** extensions = glfwGetRequiredInstanceExtensions(&count);
+    if (extensions == nullptr || count == 0) {
+        throw std::runtime_error("failed to query GLFW instance extensions");
+    }
+    return {extensions, extensions + count};
+}
+
+GLFWwindow* WrappedContext::create_window(int width, int height, const char* title, bool resizable) {
+    glfwInit();
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+    glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+    GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
+    if (window == nullptr) {
+        throw std::runtime_error("failed to create GLFW window");
+    }
+    return window;
+}
+
 WrappedContext::WrappedContext(
     const char* app_name,
     uint32_t app_version,
     const char* engine_name,
     uint32_t api_version,
-    bool enable_validation_layers
+    bool enable_validation_layers,
     const std::vector<const char*>& extra_validation_layers,
-    const std::vector<const char*>& extra_extensions)
+    const std::vector<const char*>& extra_extensions,
+    bool enable_debug_messenger)
+    : enable_debug_messenger_(enable_debug_messenger)
 {
-    // 1. create the instance
-    constexpr vk::ApplicationInfo app_info(app_name, app_version, engine_name, api_version);
+    vk::ApplicationInfo app_info{app_name, app_version, engine_name, VK_MAKE_VERSION(1, 0, 0), api_version};
 
     std::vector<const char*> validation_layers;
     if (enable_validation_layers) {
         validation_layers.assign(default_validation_layers.begin(), default_validation_layers.end());
-        if (!extra_validation_layers.empty()) {
-            validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
-        }
+        validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
     }
 
     auto layer_props = context.enumerateInstanceLayerProperties();
-    auto unsupported_layers = std::ranges::find_if(validation_layers, [&layer_props](const auto& layer) {
-        return std::ranges:none_of(layer_props, [layer](auto const& layer_prop) { return strcmp(layer_prop.layerName, layer) == 0; });
-    });
-    if (unsupported_layers != validation_layers.end()) {
-        throw std::runtime_error("Unsupported validation layer: " + std::string(unsupported_layers->layerName));
+    for (const auto* layer : validation_layers) {
+        if (!std::ranges::any_of(layer_props, [layer](const auto& layer_prop) {
+                return std::strcmp(layer_prop.layerName, layer) == 0;
+            }))
+        {
+            throw std::runtime_error(std::string("unsupported validation layer: ") + layer);
+        }
     }
 
+    std::vector<const char*> instance_extensions = extra_extensions;
     auto extension_props = context.enumerateInstanceExtensionProperties();
-    auto unsupported_extensions = std::ranges::find_if(extra_extensions, [&extension_props](const auto& extension) {
-        return std::ranges:none_of(extension_props, [extension](auto const& extension_prop) { return strcmp(extension_prop.extensionName, extension) == 0; });
-    });
-    if (unsupported_extensions != extra_extensions.end()) {
-        throw std::runtime_error("Unsupported extension: " + std::string(unsupported_extensions->extensionName));
+    for (const auto* extension : instance_extensions) {
+        if (!std::ranges::any_of(extension_props, [extension](const auto& extension_prop) {
+                return std::strcmp(extension_prop.extensionName, extension) == 0;
+            }))
+        {
+            throw std::runtime_error(std::string("unsupported instance extension: ") + extension);
+        }
     }
 
-    vk::InstanceCreateInfo instance_create_info{
-        .pApplicationInfo = &app_info,
-        .enabledLayerCount = static_cast<uint32_t>(validation_layers.size()),
-        .ppEnabledLayerNames = validation_layers.data(),
-        .enabledExtensionCount = static_cast<uint32_t>(extra_extensions.size()),
-        .ppEnabledExtensionNames = extra_extensions.data()
-    };
+    vk::DebugUtilsMessengerCreateInfoEXT debug_create_info{};
+    const vk::DebugUtilsMessengerCreateInfoEXT* debug_create_info_ptr = nullptr;
+    if (enable_validation_layers && enable_debug_messenger_) {
+        vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(
+            vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
+        vk::DebugUtilsMessageTypeFlagsEXT message_types(
+            vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+            | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance);
+        debug_create_info.messageSeverity = severity_flags;
+        debug_create_info.messageType = message_types;
+        debug_create_info.pfnUserCallback = &debug_callback;
+        debug_create_info_ptr = &debug_create_info;
+    }
+
+    vk::InstanceCreateInfo instance_create_info{};
+    instance_create_info.pNext = debug_create_info_ptr;
+    instance_create_info.pApplicationInfo = &app_info;
+    instance_create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
+    instance_create_info.ppEnabledLayerNames = validation_layers.data();
+    instance_create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
+    instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
     instance = vk::raii::Instance(context, instance_create_info);
 
-    if (enable_validation_layers && enable_debug_messenger) {
+    if (enable_validation_layers && enable_debug_messenger_) {
         setup_debug_messenger();
     }
 }
 
 void WrappedContext::setup_debug_messenger() {
-    vk::DebugUtilsMessageServerityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
+    vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
                                                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
     vk::DebugUtilsMessageTypeFlagsEXT message_types(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
                                                     vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation |
                                                     vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance);
-    vk::DebugUtilsMessengerCreateInfoEXT debug_utils_messenger_create_info{
-        .messageSeverity = severity_flags,
-        .messageType = message_types,
-        .pfnUserCallback = &debug_callback
-    };
-    debug_messenger = vk::raii::DebugUtilsMessenger(instance, debug_utils_messenger_create_info);
+    vk::DebugUtilsMessengerCreateInfoEXT debug_utils_messenger_create_info{};
+    debug_utils_messenger_create_info.messageSeverity = severity_flags;
+    debug_utils_messenger_create_info.messageType = message_types;
+    debug_utils_messenger_create_info.pfnUserCallback = &debug_callback;
+    debug_messenger = vk::raii::DebugUtilsMessengerEXT(instance, debug_utils_messenger_create_info);
 }
 
 void WrappedContext::transit_presentation_image_layout(
+    vk::raii::CommandBuffer& cmd_buf,
     vk::Image img,
     vk::ImageLayout old_layout,
     vk::ImageLayout new_layout,
@@ -168,31 +284,30 @@ void WrappedContext::transit_presentation_image_layout(
     vk::PipelineStageFlags2 dst_stage_mask,
     vk::ImageAspectFlags aspect_mask) const
 {
-    vk::ImageMemoryBarrier barrier{
-        .oldLayout = old_layout,
-        .newLayout = new_layout,
-        .srcStageMask = src_stage_mask,
-        .dstStageMask = dst_stage_mask,
-        .srcAccessMask = src_access_mask,
-        .dstAccessMask = dst_access_mask,
-        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
-        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
-        .image = img,
-        .subresourceRange = {.aspectMask = aspect_mask, .levelCount = 1, .layerCount = 1}
-    };
-    vk::DependencyInfo dependency_info{
-        .dependencyFlags = {},
-        .imageMemoryBarrierCount = 1,
-        .pImageMemoryBarriers = &barrier
-    };
-    command_buffers[image_index].pipelineBarrier2(dependency_info);
+    vk::ImageMemoryBarrier2 barrier{};
+    barrier.srcStageMask = src_stage_mask;
+    barrier.srcAccessMask = src_access_mask;
+    barrier.dstStageMask = dst_stage_mask;
+    barrier.dstAccessMask = dst_access_mask;
+    barrier.oldLayout = old_layout;
+    barrier.newLayout = new_layout;
+    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.image = img;
+    barrier.subresourceRange.aspectMask = aspect_mask;
+    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.layerCount = 1;
+    vk::DependencyInfo dependency_info{};
+    dependency_info.imageMemoryBarrierCount = 1;
+    dependency_info.pImageMemoryBarriers = &barrier;
+    cmd_buf.pipelineBarrier2(dependency_info);
 }
 
 vk::Format WrappedContext::find_supported_format(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const {
     for (const auto format : candidates) {
         vk::FormatProperties props = physical_device.getFormatProperties(format);
-        if ((tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)) ||
-            ((tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features))
+        if ((tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)
+            || (tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features))
         {
             return format;
         }
@@ -203,13 +318,13 @@ vk::Format WrappedContext::find_supported_format(const std::vector<vk::Format>& 
 void WrappedContext::create_depth_resources() {
     vk::Format depth_format = find_depth_format();
     std::tie(depth_image, depth_memo) = create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, vk::SampleCountFlagBits::e1, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageCreateFlagBits::eNone, vk::MemoryPropertyFlagBits::eDeviceLocal);
-    depth_view = create_vk_imageview(depth_image, depth_format, 1, vk::ImageAspectFlagBits::eDepth);
+    depth_view = create_vk_imageview(depth_image, depth_format, 1, vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
 }
 
 void WrappedContext::create_swapchain() {
     // create the swapchain
     vk::SurfaceCapabilitiesKHR surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-    swapchain_extent = choose_swap_extent(surface_capabilities);
+    swapchain_extent = choose_swap_extent(surface_capabilities, window_);
     uint32_t min_image_count = choose_min_image_count(surface_capabilities);
 
     std::vector<vk::SurfaceFormatKHR> surface_formats = physical_device.getSurfaceFormatsKHR(*surface);
@@ -218,34 +333,32 @@ void WrappedContext::create_swapchain() {
     std::vector<vk::PresentModeKHR> present_modes = physical_device.getSurfacePresentModesKHR(*surface);
     vk::PresentModeKHR present_mode = choose_present_mode(present_modes);
 
-    vk::SwapchainCreateInfoKHR swapchain_create_info{
-        .surface = *surface,
-        .minImageCount = min_image_count,
-        .imageFormat = swapchain_surface_format.format,
-        .imageColorSpace = swapchain_surface_format.colorSpace,
-        .imageExtent = swapchain_extent,
-        .imageArrayLayers = 1,
-        .imageUsage = vk::ImageUsageFlagBits::eColorAttachment,
-        .imageSharingMode = vk::SharingMode::eExclusive,
-        .preTransform = surface_capabilities.currentTransform,
-        .compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque,
-        .presentMode = present_mode,
-        .clipped = true
-    };
+    vk::SwapchainCreateInfoKHR swapchain_create_info{};
+    swapchain_create_info.surface = *surface;
+    swapchain_create_info.minImageCount = min_image_count;
+    swapchain_create_info.imageFormat = swapchain_surface_format.format;
+    swapchain_create_info.imageColorSpace = swapchain_surface_format.colorSpace;
+    swapchain_create_info.imageExtent = swapchain_extent;
+    swapchain_create_info.imageArrayLayers = 1;
+    swapchain_create_info.imageUsage = vk::ImageUsageFlagBits::eColorAttachment;
+    swapchain_create_info.imageSharingMode = vk::SharingMode::eExclusive;
+    swapchain_create_info.preTransform = surface_capabilities.currentTransform;
+    swapchain_create_info.compositeAlpha = vk::CompositeAlphaFlagBitsKHR::eOpaque;
+    swapchain_create_info.presentMode = present_mode;
+    swapchain_create_info.clipped = VK_TRUE;
     swapchain = vk::raii::SwapchainKHR(device, swapchain_create_info);
     swapchain_images = swapchain.getImages();
 }
 
 void WrappedContext::create_imageviews() {
-    // create the image views
-    assert(swapchain_image_views.empty());
+    swapchain_image_views.clear();
     swapchain_image_views.reserve(swapchain_images.size());
-    for (auto& image : swapchain_images) {
-        swapchain_image_views.emplace_back(create_vk_imageview(image, swapchain_surface_format.format, vk::ImageAspectFlagBits::eColor));
+    for (const auto& image : swapchain_images) {
+        swapchain_image_views.emplace_back(create_vk_imageview(image, swapchain_surface_format.format));
     }
 }
 
-static uint32_t find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags properties) {
+uint32_t WrappedContext::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags properties) const {
     vk::PhysicalDeviceMemoryProperties mem_props = physical_device.getMemoryProperties();
     for (uint32_t i = 0; i < mem_props.memoryTypeCount; ++i) {
         if ((type_filter & (1 << i)) && (mem_props.memoryTypes[i].propertyFlags & properties) == properties) {
@@ -259,138 +372,112 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> WrappedContext::create_buffe
     vk::BufferUsageFlags usage,
     vk::MemoryPropertyFlags properties) const
 {
-    vk::BufferCreateInfo buffer_create_info{
-        .size = size,
-        .usage = usage,
-        .sharingMode = vk::SharingMode::eExclusive
-    };
+    vk::BufferCreateInfo buffer_create_info{};
+    buffer_create_info.size = size;
+    buffer_create_info.usage = usage;
+    buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
     vk::raii::Buffer buffer = vk::raii::Buffer(device, buffer_create_info);
     vk::MemoryRequirements mem_reqs = buffer.getMemoryRequirements();
-    vk::MemoryAllocateInfo alloc_info{
-        .allocationSize = mem_reqs.size,
-        .memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, properties)
-    };
+    vk::MemoryAllocateInfo alloc_info{};
+    alloc_info.allocationSize = mem_reqs.size;
+    alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, properties);
     vk::raii::DeviceMemory memo = vk::raii::DeviceMemory(device, alloc_info);
     buffer.bindMemory(*memo, 0);
     return std::make_pair(std::move(buffer), std::move(memo));
 }
 
 vk::raii::CommandBuffer WrappedContext::begin_single_commands() const {
-    vk::CommandBufferAllocateInfo alloc_info{
-        .commandPool = command_pool,
-        .level = vk::CommandBufferLevel::ePrimary,
-        .commandBufferCount = 1
-    };
-    vk::raii::CommandBuffer command_buffer = vk::raii::CommandBuffer(device, alloc_info);
+    vk::CommandBufferAllocateInfo alloc_info{};
+    alloc_info.commandPool = *command_pool;
+    alloc_info.level = vk::CommandBufferLevel::ePrimary;
+    alloc_info.commandBufferCount = 1;
+    vk::raii::CommandBuffers command_buffers(device, alloc_info);
+    vk::raii::CommandBuffer command_buffer = std::move(command_buffers[0]);
 
-    vk::CommandBufferBeginInfo begin_info{
-        .flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit
-    };
+    vk::CommandBufferBeginInfo begin_info{};
+    begin_info.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
     command_buffer.begin(begin_info);
     return std::move(command_buffer);
 }
 
 void WrappedContext::end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const {
     cmd_buf.end();
-    queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = cmd_buf}, nullptr);
+    vk::CommandBuffer raw_cmd = *cmd_buf;
+    vk::SubmitInfo submit_info{};
+    submit_info.commandBufferCount = 1;
+    submit_info.pCommandBuffers = &raw_cmd;
+    queue.submit(submit_info, nullptr);
     queue.waitIdle();
 }
 
 void WrappedContext::copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const {
-    command_buffer = begin_single_commands();
-    command_buffer.copyBuffer(*src, *dst, vk::BufferCopy(0, 0, size));
-    end_single_commands(std::move(command_buffer));
+    vk::raii::CommandBuffer cmd_buf = begin_single_commands();
+    cmd_buf.copyBuffer(*src, *dst, vk::BufferCopy(0, 0, size));
+    end_single_commands(std::move(cmd_buf));
 }
 
 std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> WrappedContext::load_into_staging_buffer(void* data, uint32_t size) const {
     auto [staging_buf, staging_memo] = create_buffer(size, vk::BufferUsageFlagBits::eTransferSrc, vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
-    void* mapped = staging_buf.mapMemory(0, size);
+    void* mapped = device.mapMemory(*staging_memo, 0, size);
     std::memcpy(mapped, data, size);
-    staging_buf.unmapMemory();
+    device.unmapMemory(*staging_memo);
     return std::make_pair(std::move(staging_buf), std::move(staging_memo));
 }
 
-static bool is_device_suitable(const vk::raii::PhysicalDevice& device, const std::vector<const char*>& required_extensions) {
-    bool support_vk_1_3 = device.getProperties().apiVersion >= VK_API_VERSION_1_3;
-
-    auto queue_families = device.getQueueFamilyProperties();
-    bool support_graphics = std::ranges::any_of(queue_families, [](const auto& queue_family) {
-        return queue_family.queueFlags & vk::QueueFlagBits::eGraphics;
-    });
-
-    auto available_extensions = device.enumerateDeviceExtensionProperties();
-    bool supports_all_required_extensions = std::ranges::all_of(required_extensions, [&available_extensions](const auto& extension) {
-        return std::ranges::any_of(available_extensions, [extension](const auto& available_extension) {
-            return strcmp(available_extension.extensionName, extension) == 0;
-        });
-    });
+void WrappedContext::create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
+    size_t comp_size, size_t vcnt) const
+{
+    const vk::DeviceSize buf_size = static_cast<vk::DeviceSize>(comp_size * vcnt * sizeof(float));
+    auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    void* data = device.mapMemory(*staging_memo, 0, buf_size);
+    std::memcpy(data, src, static_cast<size_t>(buf_size));
+    device.unmapMemory(*staging_memo);
+    std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eVertexBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal);
+    copy_buffer(staging_buf, buf, buf_size);
 }
 
-static uint32_t choose_min_image_count(const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
-    uint32_t min_image_count = surface_capabilities.minImageCount + 1;
-    if (surface_capabilities.maxImageCount > 0 && min_image_count > surface_capabilities.maxImageCount) {
-        min_image_count = surface_capabilities.maxImageCount;
+void WrappedContext::create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
+    size_t idx_cnt) const
+{
+    const vk::DeviceSize buf_size = static_cast<vk::DeviceSize>(sizeof(uint32_t) * idx_cnt);
+    auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    void* data = staging_buf.mapMemory(0, buf_size);
+    std::memcpy(data, src, static_cast<size_t>(buf_size));
+    staging_buf.unmapMemory();
+    std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | vk::BufferUsageFlagBits::eIndexBuffer,
+        vk::MemoryPropertyFlagBits::eDeviceLocal);
+    copy_buffer(staging_buf, buf, buf_size);
+}
+
+void WrappedContext::init(GLFWwindow* window) {
+    window_ = window;
+
+    VkSurfaceKHR raw_surface = VK_NULL_HANDLE;
+    if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window_, nullptr, &raw_surface) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create window surface");
     }
-    return min_image_count;
-}
+    surface = vk::raii::SurfaceKHR(instance, raw_surface);
 
-static vk::SurfaceFormatKHR choose_swap_surface_format(const std::vector<vk::SurfaceFormatKHR>& surface_formats) {
-    assert(!surface_formats.empty());
-    const auto format_iter = std::ranges::find_if(surface_formats, [](const auto& surface_format) {
-        return surface_format.format == vk::Format::eB8G8R8A8Srgb && surface_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear;
-    });
-    return format_iter != surface_formats.end() ? *format_iter : surface_formats.front();
-}
-
-static vk::PresentModeKHR choose_present_mode(const std::vector<vk::PresentModeKHR>& present_modes) {
-    assert(std::ranges::any_of(present_modes, [](const auto& present_mode) {
-        return present_mode == vk::PresentModeKHR::eFifo;
-    }));
-    return std::ranges::any_of(present_modes, [](const auto& present_mode) {
-        return present_mode == vk::PresentModeKHR::eMailbox;
-    }) ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
-}
-
-static vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& surface_capabilities) {
-    if (surface_capabilities.currentExtent.width != UINT32_MAX) {
-        return surface_capabilities.currentExtent;
-    }
-    int framebuffer_width = 0;
-    int framebuffer_height = 0;
-    glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
-    return {
-        std::clamp<uint32_t>(framebuffer_width, surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width),
-        std::clamp<uint32_t>(framebuffer_height, surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height)
-    }
-}
-
-WrappedContext::init(GLFWwindow* window) {
-    // create the surface
-    VkSurfaceKHR surface = nullptr;
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create window surface!");
-    }
-    surface = vk::raii::SurfaceKHR(instance, surface);
-
-    // choose the physical device
     std::vector<vk::raii::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
     auto const dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
-        return is_device_suitable(device, required_extensions);
+        return is_device_suitable(device, surface, required_extensions);
     });
     if (dev_iter == devices.end()) {
         throw std::runtime_error("no suitable Vulkan 1.3 device with dynamic rendering support");
     }
     physical_device = *dev_iter;
 
-    // create the logical device
-    std::vector<vk:QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
+    const std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
     for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
-        if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) && (physical_device.getSurfaceSupportKHR(i, *surface))) {
+        if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) && physical_device.getSurfaceSupportKHR(i, *surface)) {
             queue_idx = i;
             break;
         }
     }
-    if (queue_idx == ~0) {
+    if (queue_idx == ~0u) {
         throw std::runtime_error("no suitable queue family found");
     }
 
@@ -429,21 +516,24 @@ WrappedContext::init(GLFWwindow* window) {
     // create the depth resources
     create_depth_resources();
 
-    // create the command buffers
-    vk::CommandBufferAllocateInfo alloc_info{.commandPool = command_pool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = max_frames_in_flight};
-    command_buffers = vk::raii::CommandBuffers(device, alloc_info);
+    image_available_semaphores.clear();
+    render_finished_semaphores.clear();
+    in_flight_fences.clear();
+    images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);
 
-    // create sync objects
-    assert(present_complete_semaphores.empty() && render_complete_semaphores.empty() && in_flight_fences.empty());
-    for (size_t i = 0; i < swapchain_images.size(); ++i) {
-        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
-    }
     for (size_t i = 0; i < max_frames_in_flight; ++i) {
-        present_complete_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+        image_available_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
         in_flight_fences.emplace_back(device, vk::FenceCreateInfo{
             .flags = vk::FenceCreateFlagBits::eSignaled
         });
     }
+
+    command_buffers = vk::raii::CommandBuffers(device, vk::CommandBufferAllocateInfo{
+        .commandPool = command_pool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = static_cast<uint32_t>(swapchain_images.size())
+    });
 }
 
 static std::vector<vk::VertexInputBindingDescription> gen_binding_desc(const std::vector<VERT_COMP>& comps, bool interleaved) {
@@ -475,91 +565,82 @@ bool WrappedContext::create_pipeline(const std::string& name,
         return false;
     }
 
-    // resources
     std::vector<vk::VertexInputBindingDescription> input_binding_descs;
     std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
     std::map<uint32_t, std::string> ubo_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
 
-    // shader modules
-    std::vector<vk::ShaderModule> shader_modules;
+    std::vector<vk::raii::ShaderModule> shader_modules;
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos;
-    for (auto& [stage, module] : shader_module_pack.modules) {
-        // handle shader itself
+    shader_modules.reserve(shader_module_pack.modules.size());
+    shader_stage_infos.reserve(shader_module_pack.modules.size());
+
+    for (const auto& [stage, module] : shader_module_pack.modules) {
         vk::ShaderModuleCreateInfo shader_module_create_info{
             .codeSize = module.spirv_code.size() * sizeof(uint32_t),
             .pCode = module.spirv_code.data()
         };
-        vk::ShaderModule shader_module = vk::raii::ShaderModule(device, shader_module_create_info);
-        shader_modules.emplace_back(std::move(shader_module));
-
-        vk::PipelineShaderStageCreateInfo shader_stage_info{
+        shader_modules.emplace_back(device, shader_module_create_info);
+        shader_stage_infos.push_back(vk::PipelineShaderStageCreateInfo{
             .stage = stage,
-            .module = shader_modules.back(),
+            .module = *shader_modules.back(),
             .pName = "main"
-        };
-        shader_stage_infos.emplace_back(std::move(shader_stage_info));
+        });
 
-        // shader input infos
-        // input attrs
         if (stage == vk::ShaderStageFlagBits::eVertex) {
             input_binding_descs = gen_binding_desc(comps, interleaved);
 
             uint32_t offset = 0;
-            for (int i = 0; const auto& [attr_loc, glsl_type, attr_name] : module.attr_infos) {
+            int binding_idx = 0;
+            for (const auto& [attr_loc, glsl_type, attr_name] : module.attr_infos) {
+                (void)attr_name;
                 if (interleaved) {
-                    vk::VertexInputAttributeDescription attr_desc{
+                    input_attr_descs.push_back(vk::VertexInputAttributeDescription{
                         .location = attr_loc,
                         .binding = 0,
-                        .format = glsl_type_macro[glsl_type],
+                        .format = static_cast<vk::Format>(glsl_type_macro[glsl_type]),
                         .offset = offset
-                    };
-                    input_attr_descs.emplace_back(std::move(attr_desc));
+                    });
                     offset += glsl_type_sizes[glsl_type];
                 }
                 else {
-                    vk::VertexInputAttributeDescription attr_desc{
+                    input_attr_descs.push_back(vk::VertexInputAttributeDescription{
                         .location = attr_loc,
-                        .binding = i,
-                        .format = glsl_type_macro[glsl_type],
+                        .binding = static_cast<uint32_t>(binding_idx),
+                        .format = static_cast<vk::Format>(glsl_type_macro[glsl_type]),
                         .offset = 0
-                    };
-                    input_attr_descs.emplace_back(std::move(attr_desc));
+                    });
                 }
-                ++i;
+                ++binding_idx;
             }
         }
 
-        // ubos
-        for (auto& [ubo_name, ubo_info] : module.buf_infos) {
-            auto& [struct_size, array_size, binding] = ubo_info;
-            auto ppl_ubo_name = name + ":" + ubo_name;
-            add_ubo(ppl_ubo_name, binding, struct_size * array_size);
+        for (const auto& [ubo_name, ubo_info] : module.buf_infos) {
+            const auto& [struct_size, array_size, binding] = ubo_info;
+            const auto ppl_ubo_name = name + ":" + ubo_name;
+            add_ubo(ppl_ubo_name, binding, struct_size, array_size);
             ubo_binding_to_name[binding] = ppl_ubo_name;
 
-            vk::DescriptorSetLayoutBinding descriptor_layout{
+            descriptor_layouts.push_back(vk::DescriptorSetLayoutBinding{
                 .binding = binding,
                 .descriptorType = vk::DescriptorType::eUniformBuffer,
                 .descriptorCount = array_size,
                 .stageFlags = stage
-            };
-            descriptor_layouts.emplace_back(std::move(descriptor_layout));
+            });
         }
 
-        // texes
-        for (auto& [tex_name, tex_info] : module.img_infos) {
+        for (const auto& [tex_name, tex_binding] : module.img_infos) {
             const auto ppl_tex_name = name + ":" + tex_name;
             uint32_t descriptor_count = 1;
             if (textures.find(ppl_tex_name) == textures.end()) {
-                auto tex_path_info = module.tex_img_pairs.find(tex_name);
+                const auto tex_path_info = module.tex_img_pairs.find(tex_name);
                 if (tex_path_info == module.tex_img_pairs.end()) {
-                    std::cout << "No texture assigned for sampler " << tex_name
-                        << std::endl;
+                    std::cout << "No texture assigned for sampler " << tex_name << std::endl;
                     continue;
                 }
 
-                auto& [path, is_cubemap] = tex_path_info->second;
+                const auto& [path, is_cubemap] = tex_path_info->second;
                 descriptor_count = is_cubemap ? 6u : 1u;
                 if (!is_cubemap) {
                     if (!add_texture(ppl_tex_name, tex_binding, path)) {
@@ -575,153 +656,285 @@ bool WrappedContext::create_pipeline(const std::string& name,
             }
             tex_binding_to_name[tex_binding] = ppl_tex_name;
 
-            vk::DescriptorSetLayoutBinding binding {
+            descriptor_layouts.push_back(vk::DescriptorSetLayoutBinding{
                 .binding = tex_binding,
                 .descriptorType = vk::DescriptorType::eCombinedImageSampler,
                 .descriptorCount = descriptor_count,
-                .stageFlags = stage,
-                .pImmutableSamplers = nullptr
-            };
-            descriptor_layouts.emplace_back(std::move(binding));
+                .stageFlags = stage
+            });
         }
     }
 
-    vk::PipelineLayoutCreateInfo pipeline_layout_info{.setLayoutCount = 0, .pushConstantRangeCount = 0};
-    pipeline_layout = vk::raii::PipelineLayout(device, pipeline_layout_info);
+    PipelineOption local_option = option;
+    local_option.vert_info.vertexBindingDescriptionCount = static_cast<uint32_t>(input_binding_descs.size());
+    local_option.vert_info.pVertexBindingDescriptions = input_binding_descs.data();
+    local_option.vert_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(input_attr_descs.size());
+    local_option.vert_info.pVertexAttributeDescriptions = input_attr_descs.data();
 
-    vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipeline_create_info{
-        {
-            .stageCount = static_cast<uint32_t>(shader_stage_infos.size()),
-            .pStages = shader_stage_infos.data(),
-            .pVertexInputState = &option.vert_info,
-            .pInputAssemblyState = &option.assembly_info,
-            .pViewportState = &option.viewport_info,
-            .pRasterizationState = &option.raster_info,
-            .pMultisampleState = &option.multisample_info,
-            .pDepthStencilState = &option.depth_info,
-            .pColorBlendState = &option.blend_info,
-            .pDynamicState = &option.dynamic_info,
-            .layout = pipeline_layout,
-            .renderPass = nullptr
-        },
-        {
-            .colorAttachmentCount = 1,
-            .pColorAttachmentFormats = &swapchain_surface_format.format
-        }
+    vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
+    if (!descriptor_layouts.empty()) {
+        descriptor_set_layout = vk::raii::DescriptorSetLayout(device, vk::DescriptorSetLayoutCreateInfo{
+            .bindingCount = static_cast<uint32_t>(descriptor_layouts.size()),
+            .pBindings = descriptor_layouts.data()
+        });
+    }
+
+    vk::PipelineLayoutCreateInfo pipeline_layout_info{
+        .setLayoutCount = descriptor_set_layout ? 1u : 0u,
+        .pSetLayouts = descriptor_set_layout ? &*descriptor_set_layout : nullptr
     };
+    vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
+
+    const vk::Format depth_format = find_depth_format();
+    vk::PipelineRenderingCreateInfo rendering_create_info{
+        .colorAttachmentCount = 1,
+        .pColorAttachmentFormats = &swapchain_surface_format.format,
+        .depthAttachmentFormat = depth_format
+    };
+    vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{
+        .stageCount = static_cast<uint32_t>(shader_stage_infos.size()),
+        .pStages = shader_stage_infos.data(),
+        .pVertexInputState = &local_option.vert_info,
+        .pInputAssemblyState = &local_option.assembly_info,
+        .pViewportState = &local_option.viewport_info,
+        .pRasterizationState = &local_option.raster_info,
+        .pMultisampleState = &local_option.multisample_info,
+        .pDepthStencilState = &local_option.depth_info,
+        .pColorBlendState = &local_option.blend_info,
+        .pDynamicState = &local_option.dynamic_info,
+        .layout = *pipeline_layout,
+        .renderPass = nullptr
+    };
+    vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipeline_create_info{
+        graphics_pipeline_create_info,
+        rendering_create_info
+    };
+    vk::raii::Pipeline vk_pipeline(device, nullptr, pipeline_create_info.get<vk::GraphicsPipelineCreateInfo>());
 
     Pipeline pipeline;
-    pipeline.vk_pipeline = vk::raii::Pipeline(device, shader_module_pack.modules);
-    pipeline.vk_pipeline_layout = vk::raii::PipelineLayout(device, shader_module_pack.modules);
-    pipelines[name] = std::move(pipeline);
+    pipeline.vk_pipeline = std::move(vk_pipeline);
+    pipeline.vk_pipeline_layout = std::move(pipeline_layout);
+    pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
+
+    const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
+    uint32_t uniform_desc_count = 0;
+    for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+        (void)binding;
+        uniform_desc_count += static_cast<uint32_t>(require_ubo(ubo_name).vecsize);
+    }
+    uint32_t image_desc_count = 0;
+    for (const auto& [binding, tex_name] : tex_binding_to_name) {
+        (void)binding;
+        const auto tex_found = textures.find(tex_name);
+        if (tex_found != textures.end()) {
+            image_desc_count += static_cast<uint32_t>(tex_found->second.vecsize);
+        }
+    }
+
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+    if (uniform_desc_count > 0) {
+        pool_sizes.push_back(vk::DescriptorPoolSize{
+            .type = vk::DescriptorType::eUniformBuffer,
+            .descriptorCount = uniform_desc_count * swapchain_cnt
+        });
+    }
+    if (image_desc_count > 0) {
+        pool_sizes.push_back(vk::DescriptorPoolSize{
+            .type = vk::DescriptorType::eCombinedImageSampler,
+            .descriptorCount = image_desc_count * swapchain_cnt
+        });
+    }
+
+    if (!pool_sizes.empty()) {
+        pipeline.descriptor_pool = vk::raii::DescriptorPool(device, vk::DescriptorPoolCreateInfo{
+            .maxSets = swapchain_cnt,
+            .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+            .pPoolSizes = pool_sizes.data()
+        });
+
+        std::vector<vk::DescriptorSetLayout> set_layouts(swapchain_cnt, *pipeline.descriptor_set_layout);
+        pipeline.descriptor_sets = vk::raii::DescriptorSets(device, vk::DescriptorSetAllocateInfo{
+            .descriptorPool = *pipeline.descriptor_pool,
+            .descriptorSetCount = swapchain_cnt,
+            .pSetLayouts = set_layouts.data()
+        });
+
+        for (uint32_t i = 0; i < swapchain_cnt; ++i) {
+            std::vector<vk::DescriptorBufferInfo> buffer_infos;
+            std::vector<vk::DescriptorImageInfo> image_infos;
+            std::vector<vk::WriteDescriptorSet> writes;
+            buffer_infos.reserve(ubo_binding_to_name.size());
+            image_infos.reserve(tex_binding_to_name.size());
+            writes.reserve(ubo_binding_to_name.size() + tex_binding_to_name.size());
+
+            for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+                auto& ubo = require_ubo(ubo_name);
+                buffer_infos.push_back(vk::DescriptorBufferInfo{
+                    .buffer = *ubo.gpu_bufs[i],
+                    .offset = 0,
+                    .range = ubo.size * ubo.vecsize
+                });
+                writes.push_back(vk::WriteDescriptorSet{
+                    .dstSet = *pipeline.descriptor_sets[i],
+                    .dstBinding = binding,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eUniformBuffer,
+                    .pBufferInfo = &buffer_infos.back()
+                });
+            }
+
+            for (const auto& [binding, tex_name] : tex_binding_to_name) {
+                const auto tex_found = textures.find(tex_name);
+                if (tex_found == textures.end()) {
+                    continue;
+                }
+                image_infos.push_back(tex_found->second.descriptor);
+                writes.push_back(vk::WriteDescriptorSet{
+                    .dstSet = *pipeline.descriptor_sets[i],
+                    .dstBinding = binding,
+                    .descriptorCount = 1,
+                    .descriptorType = vk::DescriptorType::eCombinedImageSampler,
+                    .pImageInfo = &image_infos.back()
+                });
+            }
+
+            if (!writes.empty()) {
+                device.updateDescriptorSets(writes, {});
+            }
+        }
+    }
+
+    pipelines.emplace(name, std::move(pipeline));
     return true;
 }
 
-void WrappedContext::record_cmds(uint32_t image_index, const std::function<void(uint32_t)>& emit_func) {
+void WrappedContext::record_cmds(uint32_t image_index,
+    const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func)
+{
     auto& cmd_buf = command_buffers[image_index];
+    cmd_buf.reset({});
     cmd_buf.begin({});
+
     transit_presentation_image_layout(
+        cmd_buf,
         swapchain_images[image_index],
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eColorAttachmentOptimal,
         {},
-        vk::AccessFlags2::eColorAttachmentWrite,
-        vk::PipelineStageFlags2::eColorAttachmentOutput,
-        vk::PipelineStageFlags2::eColorAttachmentOutput,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
         vk::ImageAspectFlagBits::eColor);
 
     transit_presentation_image_layout(
-        *depth_image,
+        cmd_buf,
+        static_cast<vk::Image>(*depth_image),
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        vk::AccessFlags2::eDepthStencilAttachmentWrite,
-        vk::AccessFlags2::eDepthStencilAttachmentWrite,
-        vk::PipelineStageFlags2::eEarlyFragmentTests | vk::PipelineStageFlags2::eLateFragmentTests,
-        vk::PipelineStageFlags2::eEarlyFragmentTests | vk::PipelineStageFlags2::eLateFragmentTests,
+        {},
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
         vk::ImageAspectFlagBits::eDepth);
 
-    // TODO: clear color needs to be customizable
-    vk::ClearValue clear_value = vk::ClearColorValue(0.f, 0.f, 0.f, 1.f);
+    vk::ClearValue clear_value = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
     vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);
-    vk::RenderingAttachmentInfo color_attachment_info = {
-        .imageView = swapchain_image_views[image_index],
+    vk::RenderingAttachmentInfo color_attachment_info{
+        .imageView = *swapchain_image_views[image_index],
         .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eStore,
         .clearValue = clear_value
     };
-    vk::RenderingAttachmentInfo depth_attachment_info = {
-        .imageView = depth_view,
+    vk::RenderingAttachmentInfo depth_attachment_info{
+        .imageView = *depth_view,
         .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
-        .storeOp = vk::AttachmentStoreOp::eDontCare,
+        .storeOp = vk::AttachmentStoreOp::eStore,
         .clearValue = depth_clear_value
     };
     vk::RenderingInfo rendering_info{
-        .renderArea = {
-            .offset = {0, 0},
-            .extent = swapchain_extent
-        },
+        .renderArea = {.offset = {0, 0}, .extent = swapchain_extent},
         .layerCount = 1,
         .colorAttachmentCount = 1,
         .pColorAttachments = &color_attachment_info,
         .pDepthAttachment = &depth_attachment_info
     };
     cmd_buf.beginRendering(rendering_info);
-    cmd_buf.setViewport(0, {
-        .x = 0,
-        .y = 0,
-        .width = swapchain_extent.width,
-        .height = swapchain_extent.height,
-        .minDepth = 0,
-        .maxDepth = 1
+    cmd_buf.setViewport(0, vk::Viewport{
+        0.f, 0.f,
+        static_cast<float>(swapchain_extent.width),
+        static_cast<float>(swapchain_extent.height),
+        0.f, 1.f
     });
-    cmd_buf.setScissor(0, {
-        .offset = {0, 0},
-        .extent = swapchain_extent
-    });
-    emit_func(image_index);
+    cmd_buf.setScissor(0, vk::Rect2D{{0, 0}, swapchain_extent});
+
+    emit_func(cmd_buf, image_index);
+
     cmd_buf.endRendering();
+    transit_presentation_image_layout(
+        cmd_buf,
+        swapchain_images[image_index],
+        vk::ImageLayout::eColorAttachmentOptimal,
+        vk::ImageLayout::ePresentSrcKHR,
+        vk::AccessFlagBits2::eColorAttachmentWrite,
+        {},
+        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+        vk::PipelineStageFlagBits2::eBottomOfPipe,
+        vk::ImageAspectFlagBits::eColor);
+    cmd_buf.end();
 }
 
 void WrappedContext::draw_frame() {
-    auto fence_ret = device.waitForFences(*in_flight_fences[current_frame], vk::True, UINT64_MAX);
-    if (fence_ret != vk::Result::eSuccess) {
-        throw std::runtime_error("failed to wait for fence");
-    }
-    device.resetFences(*in_flight_fences[current_frame]);
+    device.waitForFences(*in_flight_fences[current_frame], vk::True, UINT64_MAX);
 
-    auto [result, image_index] = swapchain.acquireNextImageKHR(UINT64_MAX, *present_complete_semaphores[current_frame], nullptr);
-
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || frame_buffer_resized) {
-        frame_buffer_resized = false;
+    auto [result, image_index] = swapchain.acquireNextImage(UINT64_MAX, *image_available_semaphores[current_frame], nullptr);
+    if (result == vk::Result::eErrorOutOfDateKHR) {
         recreate_swapchain();
         return;
     }
+    if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
+        throw std::runtime_error("failed to acquire swapchain image");
+    }
 
-    //command_buffers[current_frame].reset();
+    if (images_in_flight[image_index] != VK_NULL_HANDLE) {
+        device.waitForFences(images_in_flight[image_index], vk::True, UINT64_MAX);
+    }
+    images_in_flight[image_index] = *in_flight_fences[current_frame];
+
+    const auto now = std::chrono::steady_clock::now();
+    const float dt = std::chrono::duration<float>(now - last_frame_time_).count();
+    last_frame_time_ = now;
+
+    if (update_cbk_) {
+        update_cbk_(image_index, dt);
+    }
+
+    device.resetFences(*in_flight_fences[current_frame]);
 
     vk::PipelineStageFlags wait_stage_mask(vk::PipelineStageFlagBits::eColorAttachmentOutput);
     vk::SubmitInfo submit_info{
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = present_complete_semaphores[current_frame],
+        .pWaitSemaphores = &*image_available_semaphores[current_frame],
         .pWaitDstStageMask = &wait_stage_mask,
         .commandBufferCount = 1,
-        .pCommandBuffers = command_buffers[current_frame],
+        .pCommandBuffers = &*command_buffers[image_index],
         .signalSemaphoreCount = 1,
-        .pSignalSemaphores = render_finished_semaphores[image_index]
+        .pSignalSemaphores = &*render_finished_semaphores[current_frame]
     };
     queue.submit(submit_info, *in_flight_fences[current_frame]);
 
+    vk::SwapchainKHR swapchains[] = {*swapchain};
     vk::PresentInfoKHR present_info{
         .waitSemaphoreCount = 1,
-        .pWaitSemaphores = render_finished_semaphores[image_index],
+        .pWaitSemaphores = &*render_finished_semaphores[current_frame],
         .swapchainCount = 1,
-        .pSwapchains = swapchain,
+        .pSwapchains = swapchains,
         .pImageIndices = &image_index
     };
     result = queue.presentKHR(present_info);
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR) {
+    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || frame_buffer_resized) {
+        frame_buffer_resized = false;
         recreate_swapchain();
     }
 
@@ -729,23 +942,36 @@ void WrappedContext::draw_frame() {
 }
 
 void WrappedContext::recreate_swapchain() {
-    int width = 0, height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
+    int width = 0;
+    int height = 0;
+    glfwGetFramebufferSize(window_, &width, &height);
     while (width == 0 || height == 0) {
-        glfwGetFramebufferSize(window, &width, &height);
+        glfwGetFramebufferSize(window_, &width, &height);
         glfwWaitEvents();
     }
     device.waitIdle();
 
     swapchain_image_views.clear();
+    depth_view = nullptr;
+    depth_image = nullptr;
+    depth_memo = nullptr;
     swapchain = nullptr;
+    images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);
+
     create_swapchain();
     create_imageviews();
     create_depth_resources();
+
+    command_buffers = vk::raii::CommandBuffers(device, vk::CommandBufferAllocateInfo{
+        .commandPool = command_pool,
+        .level = vk::CommandBufferLevel::ePrimary,
+        .commandBufferCount = static_cast<uint32_t>(swapchain_images.size())
+    });
 }
 
-bool WrappedContext::add_ubo(const std::string& name, const uint32_t binding,
-    uint32_t size, uint32_t vecsize) {
+bool WrappedContext::add_ubo(const std::string& name, uint32_t binding,
+    uint32_t size, uint32_t vecsize)
+{
     if (ubos.find(name) != ubos.end()) {
         std::cout << "UBO " << name << " already exists" << std::endl;
         return false;
@@ -756,6 +982,38 @@ bool WrappedContext::add_ubo(const std::string& name, const uint32_t binding,
     ubo.gpu_bufs.resize(swapchain_images.size());
     ubo.memos.resize(swapchain_images.size());
     ubo.descriptors.resize(swapchain_images.size());
+
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        std::tie(ubo.gpu_bufs[i], ubo.memos[i]) = create_buffer(
+            size * vecsize,
+            vk::BufferUsageFlagBits::eUniformBuffer,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        ubo.descriptors[i] = vk::DescriptorBufferInfo{*ubo.gpu_bufs[i], 0, size * vecsize};
+    }
+
+    ubos.emplace(name, std::move(ubo));
+    return true;
+}
+
+void WrappedContext::sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const {
+    void* mapped = memo.mapMemory(0, size);
+    std::memcpy(mapped, data, size);
+    memo.unmapMemory();
+}
+
+UBO& WrappedContext::require_ubo(const std::string& full_name) {
+    const auto found = ubos.find(full_name);
+    if (found == ubos.end()) {
+        throw std::runtime_error("ubo not found: " + full_name);
+    }
+    return found->second;
+}
+
+bool WrappedContext::load_mesh(const std::string& name, const Mesh& mesh) {
+    MeshGPU gpu{};
+    gpu.sync(mesh, this);
+    meshes.emplace(name, std::move(gpu));
+    return true;
 }
 
 bool WrappedContext::add_texture(const std::string& name, const uint32_t binding,
@@ -899,13 +1157,13 @@ bool WrappedContext::add_cubemap(const std::string& name, const uint32_t binding
         regions.push_back(region);
         offset += face_bytes;
     }
-    cmd_buf.copyBufferToImage(*staging_buf, *tex.image, vk::ImageLayout::eTransferDstOptimal, regions);
+    cmd_buf.copyBufferToImage(*staging_buf, *tex.image, vk::ImageLayout::eTransferDstOptimal, {regions});
 
     transit_image_layout(cmd_buf, tex.image, vk::ImageLayout::eTransferDstOptimal, vk::ImageLayout::eShaderReadOnlyOptimal, 6);
     end_single_commands(std::move(cmd_buf));
 
     // create image view
-    tex.view = create_vk_imageview(tex.image, vk::Format::eR8G8B8A8Srgb, vk::Format::eR8G8B8A8Srgb, 6);
+    tex.view = create_vk_imageview(tex.image, vk::Format::eR8G8B8A8Srgb, 6);
 
     // create sampler
     tex.sampler = create_vk_sampler();
@@ -934,14 +1192,14 @@ void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, cons
     vk::PipelineStageFlags dst_stage;
 
     if (old_layout == vk::ImageLayout::eUndefined && new_layout == vk::ImageLayout::eTransferDstOptimal) {
-        barrier.srcAccessMask = {},
-        barrier.dstAccessMask = vk::AccessFlags2::eTransferWrite;
+        barrier.srcAccessMask = {};
+        barrier.dstAccessMask = vk::AccessFlagBits2::eTransferWrite;
         src_stage = vk::PipelineStageFlagBits::eTopOfPipe;
         dst_stage = vk::PipelineStageFlagBits::eTransfer;
     }
     else if (old_layout == vk::ImageLayout::eTransferDstOptimal && new_layout == vk::ImageLayout::eShaderReadOnlyOptimal) {
-        barrier.srcAccessMask = vk::AccessFlags2::eTransferWrite;
-        barrier.dstAccessMask = vk::AccessFlags2::eShaderRead;
+        barrier.srcAccessMask = vk::AccessFlagBits2::eTransferWrite;
+        barrier.dstAccessMask = vk::AccessFlagBits2::eShaderRead;
         src_stage = vk::PipelineStageFlagBits::eTransfer;
         dst_stage = vk::PipelineStageFlagBits::eFragmentShader;
     }
@@ -992,9 +1250,21 @@ std::pair<vk::raii::Image, vk::raii::DeviceMemory> WrappedContext::create_vk_ima
     return {std::move(image), std::move(memo)};
 }
 
-vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count, vk::ImageAspectFlags aspect_mask) const {
+vk::raii::ImageView WrappedContext::create_vk_imageview(vk::Image img, vk::Format format, vk::ImageAspectFlags aspect_mask) const {
     vk::ImageViewCreateInfo view_info{
         .image = img,
+        .viewType = vk::ImageViewType::e2D,
+        .format = format,
+        .subresourceRange = {.aspectMask = aspect_mask, .levelCount = 1, .layerCount = 1}
+    };
+    return vk::raii::ImageView(device, view_info);
+}
+
+vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, uint32_t layer_count,
+    vk::ImageAspectFlags aspect_mask) const
+{
+    vk::ImageViewCreateInfo view_info{
+        .image = *img,
         .viewType = layer_count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::eCube,
         .format = format,
         .subresourceRange = {.aspectMask = aspect_mask, .levelCount = 1, .layerCount = layer_count}

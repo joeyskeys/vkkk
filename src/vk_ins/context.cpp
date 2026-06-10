@@ -13,6 +13,59 @@
 namespace vkkk
 {
 
+PipelineOption::PipelineOption() {
+    vert_info = vk::PipelineVertexInputStateCreateInfo{};
+
+    assembly_info = vk::PipelineInputAssemblyStateCreateInfo{};
+    assembly_info.topology = vk::PrimitiveTopology::eTriangleList;
+    assembly_info.primitiveRestartEnable = vk::False;
+
+    viewport = vk::Viewport{0.f, 0.f, 800.f, 600.f, 0.f, 1.f};
+    scissor = vk::Rect2D{{0, 0}, {800, 600}};
+    viewport_info = vk::PipelineViewportStateCreateInfo{};
+    viewport_info.viewportCount = 1;
+    viewport_info.pViewports = &viewport;
+    viewport_info.scissorCount = 1;
+    viewport_info.pScissors = &scissor;
+
+    raster_info = vk::PipelineRasterizationStateCreateInfo{};
+    raster_info.depthClampEnable = vk::False;
+    raster_info.rasterizerDiscardEnable = vk::False;
+    raster_info.polygonMode = vk::PolygonMode::eFill;
+    raster_info.cullMode = vk::CullModeFlagBits::eBack;
+    raster_info.frontFace = vk::FrontFace::eCounterClockwise;
+    raster_info.depthBiasEnable = vk::False;
+    raster_info.lineWidth = 1.f;
+
+    multisample_info = vk::PipelineMultisampleStateCreateInfo{};
+    multisample_info.rasterizationSamples = vk::SampleCountFlagBits::e1;
+    multisample_info.sampleShadingEnable = vk::False;
+
+    depth_info = vk::PipelineDepthStencilStateCreateInfo{};
+    depth_info.depthTestEnable = vk::True;
+    depth_info.depthWriteEnable = vk::True;
+    depth_info.depthCompareOp = vk::CompareOp::eLess;
+    depth_info.depthBoundsTestEnable = vk::False;
+    depth_info.stencilTestEnable = vk::False;
+
+    blend_attachment_info = vk::PipelineColorBlendAttachmentState{};
+    blend_attachment_info.blendEnable = vk::False;
+    blend_attachment_info.colorWriteMask = vk::ColorComponentFlagBits::eR
+        | vk::ColorComponentFlagBits::eG | vk::ColorComponentFlagBits::eB
+        | vk::ColorComponentFlagBits::eA;
+
+    blend_info = vk::PipelineColorBlendStateCreateInfo{};
+    blend_info.logicOpEnable = vk::False;
+    blend_info.logicOp = vk::LogicOp::eCopy;
+    blend_info.attachmentCount = 1;
+    blend_info.pAttachments = &blend_attachment_info;
+
+    dynamic_states = {vk::DynamicState::eViewport, vk::DynamicState::eScissor};
+    dynamic_info = vk::PipelineDynamicStateCreateInfo{};
+    dynamic_info.dynamicStateCount = static_cast<uint32_t>(dynamic_states.size());
+    dynamic_info.pDynamicStates = dynamic_states.data();
+}
+
 void MeshGPU::sync(const Mesh& mesh, Context* ctx) {
     if (!mesh.loaded)
         throw std::runtime_error("cannot sync unloaded mesh");
@@ -451,7 +504,7 @@ bool WrappedContext::create_pipeline(const std::string& name,
         // shader input infos
         // input attrs
         if (stage == vk::ShaderStageFlagBits::eVertex) {
-            input_binding_descs = gen_binding_desc(option.comps, interleaved);
+            input_binding_descs = gen_binding_desc(comps, interleaved);
 
             uint32_t offset = 0;
             for (int i = 0; const auto& [attr_loc, glsl_type, attr_name] : module.attr_infos) {

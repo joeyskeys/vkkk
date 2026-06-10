@@ -41,15 +41,66 @@ struct Pipeline {
 };
 
 struct PipelineOption {
+    PipelineOption();
+
     vk::PipelineVertexInputStateCreateInfo vert_info;
     vk::PipelineInputAssemblyStateCreateInfo assembly_info;
+    vk::Viewport viewport;
     vk::PipelineViewportStateCreateInfo viewport_info;
+    vk::Rect2D scissor;
     vk::PipelineRasterizationStateCreateInfo raster_info;
     vk::PipelineMultisampleStateCreateInfo multisample_info;
     vk::PipelineDepthStencilStateCreateInfo depth_info;
     vk::PipelineColorBlendAttachmentState blend_attachment_info;
     vk::PipelineColorBlendStateCreateInfo blend_info;
+    std::vector<vk::DynamicState> dynamic_states;
     vk::PipelineDynamicStateCreateInfo dynamic_info;
+
+    inline void setup_input_assembly(vk::PrimitiveTopology topo, bool restart) {
+        assembly_info.topology = topo;
+        assembly_info.primitiveRestartEnable = restart ? vk::True : vk::False;
+    }
+
+    inline void setup_viewport(float x, float y, float w, float h, float min_depth, float max_depth) {
+        viewport.x = x;
+        viewport.y = y;
+        viewport.width = w;
+        viewport.height = h;
+        viewport.minDepth = min_depth;
+        viewport.maxDepth = max_depth;
+    }
+
+    inline void setup_scissor(int32_t off_x, int32_t off_y, uint32_t ext_x, uint32_t ext_y) {
+        scissor.offset = vk::Offset2D{off_x, off_y};
+        scissor.extent = vk::Extent2D{ext_x, ext_y};
+    }
+
+    inline void setup_rasterizer(bool depth_clamp, bool discard, vk::PolygonMode mode, float line_width,
+        vk::CullModeFlags cull_mode, vk::FrontFace front, bool depth_bias)
+    {
+        raster_info.depthClampEnable = depth_clamp ? vk::True : vk::False;
+        raster_info.rasterizerDiscardEnable = discard ? vk::True : vk::False;
+        raster_info.polygonMode = mode;
+        raster_info.lineWidth = line_width;
+        raster_info.cullMode = cull_mode;
+        raster_info.frontFace = front;
+        raster_info.depthBiasEnable = depth_bias ? vk::True : vk::False;
+    }
+
+    inline void setup_multisampling(bool enable, vk::SampleCountFlagBits sample_count) {
+        multisample_info.sampleShadingEnable = enable ? vk::True : vk::False;
+        multisample_info.rasterizationSamples = sample_count;
+    }
+
+    inline void setup_depth_stencil(bool test_enable, bool write_enable, vk::CompareOp compare_op,
+        bool bounds_enable, bool stencil_enable)
+    {
+        depth_info.depthTestEnable = test_enable ? vk::True : vk::False;
+        depth_info.depthWriteEnable = write_enable ? vk::True : vk::False;
+        depth_info.depthCompareOp = compare_op;
+        depth_info.depthBoundsTestEnable = bounds_enable ? vk::True : vk::False;
+        depth_info.stencilTestEnable = stencil_enable ? vk::True : vk::False;
+    }
 };
 
 struct UBO {

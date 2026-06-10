@@ -130,18 +130,24 @@ public:
 
 private:
     void setup_debug_messenger();
-    void transit_image_layout(
-        uint32_t image_index,
+    void transit_presentation_image_layout(
+        vk::Image img,
         vk::ImageLayout old_layout,
         vk::ImageLayout new_layout,
         vk::AccessFlags2 src_access_mask,
         vk::AccessFlags2 dst_access_mask,
         vk::PipelineStageFlags2 src_stage_mask,
         vk::PipelineStageFlags2 dst_stage_mask,
-        uint32_t layer_count=1
-    );
+        vk::ImageAspectFlags aspect_mask
+    );, const uint32_t layer_count=1
+
     void create_swapchain();
     void create_imageviews();
+
+    vk::Format find_supported_format(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
+    inline vk::Format find_depth_format() const {
+        return find_supported_format({vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint}, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+    }
 
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size,
         vk::BufferUsageFlags usage,
@@ -168,7 +174,9 @@ private:
     using create_vertex_buffer = create_input_attr_buffer<vk::BufferUsageFlagBits::eVertexBuffer>;
     using create_index_buffer = create_input_attr_buffer<vk::BufferUsageFlagBits::eIndexBuffer>;
 
-    void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout) const;
+    void create_depth_resources();
+
+    void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, const uint32_t layer_count=1) const;
     void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;
     std::pair<vk::raiiImage, vk::raii::DeviceMemory> create_vk_image(uint32_t width, uint32_t height, uint32_t layers, vk::SampleCountFlagBits samples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags flags, vk::MemoryPropertyFlags properties) const;
     vk::raii::ImageView create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count) const;
@@ -200,6 +208,10 @@ private:
     std::vector<vk::raii::ImageView> swapchain_image_views;
     vk::Extent2D swapchain_extent;
     vk::SurfaceFormatKHR swapchain_surface_format;
+
+    vk::raii::Image depth_image = nullptr;
+    vk::raii::DeviceMemory depth_memo = nullptr;
+    vk::raii::ImageView depth_view = nullptr;
 
     vk::raii::CommandPool command_pool = nullptr;
 

@@ -91,7 +91,7 @@ WrappedContext::WrappedContext(
     }
 }
 
-WrappedContext::setup_debug_messenger() {
+void WrappedContext::setup_debug_messenger() {
     vk::DebugUtilsMessageServerityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
                                                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
     vk::DebugUtilsMessageTypeFlagsEXT message_types(vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral |
@@ -105,32 +105,27 @@ WrappedContext::setup_debug_messenger() {
     debug_messenger = vk::raii::DebugUtilsMessenger(instance, debug_utils_messenger_create_info);
 }
 
-void WrappedContext::transit_image_layout(
-    uint32_t image_index,
+void WrappedContext::transit_presentation_image_layout(
+    vk::Image img,
     vk::ImageLayout old_layout,
     vk::ImageLayout new_layout,
     vk::AccessFlags2 src_access_mask,
     vk::AccessFlags2 dst_access_mask,
     vk::PipelineStageFlags2 src_stage_mask,
     vk::PipelineStageFlags2 dst_stage_mask,
-) {
-    vk::ImageMemoryBarrier2 barrier{
+    vk::ImageAspectFlags aspect_mask) const
+{
+    vk::ImageMemoryBarrier barrier{
+        .oldLayout = old_layout,
+        .newLayout = new_layout,
         .srcStageMask = src_stage_mask,
         .dstStageMask = dst_stage_mask,
         .srcAccessMask = src_access_mask,
         .dstAccessMask = dst_access_mask,
-        .oldLayout = old_layout,
-        .newLayout = new_layout,
-        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-        .image = swapchain_images[image_index],
-        .subresourceRange = {
-            .aspectMask = vk::ImageAspectFlagBits::eColor,
-            .baseMipLevel = 0,
-            .levelCount = 1,
-            .baseArrayLayer = 0,
-            .layerCount = 1
-        }
+        .srcQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .dstQueueFamilyIndex = vk::QueueFamilyIgnored,
+        .image = img,
+        .subresourceRange = {.aspectMask = aspect_mask, .levelCount = 1, .layerCount = 1}
     };
     vk::DependencyInfo dependency_info{
         .dependencyFlags = {},
@@ -138,6 +133,24 @@ void WrappedContext::transit_image_layout(
         .pImageMemoryBarriers = &barrier
     };
     command_buffers[image_index].pipelineBarrier2(dependency_info);
+}
+
+vk::Format WrappedContext::find_supported_format(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const {
+    for (const auto format : candidates) {
+        vk::FormatProperties props = physical_device.getFormatProperties(format);
+        if ((tiling == vk::ImageTiling::eLinear && (props.linearTilingFeatures & features) == features)) ||
+            ((tiling == vk::ImageTiling::eOptimal && (props.optimalTilingFeatures & features) == features))
+        {
+            return format;
+        }
+    }
+    throw std::runtime_error("failed to find supported format");
+}
+
+void WrappedContext::create_depth_resources() {
+    vk::Format depth_format = find_depth_format();
+    std::tie(depth_image, depth_memo) = create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, vk::SampleCountFlagBits::e1, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::ImageCreateFlagBits::eNone, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    depth_view = create_vk_imageview(depth_image, depth_format, 1, vk::ImageAspectFlagBits::eDepth);
 }
 
 void WrappedContext::create_swapchain() {
@@ -175,7 +188,7 @@ void WrappedContext::create_imageviews() {
     assert(swapchain_image_views.empty());
     swapchain_image_views.reserve(swapchain_images.size());
     for (auto& image : swapchain_images) {
-        swapchain_image_views.emplace_back(create_vk_imageview(image, swapchain_surface_format.format));
+        swapchain_image_views.emplace_back(create_vk_imageview(image, swapchain_surface_format.format, vk::ImageAspectFlagBits::eColor));
     }
 }
 
@@ -359,6 +372,9 @@ WrappedContext::init(GLFWwindow* window) {
         .flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer
     };
     command_pool = vk::raii::CommandPool(device, command_pool_create_info);
+
+    // create the depth resources
+    create_depth_resources();
 
     // create the command buffers
     vk::CommandBufferAllocateInfo alloc_info{.commandPool = command_pool, .level = vk::CommandBufferLevel::ePrimary, .commandBufferCount = max_frames_in_flight};
@@ -551,23 +567,42 @@ bool WrappedContext::create_pipeline(const std::string& name,
 void WrappedContext::record_cmds(uint32_t image_index, const std::function<void(uint32_t)>& emit_func) {
     auto& cmd_buf = command_buffers[image_index];
     cmd_buf.begin({});
-    transit_image_layout(
-        image_index,
+    transit_presentation_image_layout(
+        swapchain_images[image_index],
         vk::ImageLayout::eUndefined,
         vk::ImageLayout::eColorAttachmentOptimal,
         {},
         vk::AccessFlags2::eColorAttachmentWrite,
         vk::PipelineStageFlags2::eColorAttachmentOutput,
-        vk::PipelineStageFlags2::eColorAttachmentOutput);
+        vk::PipelineStageFlags2::eColorAttachmentOutput,
+        vk::ImageAspectFlagBits::eColor);
+
+    transit_presentation_image_layout(
+        *depth_image,
+        vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        vk::AccessFlags2::eDepthStencilAttachmentWrite,
+        vk::AccessFlags2::eDepthStencilAttachmentWrite,
+        vk::PipelineStageFlags2::eEarlyFragmentTests | vk::PipelineStageFlags2::eLateFragmentTests,
+        vk::PipelineStageFlags2::eEarlyFragmentTests | vk::PipelineStageFlags2::eLateFragmentTests,
+        vk::ImageAspectFlagBits::eDepth);
 
     // TODO: clear color needs to be customizable
     vk::ClearValue clear_value = vk::ClearColorValue(0.f, 0.f, 0.f, 1.f);
-    vk::RenderingAttachmentInfo attachment_info = {
+    vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);
+    vk::RenderingAttachmentInfo color_attachment_info = {
         .imageView = swapchain_image_views[image_index],
         .imageLayout = vk::ImageLayout::eColorAttachmentOptimal,
         .loadOp = vk::AttachmentLoadOp::eClear,
         .storeOp = vk::AttachmentStoreOp::eStore,
         .clearValue = clear_value
+    };
+    vk::RenderingAttachmentInfo depth_attachment_info = {
+        .imageView = depth_view,
+        .imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        .loadOp = vk::AttachmentLoadOp::eClear,
+        .storeOp = vk::AttachmentStoreOp::eDontCare,
+        .clearValue = depth_clear_value
     };
     vk::RenderingInfo rendering_info{
         .renderArea = {
@@ -576,7 +611,8 @@ void WrappedContext::record_cmds(uint32_t image_index, const std::function<void(
         },
         .layerCount = 1,
         .colorAttachmentCount = 1,
-        .pColorAttachments = &attachment_info
+        .pColorAttachments = &color_attachment_info,
+        .pDepthAttachment = &depth_attachment_info
     };
     cmd_buf.beginRendering(rendering_info);
     cmd_buf.setViewport(0, {
@@ -652,6 +688,7 @@ void WrappedContext::recreate_swapchain() {
     swapchain = nullptr;
     create_swapchain();
     create_imageviews();
+    create_depth_resources();
 }
 
 bool WrappedContext::add_ubo(const std::string& name, const uint32_t binding,
@@ -827,7 +864,7 @@ bool WrappedContext::add_cubemap(const std::string& name, const uint32_t binding
     return true;
 }
 
-void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t layer_count) const {
+void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, const uint32_t layer_count) const {
     vk::ImageMemoryBarrier barrier{
         .oldLayout = old_layout,
         .newLayout = new_layout,
@@ -837,7 +874,7 @@ void WrappedContext::transit_image_layout(vk::raii::CommandBuffer& cmd_buf, cons
         .subresourceRange = {
             .aspectMask = vk::ImageAspectFlagBits::eColor,
             .levelCount = 1,
-            .layerCount = 1
+            .layerCount = layer_count
         }
     };
     vk::PipelineStageFlags src_stage;
@@ -902,12 +939,12 @@ std::pair<vk::raii::Image, vk::raii::DeviceMemory> WrappedContext::create_vk_ima
     return {std::move(image), std::move(memo)};
 }
 
-vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count) const {
+vk::raii::ImageView WrappedContext::create_vk_imageview(const vk::raii::Image& img, vk::Format format, vk::Format format, uint32_t layer_count, vk::ImageAspectFlags aspect_mask) const {
     vk::ImageViewCreateInfo view_info{
         .image = img,
         .viewType = layer_count == 1 ? vk::ImageViewType::e2D : vk::ImageViewType::eCube,
         .format = format,
-        .subresourceRange = {.aspectMask = vk::ImageAspectFlagBits::eColor, .levelCount = 1, .layerCount = layer_count}
+        .subresourceRange = {.aspectMask = aspect_mask, .levelCount = 1, .layerCount = layer_count}
     };
     return vk::raii::ImageView(device, view_info);
 }

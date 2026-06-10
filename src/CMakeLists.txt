@@ -44,7 +44,9 @@ set(SRCS
     #vk_ins/vkabstraction.cpp
     #vk_ins/shader_mgr.cpp
     vk_ins/shader_module_pack.cpp
-    vk_ins/context.cpp)
+    vk_ins/context.cpp
+    vk_ins/context_glfw.cpp
+    vk_ins/context_utils.cpp)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)

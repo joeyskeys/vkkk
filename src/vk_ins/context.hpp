@@ -170,6 +170,7 @@ public:
 
     static std::vector<const char*> get_glfw_instance_extensions();
     static GLFWwindow* create_window(int width, int height, const char* title, bool resizable = false);
+    void init_glfw(int width, int height, const char* title = default_app_name, bool resizable = false);
 
     void init(GLFWwindow* window);
 
@@ -217,6 +218,17 @@ public:
 
 private:
     void setup_debug_messenger();
+    static bool is_device_suitable(
+        const vk::raii::PhysicalDevice& device,
+        vk::raii::SurfaceKHR& surface,
+        const std::vector<const char*>& required_extensions);
+    static uint32_t choose_min_image_count(const vk::SurfaceCapabilitiesKHR& surface_capabilities);
+    static vk::SurfaceFormatKHR choose_swap_surface_format(
+        const std::vector<vk::SurfaceFormatKHR>& surface_formats);
+    static vk::PresentModeKHR choose_present_mode(const std::vector<vk::PresentModeKHR>& present_modes);
+    static vk::Extent2D choose_swap_extent(
+        const vk::SurfaceCapabilitiesKHR& surface_capabilities,
+        GLFWwindow* window);
     void transit_presentation_image_layout(
         vk::raii::CommandBuffer& cmd_buf,
         vk::Image img,

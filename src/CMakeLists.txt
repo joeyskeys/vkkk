@@ -94,6 +94,6 @@ target_link_libraries(vkcornellpp
     #PUBLIC
         #Vulkan::Vulkan)
 
-if(VKKK_BUILD_PYTHON_BINDINGS)
-    add_subdirectory(binding)
-endif()
+#if(VKKK_BUILD_PYTHON_BINDINGS)
+    #add_subdirectory(binding)
+#endif()

@@ -39,7 +39,7 @@ static std::array<uint32_t, 4> comp_sizes = {
     3, 3, 2, 3
 };
 
-uint32_t get_mesh_component_size(const std::vector<VERT_COMP>& comps) {
+inline uint32_t get_mesh_component_size(const std::vector<VERT_COMP>& comps) {
     uint32_t size = 0;
     for (const auto& comp : comps) {
         size += comp_sizes[comp];

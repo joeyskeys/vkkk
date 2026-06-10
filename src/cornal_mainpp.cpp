@@ -181,9 +181,9 @@ void upload_mesh(vkkk::Context& ctx, vkkk::Scene& scene, const std::string& name
 } // namespace
 
 int main() {
-    const auto glfw_extensions = vkkk::WrappedContext::get_glfw_instance_extensions();
+    const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     vkkk::Context ctx("vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
-    GLFWwindow* window = vkkk::WrappedContext::create_window(WIDTH, HEIGHT, "Cornell Box (HPP)");
+    GLFWwindow* window = vkkk::Context::create_window(WIDTH, HEIGHT, "Cornell Box (HPP)");
     ctx.init(window);
 
     vkkk::Scene scene;

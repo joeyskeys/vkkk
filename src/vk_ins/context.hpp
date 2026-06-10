@@ -125,40 +125,40 @@ struct UBO {
 struct Texture {
     uint32_t                                binding;
     size_t                                  vecsize;
-    vk::raii::Image                         image;
-    vk::raii::DeviceMemory                  memo;
-    vk::raii::ImageView                     view;
+    vk::raii::Image                         image{nullptr};
+    vk::raii::DeviceMemory                  memo{nullptr};
+    vk::raii::ImageView                     view{nullptr};
     vk::ImageLayout                         layout;
     vk::DescriptorImageInfo                 descriptor;
-    vk::raii::Sampler                       sampler;
+    vk::raii::Sampler                       sampler{nullptr};
 };
 
 struct MeshGPU {
-    vk::raii::Buffer                        vbuf;
-    vk::raii::DeviceMemory                  vbuf_memo;
-    vk::raii::Buffer                        ibuf;
-    vk::raii::DeviceMemory                  ibuf_memo;
+    vk::raii::Buffer                        vbuf{nullptr};
+    vk::raii::DeviceMemory                  vbuf_memo{nullptr};
+    vk::raii::Buffer                        ibuf{nullptr};
+    vk::raii::DeviceMemory                  ibuf_memo{nullptr};
     uint32_t                                icnt = 0;
     
-    void sync(const Mesh& mesh, class WrappedContext* ctx);
+    void sync(const Mesh& mesh, class Context* ctx);
     void emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
         const vk::DescriptorSet* desc_set = nullptr) const;
 };
 
 struct CameraGPU {
     uint32_t                                binding;
-    vk::raii::Buffer                        buf;
-    vk::raii::DeviceMemory                  memo;
+    vk::raii::Buffer                        buf{nullptr};
+    vk::raii::DeviceMemory                  memo{nullptr};
     vk::DescriptorBufferInfo                descriptor;
 
-    void sync(Camera& cam, WrappedContext* ctx) const;
+    void sync(Camera& cam, Context* ctx) const;
 };
 
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
-class WrappedContext {
+class Context {
 public:
-    WrappedContext(
+    Context(
         const char* app_name = default_app_name,
         uint32_t app_version = default_app_version,
         const char* engine_name = default_engine_name,
@@ -266,7 +266,7 @@ private:
 
     void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t layer_count = 1) const;
     void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;
-    std::pair<vk::raii::Image, vk::raii::DeviceMemory> create_vk_image(uint32_t width, uint32_t height, uint32_t layers, vk::SampleCountFlagBits samples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::ImageCreateFlags flags, vk::MemoryPropertyFlags properties) const;
+    std::pair<vk::raii::Image, vk::raii::DeviceMemory> create_vk_image(uint32_t width, uint32_t height, uint32_t layers, vk::SampleCountFlagBits samples, vk::Format format, vk::ImageTiling tiling, vk::ImageUsageFlags usage, vk::MemoryPropertyFlags properties, vk::ImageCreateFlags flags = {}) const;
     vk::raii::ImageView create_vk_imageview(vk::Image img, vk::Format format, vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor) const;
     vk::raii::ImageView create_vk_imageview(const vk::raii::Image& img, vk::Format format, uint32_t layer_count = 1,
         vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor) const;
@@ -314,7 +314,7 @@ private:
     GLFWwindow* window_ = nullptr;
     UpdateCallback update_cbk_;
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
-    bool enable_debug_messenger_ = true;
+    bool enable_debug_messenger = true;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
@@ -325,7 +325,5 @@ public:
     std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, Texture> textures;
 };
-
-using Context = WrappedContext;
 
 }

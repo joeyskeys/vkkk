@@ -18,13 +18,10 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <glm/glm.hpp>
 
-#include "vk_ins/cmd_buf.h"
 #include "vk_ins/types.h"
 
 namespace vkkk
 {
-
-class VkWrappedInstance;
 
 class Mesh {
 public:

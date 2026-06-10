@@ -7,7 +7,8 @@
 #include "concepts/mesh.h"
 //#include "vk_ins/cmd_buf.h"
 //#include "vk_ins/pipeline_mgr.h"
-#include "vk_ins/vkabstraction.h"
+// Legacy wrapper include not needed for Mesh data container.
+// #include "vk_ins/vkabstraction.h"
 
 namespace vkkk
 {

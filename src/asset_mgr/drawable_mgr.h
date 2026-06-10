@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
-class VkWrappedInstance;
+// class VkWrappedInstance; // Legacy wrapper forward declaration.
 
 class DrawableMgr : public Singleton<DrawableMgr> {
 private:
@@ -38,8 +38,8 @@ public:
     void add_line(const std::string&, const std::vector<VERT_COMP>&,
         const glm::vec3&, const glm::vec3&);
 
-    // Upload mesh drawable by name. (Line upload path can be added later.)
-    void upload_gpu(VkWrappedInstance*, const std::string&) const;
+    // Legacy path (old VkWrappedInstance wrapper). Temporarily disabled while testing Context.
+    // void upload_gpu(VkWrappedInstance*, const std::string&) const;
     const Mesh* find_mesh(const std::string& name) const;
 
 private:

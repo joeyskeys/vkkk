@@ -6,13 +6,14 @@
 namespace vkkk
 {
 
-std::vector<const char*> Context::get_glfw_instance_extensions() {
+std::vector<const char*> Context::get_glfw_instance_extensions(bool enable_validation) {
     uint32_t count = 0;
-    const char** extensions = glfwGetRequiredInstanceExtensions(&count);
-    if (extensions == nullptr || count == 0) {
-        throw std::runtime_error("failed to query GLFW instance extensions");
+    const char** glfw_extensions = glfwGetRequiredInstanceExtensions(&count);
+    std::vector extensions(glfw_extensions, glfw_extensions + count);
+    if (enable_validation) {
+        extensions.push_back(vk::EXTDebugUtilsExtensionName);
     }
-    return {extensions, extensions + count};
+    return extensions;
 }
 
 GLFWwindow* Context::create_window(int width, int height, const char* title, bool resizable) {
@@ -35,15 +36,14 @@ void Context::init_glfw(int width, int height, const char* title, bool resizable
             ctx->frame_buffer_resized = true;
         }
     });
-    init(window);
 }
 
 void Context::recreate_swapchain() {
     int width = 0;
     int height = 0;
-    glfwGetFramebufferSize(window_, &width, &height);
+    glfwGetFramebufferSize(window, &width, &height);
     while (width == 0 || height == 0) {
-        glfwGetFramebufferSize(window_, &width, &height);
+        glfwGetFramebufferSize(window, &width, &height);
         glfwWaitEvents();
     }
     device.waitIdle();

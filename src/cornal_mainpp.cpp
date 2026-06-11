@@ -181,10 +181,11 @@ void upload_mesh(vkkk::Context& ctx, vkkk::Scene& scene, const std::string& name
 } // namespace
 
 int main() {
+    vkkk::Context ctx;
+    ctx.init_glfw(WIDTH, HEIGHT, "Cornell Box (HPP)");
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
-    vkkk::Context ctx("vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
     GLFWwindow* window = vkkk::Context::create_window(WIDTH, HEIGHT, "Cornell Box (HPP)");
-    ctx.init(window);
+    ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
 
     vkkk::Scene scene;
     scene.drawable_mgr->add_plane("cornell_plane", {vkkk::VERTEX, vkkk::NORMAL}, 2.0f);

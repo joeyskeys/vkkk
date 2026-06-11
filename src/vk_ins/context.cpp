@@ -100,73 +100,9 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
     return vk::False;
 }
 
-Context::Context(
-    const char* app_name,
-    uint32_t app_version,
-    const char* engine_name,
-    uint32_t api_version,
-    bool enable_validation_layers,
-    const std::vector<const char*>& extra_validation_layers,
-    const std::vector<const char*>& extra_extensions,
-    bool enable_debug_messenger)
-    : enable_debug_messenger(enable_debug_messenger)
-{
-    vk::ApplicationInfo app_info{app_name, app_version, engine_name, VK_MAKE_VERSION(1, 0, 0), api_version};
-
-    std::vector<const char*> validation_layers;
-    if (enable_validation_layers) {
-        validation_layers.assign(default_validation_layers.begin(), default_validation_layers.end());
-        validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
-    }
-
-    auto layer_props = context.enumerateInstanceLayerProperties();
-    for (const auto* layer : validation_layers) {
-        if (!std::ranges::any_of(layer_props, [layer](const auto& layer_prop) {
-                return std::strcmp(layer_prop.layerName, layer) == 0;
-            }))
-        {
-            throw std::runtime_error(std::string("unsupported validation layer: ") + layer);
-        }
-    }
-
-    std::vector<const char*> instance_extensions = extra_extensions;
-    auto extension_props = context.enumerateInstanceExtensionProperties();
-    for (const auto* extension : instance_extensions) {
-        if (!std::ranges::any_of(extension_props, [extension](const auto& extension_prop) {
-                return std::strcmp(extension_prop.extensionName, extension) == 0;
-            }))
-        {
-            throw std::runtime_error(std::string("unsupported instance extension: ") + extension);
-        }
-    }
-
-    vk::DebugUtilsMessengerCreateInfoEXT debug_create_info{};
-    const vk::DebugUtilsMessengerCreateInfoEXT* debug_create_info_ptr = nullptr;
-    if (enable_validation_layers && enable_debug_messenger) {
-        vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(
-            vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
-        vk::DebugUtilsMessageTypeFlagsEXT message_types(
-            vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
-            | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance);
-        debug_create_info.messageSeverity = severity_flags;
-        debug_create_info.messageType = message_types;
-        debug_create_info.pfnUserCallback = &debug_callback;
-        debug_create_info_ptr = &debug_create_info;
-    }
-
-    vk::InstanceCreateInfo instance_create_info{};
-    instance_create_info.pNext = debug_create_info_ptr;
-    instance_create_info.pApplicationInfo = &app_info;
-    instance_create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
-    instance_create_info.ppEnabledLayerNames = validation_layers.data();
-    instance_create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
-    instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
-    instance = vk::raii::Instance(context, instance_create_info);
-
-    if (enable_validation_layers && enable_debug_messenger) {
-        setup_debug_messenger();
-    }
-}
+Context::Context(bool enable_debug_m)
+    : enable_debug_messenger(enable_debug_m)
+{}
 
 void Context::setup_debug_messenger() {
     vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
@@ -178,7 +114,7 @@ void Context::setup_debug_messenger() {
     debug_utils_messenger_create_info.messageSeverity = severity_flags;
     debug_utils_messenger_create_info.messageType = message_types;
     debug_utils_messenger_create_info.pfnUserCallback = &debug_callback;
-    debug_messenger = vk::raii::DebugUtilsMessengerEXT(instance, debug_utils_messenger_create_info);
+    debug_messenger = instance.createDebugUtilsMessengerEXT(debug_utils_messenger_create_info);
 }
 
 void Context::transit_presentation_image_layout(
@@ -232,7 +168,7 @@ void Context::create_depth_resources() {
 void Context::create_swapchain() {
     // create the swapchain
     vk::SurfaceCapabilitiesKHR surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-    swapchain_extent = choose_swap_extent(surface_capabilities, window_);
+    swapchain_extent = choose_swap_extent(surface_capabilities, window);
     uint32_t min_image_count = choose_min_image_count(surface_capabilities);
 
     std::vector<vk::SurfaceFormatKHR> surface_formats = physical_device.getSurfaceFormatsKHR(*surface);
@@ -332,11 +268,77 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Context::load_into_staging_b
     return std::make_pair(std::move(staging_buf), std::move(staging_memo));
 }
 
-void Context::init(GLFWwindow* window) {
-    window_ = window;
+void Context::init(GLFWwindow* win,
+    const char* app_name,
+    uint32_t app_version,
+    const char* engine_name,
+    uint32_t api_version,
+    bool enable_validation_layers,
+    const std::vector<const char*>& extra_validation_layers,
+    const std::vector<const char*>& extra_extensions)
+{
+    window = win;
 
+    // init vulkan
+    vk::ApplicationInfo app_info{app_name, app_version, engine_name, VK_MAKE_VERSION(1, 0, 0), api_version};
+
+    std::vector<const char*> validation_layers;
+    if (enable_validation_layers) {
+        validation_layers.assign(default_validation_layers.begin(), default_validation_layers.end());
+        validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
+    }
+
+    auto layer_props = context.enumerateInstanceLayerProperties();
+    for (const auto* layer : validation_layers) {
+        if (!std::ranges::any_of(layer_props, [layer](const auto& layer_prop) {
+                return std::strcmp(layer_prop.layerName, layer) == 0;
+            }))
+        {
+            throw std::runtime_error(std::string("unsupported validation layer: ") + layer);
+        }
+    }
+
+    std::vector<const char*> instance_extensions = extra_extensions;
+    auto extension_props = context.enumerateInstanceExtensionProperties();
+    for (const auto* extension : instance_extensions) {
+        if (!std::ranges::any_of(extension_props, [extension](const auto& extension_prop) {
+                return std::strcmp(extension_prop.extensionName, extension) == 0;
+            }))
+        {
+            throw std::runtime_error(std::string("unsupported instance extension: ") + extension);
+        }
+    }
+
+    vk::DebugUtilsMessengerCreateInfoEXT debug_create_info{};
+    const vk::DebugUtilsMessengerCreateInfoEXT* debug_create_info_ptr = nullptr;
+    if (enable_validation_layers && enable_debug_messenger) {
+        vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(
+            vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning | vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
+        vk::DebugUtilsMessageTypeFlagsEXT message_types(
+            vk::DebugUtilsMessageTypeFlagBitsEXT::eGeneral | vk::DebugUtilsMessageTypeFlagBitsEXT::eValidation
+            | vk::DebugUtilsMessageTypeFlagBitsEXT::ePerformance);
+        debug_create_info.messageSeverity = severity_flags;
+        debug_create_info.messageType = message_types;
+        debug_create_info.pfnUserCallback = &debug_callback;
+        debug_create_info_ptr = &debug_create_info;
+    }
+
+    vk::InstanceCreateInfo instance_create_info{};
+    instance_create_info.pNext = debug_create_info_ptr;
+    instance_create_info.pApplicationInfo = &app_info;
+    instance_create_info.enabledLayerCount = static_cast<uint32_t>(validation_layers.size());
+    instance_create_info.ppEnabledLayerNames = validation_layers.data();
+    instance_create_info.enabledExtensionCount = static_cast<uint32_t>(instance_extensions.size());
+    instance_create_info.ppEnabledExtensionNames = instance_extensions.data();
+    instance = vk::raii::Instance(context, instance_create_info);
+
+    if (enable_validation_layers && enable_debug_messenger) {
+        setup_debug_messenger();
+    }
+
+    // create surface
     VkSurfaceKHR raw_surface = VK_NULL_HANDLE;
-    if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window_, nullptr, &raw_surface) != VK_SUCCESS) {
+    if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window, nullptr, &raw_surface) != VK_SUCCESS) {
         throw std::runtime_error("failed to create window surface");
     }
     surface = vk::raii::SurfaceKHR(instance, raw_surface);

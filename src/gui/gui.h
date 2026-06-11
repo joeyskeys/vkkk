@@ -9,18 +9,18 @@ struct ImDrawData;
 namespace vkkk
 {
 
-class VkWrappedInstance;
+class Context;
 
 class ImGuiHud {
 public:
-    bool init(VkWrappedInstance* ins);
+    bool init(Context* ctx);
     void begin_frame();
     void build_default_hud(float fps, uint32_t drawable_count);
     void render(VkCommandBuffer cmd);
     void shutdown();
 
 private:
-    VkWrappedInstance* ins_ = nullptr;
+    Context* ctx_ = nullptr;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     bool initialized_ = false;
 };

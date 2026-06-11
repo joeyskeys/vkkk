@@ -1,4 +1,5 @@
 #include <array>
+#include <utility>
 
 #include <GLFW/glfw3.h>
 #include <imgui.h>
@@ -6,21 +7,21 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "gui/gui.h"
-#include "vk_ins/vkabstraction.h"
+#include "vk_ins/context.hpp"
 
 namespace vkkk
 {
 
-bool ImGuiHud::init(VkWrappedInstance* ins) {
+bool ImGuiHud::init(Context* ctx) {
     if (initialized_) {
         return true;
     }
 
-    if (ins == nullptr || ins->get_window() == nullptr) {
+    if (ctx == nullptr || ctx->get_window() == nullptr) {
         return false;
     }
 
-    ins_ = ins;
+    ctx_ = ctx;
 
     const std::array<VkDescriptorPoolSize, 11> pool_sizes{{
         { VK_DESCRIPTOR_TYPE_SAMPLER, 1000 },
@@ -43,7 +44,7 @@ bool ImGuiHud::init(VkWrappedInstance* ins) {
         .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
         .pPoolSizes = pool_sizes.data()
     };
-    if (vkCreateDescriptorPool(ins_->get_device(), &pool_info, nullptr, &descriptor_pool_) != VK_SUCCESS) {
+    if (vkCreateDescriptorPool(ctx_->get_vk_device(), &pool_info, nullptr, &descriptor_pool_) != VK_SUCCESS) {
         return false;
     }
 
@@ -51,30 +52,32 @@ bool ImGuiHud::init(VkWrappedInstance* ins) {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
-    ImGui_ImplGlfw_InitForVulkan(ins_->get_window(), false);
+    ImGui_ImplGlfw_InitForVulkan(ctx_->get_window(), false);
 
     ImGui_ImplVulkan_InitInfo init_info{};
-    init_info.Instance = ins_->get_instance();
-    init_info.PhysicalDevice = ins_->get_physical_device();
-    init_info.Device = ins_->get_device();
-    init_info.QueueFamily = ins_->get_graphic_queue_family_index();
-    init_info.Queue = ins_->get_graphic_queue();
+    init_info.Instance = ctx_->get_vk_instance();
+    init_info.PhysicalDevice = ctx_->get_vk_physical_device();
+    init_info.Device = ctx_->get_vk_device();
+    init_info.QueueFamily = ctx_->get_graphic_queue_family_index();
+    init_info.Queue = ctx_->get_vk_queue();
     init_info.PipelineCache = VK_NULL_HANDLE;
     init_info.DescriptorPool = descriptor_pool_;
     init_info.Subpass = 0;
-    init_info.MinImageCount = ins_->get_swapchain_cnt();
-    init_info.ImageCount = ins_->get_swapchain_cnt();
-    init_info.MSAASamples = ins_->nsample;
+    init_info.MinImageCount = ctx_->get_swapchain_count();
+    init_info.ImageCount = ctx_->get_swapchain_count();
+    init_info.MSAASamples = static_cast<VkSampleCountFlagBits>(ctx_->nsample);
+    init_info.UseDynamicRendering = true;
+    init_info.ColorAttachmentFormat = ctx_->get_swapchain_format();
     init_info.Allocator = nullptr;
     init_info.CheckVkResultFn = nullptr;
 
-    if (!ImGui_ImplVulkan_Init(&init_info, ins_->get_renderpass())) {
+    if (!ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE)) {
         return false;
     }
 
-    VkCommandBuffer cmd = ins_->begin_single_time_commands();
-    ImGui_ImplVulkan_CreateFontsTexture(cmd);
-    ins_->end_single_time_commands(cmd);
+    auto cmd = ctx_->begin_single_commands();
+    ImGui_ImplVulkan_CreateFontsTexture(*cmd);
+    ctx_->end_single_commands(std::move(cmd));
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 
     initialized_ = true;
@@ -119,18 +122,18 @@ void ImGuiHud::shutdown() {
         return;
     }
 
-    vkDeviceWaitIdle(ins_->get_device());
+    ctx_->wait_idle();
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
 
     if (descriptor_pool_ != VK_NULL_HANDLE) {
-        vkDestroyDescriptorPool(ins_->get_device(), descriptor_pool_, nullptr);
+        vkDestroyDescriptorPool(ctx_->get_vk_device(), descriptor_pool_, nullptr);
         descriptor_pool_ = VK_NULL_HANDLE;
     }
 
     initialized_ = false;
-    ins_ = nullptr;
+    ctx_ = nullptr;
 }
 
 } // namespace vkkk

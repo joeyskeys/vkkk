@@ -8,6 +8,7 @@
 
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "asset_mgr/drawable_mgr.h"
 #include "asset_mgr/light_mgr.h"
@@ -15,6 +16,7 @@
 #include "built_in_shader/fixed_color.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
+#include "gui/gui.h"
 #include "vk_ins/context.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 
@@ -182,9 +184,8 @@ void upload_mesh(vkkk::Context& ctx, vkkk::Scene& scene, const std::string& name
 
 int main() {
     vkkk::Context ctx;
-    ctx.init_glfw(WIDTH, HEIGHT, "Cornell Box (HPP)");
+    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Cornell Box");
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
-    GLFWwindow* window = vkkk::Context::create_window(WIDTH, HEIGHT, "Cornell Box (HPP)");
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
 
     vkkk::Scene scene;
@@ -277,9 +278,15 @@ int main() {
     float target_fps = 60.0f;
     float current_fps = 0.0f;
     float frame_dt = 0.0f;
+    float raw_frame_dt = 0.0f;
+
+    vkkk::ImGuiHud hud;
+    if (!hud.init(&ctx)) {
+        throw std::runtime_error("failed to initialize imgui hud");
+    }
 
     ctx.set_update_cbk([&](uint32_t image_index, float dt) {
-        frame_dt = dt;
+        raw_frame_dt = dt;
         cam.update_position(frame_dt);
         cam.update_orientation();
 
@@ -291,6 +298,23 @@ int main() {
         for (const auto& renderable : renderables) {
             update_renderable_uniforms(ctx, renderable, image_index, light);
         }
+
+        hud.begin_frame();
+        ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        constexpr ImGuiWindowFlags hud_flags =
+            ImGuiWindowFlags_NoDecoration
+            | ImGuiWindowFlags_AlwaysAutoResize
+            | ImGuiWindowFlags_NoSavedSettings
+            | ImGuiWindowFlags_NoFocusOnAppearing
+            | ImGuiWindowFlags_NoNav;
+        ImGui::Begin("FPS HUD", nullptr, hud_flags);
+        ImGui::Checkbox("Limit FPS", &limit_fps_enabled);
+        ImGui::SliderFloat("Target FPS", &target_fps, 15.0f, 240.0f, "%.0f");
+        ImGui::Text("FPS: %.1f", current_fps);
+        ImGui::Text("Frame: %.2f ms", frame_dt * 1000.0f);
+        ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
+        ImGui::End();
 
         ctx.record_cmds(image_index, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t idx) {
             (void)idx;
@@ -310,6 +334,7 @@ int main() {
                     : &*pipeline.descriptor_sets[image_index];
                 mesh_found->second.emit_draw_cmd(cmd_buf, *pipeline.vk_pipeline_layout, desc_set);
             }
+            hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
         });
     });
 
@@ -320,13 +345,14 @@ int main() {
 
         const auto frame_begin = Clock::now();
         ctx.draw_frame();
-        const auto frame_end = Clock::now();
+        auto frame_end = Clock::now();
 
         if (limit_fps_enabled && target_fps > 1.0f) {
             const auto frame_period = std::chrono::duration<float>(1.0f / target_fps);
             next_frame_tick += std::chrono::duration_cast<Clock::duration>(frame_period);
             if (frame_end < next_frame_tick) {
                 std::this_thread::sleep_until(next_frame_tick);
+                frame_end = Clock::now();
             }
             else {
                 next_frame_tick = frame_end;
@@ -338,9 +364,9 @@ int main() {
 
         frame_dt = std::chrono::duration<float>(frame_end - frame_begin).count();
         current_fps = frame_dt > 0.0f ? 1.0f / frame_dt : 0.0f;
-        glfwSetWindowTitle(window, ("Cornell Box (HPP) | FPS: " + std::to_string(static_cast<int>(current_fps))).c_str());
     }
 
+    hud.shutdown();
     ctx.wait_idle();
     glfwDestroyWindow(window);
     glfwTerminate();

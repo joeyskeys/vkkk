@@ -16,19 +16,15 @@ std::vector<const char*> Context::get_glfw_instance_extensions(bool enable_valid
     return extensions;
 }
 
-GLFWwindow* Context::create_window(int width, int height, const char* title, bool resizable) {
+GLFWwindow* Context::init_glfw(int width, int height, const char* title, bool resizable) {
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, resizable ? GLFW_TRUE : GLFW_FALSE);
+
     GLFWwindow* window = glfwCreateWindow(width, height, title, nullptr, nullptr);
     if (window == nullptr) {
         throw std::runtime_error("failed to create GLFW window");
     }
-    return window;
-}
-
-void Context::init_glfw(int width, int height, const char* title, bool resizable) {
-    GLFWwindow* window = create_window(width, height, title, resizable);
     glfwSetWindowUserPointer(window, this);
     glfwSetFramebufferSizeCallback(window, [](GLFWwindow* win, int, int) {
         auto* ctx = static_cast<Context*>(glfwGetWindowUserPointer(win));
@@ -36,6 +32,8 @@ void Context::init_glfw(int width, int height, const char* title, bool resizable
             ctx->frame_buffer_resized = true;
         }
     });
+    
+    return window;
 }
 
 void Context::recreate_swapchain() {

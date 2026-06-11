@@ -161,8 +161,7 @@ public:
     Context(bool enable_debug_m = true);
 
     static std::vector<const char*> get_glfw_instance_extensions(bool enable_validation = true);
-    static GLFWwindow* create_window(int width, int height, const char* title, bool resizable = false);
-    void init_glfw(int width, int height, const char* title = default_app_name, bool resizable = false);
+    GLFWwindow* init_glfw(int width, int height, const char* title = default_app_name, bool resizable = false);
 
     void init(GLFWwindow* win,
         const char* app_name = default_app_name,
@@ -209,6 +208,15 @@ public:
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
     UBO& require_ubo(const std::string& full_name);
     GLFWwindow* get_window() const { return window; }
+    VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
+    VkPhysicalDevice get_vk_physical_device() const { return static_cast<VkPhysicalDevice>(*physical_device); }
+    VkDevice get_vk_device() const { return static_cast<VkDevice>(*device); }
+    VkQueue get_vk_queue() const { return static_cast<VkQueue>(*queue); }
+    uint32_t get_graphic_queue_family_index() const { return queue_idx; }
+    uint32_t get_swapchain_count() const { return static_cast<uint32_t>(swapchain_images.size()); }
+    VkFormat get_swapchain_format() const { return static_cast<VkFormat>(swapchain_surface_format.format); }
+    vk::raii::CommandBuffer begin_single_commands() const;
+    void end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const;
 
     using UpdateCallback = std::function<void(uint32_t image_index, float dt)>;
     void set_update_cbk(UpdateCallback cbk) { update_cbk_ = std::move(cbk); }
@@ -251,8 +259,6 @@ private:
         vk::BufferUsageFlags usage,
         vk::MemoryPropertyFlags properties) const;
 
-    vk::raii::CommandBuffer begin_single_commands() const;
-    void end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const;
     void copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const;
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
 

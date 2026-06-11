@@ -2,31 +2,32 @@
 
 #include <vector>
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan_raii.hpp>
 
 namespace vkkk
 {
 
-class VkWrappedInstance;
+class Context;
 
 class CommandBuffers {
 public:
-    CommandBuffers(VkWrappedInstance*);
+    explicit CommandBuffers(Context* ctx);
 
+    // Mirror command buffer handles currently owned by Context.
     void alloc();
 
-    std::vector<VkCommandBuffer> bufs;
+    std::vector<vk::CommandBuffer> bufs;
 
-    inline VkCommandBuffer& operator[] (uint32_t idx) {
+    inline vk::CommandBuffer& operator[] (uint32_t idx) {
         return bufs[idx];
     }
 
-    inline const VkCommandBuffer& operator[] (uint32_t idx) const {
+    inline const vk::CommandBuffer& operator[] (uint32_t idx) const {
         return bufs[idx];
     }
 
 private:
-    VkWrappedInstance* ins;
+    Context* ctx_ = nullptr;
 };
 
-}
+} // namespace vkkk

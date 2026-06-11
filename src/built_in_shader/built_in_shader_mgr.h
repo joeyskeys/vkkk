@@ -5,15 +5,11 @@
 #include <unordered_map>
 #include <vector>
 
-#include <vulkan/vulkan.h>
-
-#include "vk_ins/shader_mgr.h"
+#include "vk_ins/context.hpp"
+#include "vk_ins/shader_module_pack.hpp"
 
 namespace vkkk
 {
-
-class VkWrappedInstance;
-struct PipelineOption;
 
 namespace built_in_shader
 {
@@ -31,10 +27,10 @@ struct UniformDefaultValue {
 
 class BuiltInShaderMgr {
 public:
-    explicit BuiltInShaderMgr(VkWrappedInstance* ins);
+    explicit BuiltInShaderMgr(Context* ctx);
 
     bool compile(BuiltInShaderType type);
-    const std::vector<ShaderModule>* get_modules(BuiltInShaderType type) const;
+    const ShaderModulePack* get_modules(BuiltInShaderType type) const;
 
     bool create_pipeline(const std::string& pipeline_name,
         BuiltInShaderType type, PipelineOption option);
@@ -59,8 +55,8 @@ private:
         const std::vector<uint8_t>& bytes, uint32_t swapchain_image_idx) const;
 
 private:
-    VkWrappedInstance* ins_;
-    std::unordered_map<BuiltInShaderType, std::vector<ShaderModule>> modules_;
+    Context* ctx_ = nullptr;
+    std::unordered_map<BuiltInShaderType, ShaderModulePack> modules_;
 };
 
 } // namespace built_in_shader

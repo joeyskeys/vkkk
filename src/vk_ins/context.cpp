@@ -285,7 +285,7 @@ void Context::init(GLFWwindow* win,
     std::vector<const char*> validation_layers;
     if (enable_validation_layers) {
         validation_layers.assign(default_validation_layers.begin(), default_validation_layers.end());
-        validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
+            validation_layers.insert(validation_layers.end(), extra_validation_layers.begin(), extra_validation_layers.end());
     }
 
     auto layer_props = context.enumerateInstanceLayerProperties();

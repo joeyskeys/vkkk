@@ -1,13 +1,11 @@
 #include <cstring>
 #include <iostream>
 #include <utility>
-#include <vector>
 
 #include "built_in_shader/built_in_shader_mgr.h"
 #include "built_in_shader/fixed_color.h"
 #include "built_in_shader/pbr.h"
 #include "built_in_shader/phong.h"
-#include "vk_ins/vkabstraction.h"
 
 namespace vkkk
 {
@@ -27,13 +25,12 @@ std::vector<uint8_t> to_bytes(const T& value) {
 
 } // namespace
 
-BuiltInShaderMgr::BuiltInShaderMgr(VkWrappedInstance* ins)
-    : ins_(ins)
+BuiltInShaderMgr::BuiltInShaderMgr(Context* ctx)
+    : ctx_(ctx)
 {}
 
 bool BuiltInShaderMgr::compile(BuiltInShaderType type) {
-    auto found = modules_.find(type);
-    if (found != modules_.end()) {
+    if (modules_.find(type) != modules_.end()) {
         return true;
     }
 
@@ -42,20 +39,28 @@ bool BuiltInShaderMgr::compile(BuiltInShaderType type) {
         return false;
     }
 
-    std::vector<ShaderModule> modules(2);
-    if (!modules[0].load(shader_set.vert, VK_SHADER_STAGE_VERTEX_BIT, "built_in_vert")) {
+    ShaderModulePack pack;
+    ShaderModule vert;
+    ShaderModule frag;
+    if (!vert.load(shader_set.vert, vk::ShaderStageFlagBits::eVertex, "built_in_vert")) {
         return false;
     }
-    if (!modules[1].load(shader_set.frag, VK_SHADER_STAGE_FRAGMENT_BIT, "built_in_frag")) {
+    if (!frag.load(shader_set.frag, vk::ShaderStageFlagBits::eFragment, "built_in_frag")) {
+        return false;
+    }
+    if (!pack.add_shader_module(vert, true)) {
+        return false;
+    }
+    if (!pack.add_shader_module(frag, true)) {
         return false;
     }
 
-    modules_.emplace(type, std::move(modules));
+    modules_.emplace(type, std::move(pack));
     return true;
 }
 
-const std::vector<ShaderModule>* BuiltInShaderMgr::get_modules(BuiltInShaderType type) const {
-    auto found = modules_.find(type);
+const ShaderModulePack* BuiltInShaderMgr::get_modules(BuiltInShaderType type) const {
+    const auto found = modules_.find(type);
     if (found == modules_.end()) {
         return nullptr;
     }
@@ -71,16 +76,19 @@ bool BuiltInShaderMgr::create_pipeline(const std::string& pipeline_name,
 bool BuiltInShaderMgr::create_pipeline(const std::string& pipeline_name,
     BuiltInShaderType type, const std::vector<VERT_COMP>& comps, PipelineOption option)
 {
+    if (ctx_ == nullptr) {
+        return false;
+    }
     if (!compile(type)) {
         return false;
     }
 
-    auto found = modules_.find(type);
+    const auto found = modules_.find(type);
     if (found == modules_.end()) {
         return false;
     }
 
-    return ins_->create_pipeline(pipeline_name, found->second, comps, option);
+    return ctx_->create_pipeline(pipeline_name, found->second, option, comps);
 }
 
 std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInShaderType type) const {
@@ -112,7 +120,10 @@ std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInS
 bool BuiltInShaderMgr::apply_default_uniforms(const std::string& pipeline_name,
     BuiltInShaderType type) const
 {
-    auto swapchain_cnt = ins_->get_swapchain_cnt();
+    if (ctx_ == nullptr) {
+        return false;
+    }
+    const auto swapchain_cnt = ctx_->get_swapchain_count();
     for (uint32_t i = 0; i < swapchain_cnt; ++i) {
         if (!apply_default_uniforms(pipeline_name, type, i)) {
             return false;
@@ -160,8 +171,12 @@ BuiltInShaderMgr::ShaderSetSource BuiltInShaderMgr::get_shader_set_source(BuiltI
 bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,
     const std::vector<uint8_t>& bytes, uint32_t swapchain_image_idx) const
 {
-    auto found = ins_->ubos.find(uniform_full_name);
-    if (found == ins_->ubos.end()) {
+    if (ctx_ == nullptr) {
+        return false;
+    }
+
+    auto found = ctx_->ubos.find(uniform_full_name);
+    if (found == ctx_->ubos.end()) {
         std::cout << "Uniform " << uniform_full_name << " not found" << std::endl;
         return false;
     }
@@ -181,7 +196,7 @@ bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,
 
     std::vector<uint8_t> upload_data(upload_size, 0);
     std::memcpy(upload_data.data(), bytes.data(), bytes.size());
-    ins_->sync_uniform(ubo.memos[swapchain_image_idx], upload_data.data(), upload_size);
+    ctx_->sync_uniform(ubo.memos[swapchain_image_idx], upload_data.data(), upload_size);
     return true;
 }
 

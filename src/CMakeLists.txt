@@ -85,6 +85,12 @@ target_link_libraries(vkcornellpp
         vkkk
         OpenImageIO::OpenImageIO)
 
+add_executable(vkrendererpp renderer_mainpp.cpp)
+target_link_libraries(vkrendererpp
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
 #add_executable(vkrenderer renderer_main.cpp)
 #target_link_libraries(vkrenderer
     #PRIVATE

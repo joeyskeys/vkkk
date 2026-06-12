@@ -13,7 +13,7 @@
 #include "asset_mgr/scene.h"
 #include "concepts/camera.h"
 #include "gui/gui.h"
-#include "renderer/forward.h"
+#include "renderer/forward_plus.h"
 #include "renderer/renderer.h"
 #include "vk_ins/context.hpp"
 
@@ -91,15 +91,16 @@ vkkk::built_in_shader::PhongMaterialUBO make_material(const glm::vec3& color, fl
     return material;
 }
 
-void setup_cornell_scene(vkkk::Scene& scene, vkkk::ForwardRenderer& renderer) {
+void setup_cornell_scene(vkkk::Scene& scene, vkkk::ForwardPlusRenderer& renderer) {
     scene.drawable_mgr->add_plane("cornell_plane", {vkkk::VERTEX, vkkk::NORMAL}, 2.0f);
     scene.drawable_mgr->add_cube("cornell_cube", {vkkk::VERTEX, vkkk::NORMAL}, 1.0f);
     scene.light_mgr->add_pt_light(
         glm::vec4(0.0f, 0.85f, 0.0f, 1.0f),
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-    const auto add_plane = [&](const char* pipeline_name, const glm::mat4& model, const glm::vec3& color, float shininess) {
-        vkkk::ForwardDrawItem item{};
+    const auto add_plane = [&](const char* pipeline_name, const glm::mat4& model,
+                               const glm::vec3& color, float shininess) {
+        vkkk::ForwardPlusDrawItem item{};
         item.mesh_name = "cornell_plane";
         item.pipeline_name = pipeline_name;
         item.model = model;
@@ -107,8 +108,9 @@ void setup_cornell_scene(vkkk::Scene& scene, vkkk::ForwardRenderer& renderer) {
         renderer.add_draw_item(item);
     };
 
-    const auto add_cube = [&](const char* pipeline_name, const glm::mat4& model, const glm::vec3& color, float shininess) {
-        vkkk::ForwardDrawItem item{};
+    const auto add_cube = [&](const char* pipeline_name, const glm::mat4& model,
+                              const glm::vec3& color, float shininess) {
+        vkkk::ForwardPlusDrawItem item{};
         item.mesh_name = "cornell_cube";
         item.pipeline_name = pipeline_name;
         item.model = model;
@@ -116,49 +118,35 @@ void setup_cornell_scene(vkkk::Scene& scene, vkkk::ForwardRenderer& renderer) {
         renderer.add_draw_item(item);
     };
 
-    add_plane(
-        "cornell_floor",
+    add_plane("cornell_floor",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f),
-        8.0f);
-    add_plane(
-        "cornell_ceiling",
+        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
+    add_plane("cornell_ceiling",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f),
-        8.0f);
-    add_plane(
-        "cornell_back",
+        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
+    add_plane("cornell_back",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f),
-        8.0f);
-    add_plane(
-        "cornell_left",
+        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
+    add_plane("cornell_left",
         glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-        glm::vec3(0.72f, 0.12f, 0.12f),
-        8.0f);
-    add_plane(
-        "cornell_right",
+        glm::vec3(0.72f, 0.12f, 0.12f), 8.0f);
+    add_plane("cornell_right",
         glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-        glm::vec3(0.14f, 0.62f, 0.18f),
-        8.0f);
-    add_cube(
-        "cornell_short_box",
+        glm::vec3(0.14f, 0.62f, 0.18f), 8.0f);
+    add_cube("cornell_short_box",
         glm::translate(glm::mat4(1.0f), glm::vec3(-0.45f, -0.6f, -0.15f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(-18.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, 0.8f, 0.6f)),
-        glm::vec3(0.82f, 0.82f, 0.82f),
-        24.0f);
-    add_cube(
-        "cornell_tall_box",
+        glm::vec3(0.82f, 0.82f, 0.82f), 24.0f);
+    add_cube("cornell_tall_box",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.38f, -0.35f, 0.32f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(14.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::scale(glm::mat4(1.0f), glm::vec3(0.55f, 1.3f, 0.55f)),
-        glm::vec3(0.82f, 0.82f, 0.82f),
-        24.0f);
+        glm::vec3(0.82f, 0.82f, 0.82f), 24.0f);
 }
 
 void upload_mesh(vkkk::Context& ctx, const vkkk::Scene& scene, const std::string& name) {
@@ -175,13 +163,13 @@ void upload_mesh(vkkk::Context& ctx, const vkkk::Scene& scene, const std::string
 
 int main() {
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Forward Renderer (HPP)");
+    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Cornell Box (Forward+)");
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
 
-    vkkk::ForwardRenderer renderer;
+    vkkk::ForwardPlusRenderer renderer;
     if (!renderer.initialize(&ctx)) {
-        throw std::runtime_error("failed to initialize forward renderer");
+        throw std::runtime_error("failed to initialize forward+ renderer");
     }
     renderer.set_camera(&cam);
 
@@ -192,7 +180,7 @@ int main() {
     renderer.set_scene(&scene);
 
     if (!renderer.missing_shaders().empty()) {
-        std::cerr << "missing forward shaders:";
+        std::cerr << "missing forward+ shaders:";
         for (const auto& shader : renderer.missing_shaders()) {
             std::cerr << ' ' << shader;
         }

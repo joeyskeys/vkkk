@@ -23,16 +23,17 @@ namespace vkkk
 class Camera;
 class Scene;
 
-struct ShadowTransformUBO {
-    glm::mat4 model{1.0f};
-    glm::mat4 lightView{1.0f};
-    glm::mat4 lightProj{1.0f};
-};
-
-struct ShadowParamsUBO {
-    glm::mat4 lightSpace{1.0f};
-    glm::vec4 params{0.0025f, 1.0f, 0.0f, 0.0f};
-};
+// Shadow UBOs are temporarily disabled while forward shadow pass is under migration.
+// struct ShadowTransformUBO {
+//     glm::mat4 model{1.0f};
+//     glm::mat4 lightView{1.0f};
+//     glm::mat4 lightProj{1.0f};
+// };
+//
+// struct ShadowParamsUBO {
+//     glm::mat4 lightSpace{1.0f};
+//     glm::vec4 params{0.0025f, 1.0f, 0.0f, 0.0f};
+// };
 
 struct PostParamsUBO {
     float exposure{1.0f};
@@ -58,8 +59,9 @@ public:
     static constexpr const char* kTransparentPipeline = "forward_transparent";
     static constexpr const char* kPostPipeline = "forward_post";
 
-    static constexpr const char* kShaderOpaqueShadowVert = "opaque_shadow.vert";
-    static constexpr const char* kShaderOpaqueShadowFrag = "opaque_shadow.frag";
+    // Temporary non-shadow opaque shaders (shadow-enabled pair disabled for now).
+    static constexpr const char* kShaderOpaqueVert = "transparent.vert";
+    static constexpr const char* kShaderOpaqueFrag = "transparent.frag";
     static constexpr const char* kShaderTransparentVert = "transparent.vert";
     static constexpr const char* kShaderTransparentFrag = "transparent.frag";
     static constexpr const char* kShaderPostVert = "post.vert";
@@ -127,7 +129,7 @@ private:
     std::vector<std::string> missing_shaders_;
 
     built_in_shader::PhongLightUBO light_ubo_{};
-    ShadowParamsUBO shadow_params_ubo_{};
+    // ShadowParamsUBO shadow_params_ubo_{};
     PostParamsUBO post_params_ubo_{};
 
     bool post_pipeline_ready_ = false;

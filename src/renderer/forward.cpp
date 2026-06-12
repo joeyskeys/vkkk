@@ -73,12 +73,11 @@ bool ForwardRenderer::load_shader_pair(const char* vert_file, const char* frag_f
     }
 
     // Context::create_pipeline only auto-binds texture samplers when a sampler name
-    // has a source image path in tex_img_pairs. For forward shaders that rely on
-    // shadowMap/sceneColor, bind a temporary fallback texture path.
+    // has a source image path in tex_img_pairs. Keep fallback only for post sceneColor.
     const auto fallback_tex_path = resolve_fallback_texture_path();
     if (fallback_tex_path) {
         for (const auto& [sampler_name, _binding] : frag.img_infos) {
-            if (sampler_name == "shadowMap" || sampler_name == "sceneColor") {
+            if (sampler_name == "sceneColor") {
                 frag.tex_img_pairs[sampler_name] = std::make_pair(*fallback_tex_path, false);
             }
         }
@@ -163,7 +162,7 @@ bool ForwardRenderer::ensure_draw_item_pipeline(const ForwardDrawItem& item) {
             kShaderTransparentVert, kShaderTransparentFrag, components, option);
     }
     return create_shader_pipeline(item.pipeline_name.c_str(),
-        kShaderOpaqueShadowVert, kShaderOpaqueShadowFrag, components, option);
+        kShaderOpaqueVert, kShaderOpaqueFrag, components, option);
 }
 
 void ForwardRenderer::clear_draw_items() {
@@ -218,7 +217,7 @@ bool ForwardRenderer::create_pass_pipelines() {
     const std::vector<VERT_COMP> phong_components{VERTEX, NORMAL};
     auto opaque_option = make_base_pipeline_option();
     if (!create_shader_pipeline(kOpaquePipeline,
-            kShaderOpaqueShadowVert, kShaderOpaqueShadowFrag, phong_components, opaque_option))
+            kShaderOpaqueVert, kShaderOpaqueFrag, phong_components, opaque_option))
     {
         return false;
     }
@@ -231,9 +230,11 @@ bool ForwardRenderer::create_pass_pipelines() {
         return false;
     }
 
-    auto post_option = make_post_pipeline_option();
-    post_pipeline_ready_ = create_shader_pipeline(kPostPipeline,
-        kShaderPostVert, kShaderPostFrag, {}, post_option);
+    // Post pass is disabled until a real scene-color offscreen target is wired in Context.
+    // auto post_option = make_post_pipeline_option();
+    // post_pipeline_ready_ = create_shader_pipeline(kPostPipeline,
+    //     kShaderPostVert, kShaderPostFrag, {}, post_option);
+    post_pipeline_ready_ = false;
     return true;
 }
 
@@ -259,7 +260,7 @@ void ForwardRenderer::update_lights_from_scene() {
     light_ubo_.viewPos = camera_
         ? glm::vec4(camera_->pos, 1.0f)
         : glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
-    shadow_params_ubo_.lightSpace = glm::mat4(1.0f);
+    // shadow_params_ubo_.lightSpace = glm::mat4(1.0f);
 }
 
 void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
@@ -289,12 +290,12 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     for (const auto* pipeline_name : {kOpaquePipeline, kTransparentPipeline}) {
         sync_global_ubo(pipeline_name, ":UniformBufferObject", &camera_transform, sizeof(camera_transform));
         sync_global_ubo(pipeline_name, ":PhongLight", &light_ubo_, sizeof(light_ubo_));
-        sync_global_ubo(pipeline_name, ":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
+        // sync_global_ubo(pipeline_name, ":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
     }
 
-    if (post_pipeline_ready_) {
-        sync_global_ubo(kPostPipeline, ":post", &post_params_ubo_, sizeof(post_params_ubo_));
-    }
+    // if (post_pipeline_ready_) {
+    //     sync_global_ubo(kPostPipeline, ":post", &post_params_ubo_, sizeof(post_params_ubo_));
+    // }
 }
 
 void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
@@ -324,7 +325,7 @@ void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     sync_if_present(":PhongMaterial", &item.material, sizeof(item.material));
     sync_if_present(":light", &light_ubo_, sizeof(light_ubo_));
     sync_if_present(":PhongLight", &light_ubo_, sizeof(light_ubo_));
-    sync_if_present(":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
+    // sync_if_present(":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
 }
 
 void ForwardRenderer::update(const RenderView& view) {
@@ -441,7 +442,7 @@ void ForwardRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& v
 
     pass_opaque(cmd, view);
     pass_transparent(cmd, view);
-    pass_post_process(cmd, view);
+    // pass_post_process(cmd, view);
     if (overlay_draw_) {
         overlay_draw_(cmd);
     }

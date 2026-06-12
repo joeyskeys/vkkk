@@ -12,6 +12,7 @@ set(HEADERS
     gui/gui.h
     renderer/renderer.h
     renderer/forward.h
+    renderer/forward_plus.h
     renderer/deferred.h
     utils/common.h
     utils/io.h
@@ -39,6 +40,7 @@ set(SRCS
     concepts/mesh.cpp
     gui/gui.cpp
     renderer/forward.cpp
+    renderer/forward_plus.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
     #vk_ins/vkabstraction.cpp
@@ -87,6 +89,12 @@ target_link_libraries(vkcornellpp
 
 add_executable(vkrendererpp renderer_mainpp.cpp)
 target_link_libraries(vkrendererpp
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
+add_executable(vkcornellpluspp cornell_main_plus.cpp)
+target_link_libraries(vkcornellpluspp
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

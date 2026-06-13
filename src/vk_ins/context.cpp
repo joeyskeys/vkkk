@@ -406,10 +406,13 @@ void Context::init(GLFWwindow* win,
 
     for (size_t i = 0; i < max_frames_in_flight; ++i) {
         image_available_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
-        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
         vk::FenceCreateInfo fence_create_info{};
         fence_create_info.flags = vk::FenceCreateFlagBits::eSignaled;
         in_flight_fences.emplace_back(device, fence_create_info);
+    }
+    render_finished_semaphores.reserve(swapchain_images.size());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
     }
 
     vk::CommandBufferAllocateInfo command_buffer_alloc_info{};
@@ -799,13 +802,13 @@ void Context::draw_frame() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &*command_buffers[image_index];
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &*render_finished_semaphores[current_frame];
+    submit_info.pSignalSemaphores = &*render_finished_semaphores[image_index];
     queue.submit(submit_info, *in_flight_fences[current_frame]);
 
     vk::SwapchainKHR swapchains[] = {*swapchain};
     vk::PresentInfoKHR present_info{};
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &*render_finished_semaphores[current_frame];
+    present_info.pWaitSemaphores = &*render_finished_semaphores[image_index];
     present_info.swapchainCount = 1;
     present_info.pSwapchains = swapchains;
     present_info.pImageIndices = &image_index;

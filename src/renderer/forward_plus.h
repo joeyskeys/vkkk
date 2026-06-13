@@ -46,8 +46,6 @@ public:
     bool initialize(Context* context) override;
     void shutdown() override;
 
-    void set_scene(Scene* scene) override;
-
     void set_overlay_draw(std::function<void(vk::CommandBuffer)> draw) {
         overlay_draw_ = std::move(draw);
     }
@@ -97,15 +95,10 @@ private:
     PipelineOption make_transparent_pipeline_option() const;
 
 private:
-    Context* ctx_ = nullptr;
-    Scene* scene_ = nullptr;
     std::vector<ForwardPlusDrawItem> draw_items_;
     std::vector<std::string> missing_shaders_;
 
     built_in_shader::PhongLightUBO light_ubo_{};
-
-    uint32_t width_ = 0;
-    uint32_t height_ = 0;
 
     std::function<void(vk::CommandBuffer)> overlay_draw_;
 };

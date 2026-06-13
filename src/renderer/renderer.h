@@ -28,7 +28,7 @@ public:
     virtual void shutdown() = 0;
 
     // Scene data to be consumed by concrete renderer implementation.
-    virtual void set_scene(Scene* scene) = 0;
+    virtual void set_scene(Scene* s) { scene = s; }
 
     // Camera data to be consumed by concrete renderer implementation.
     virtual void set_camera(Camera* c) { camera = c; }
@@ -43,7 +43,11 @@ public:
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
 
 public:
+    Context* ctx = nullptr;
+    Scene* scene = nullptr;
     Camera* camera = nullptr;
+    uint32_t width = 0;
+    uint32_t height = 0;
 };
 
 } // namespace vkkk

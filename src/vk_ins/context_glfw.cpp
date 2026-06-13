@@ -51,11 +51,16 @@ void Context::recreate_swapchain() {
     depth_image = nullptr;
     depth_memo = nullptr;
     swapchain = nullptr;
-    images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);
 
     create_swapchain();
     create_imageviews();
     create_depth_resources();
+    images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);
+    render_finished_semaphores.clear();
+    render_finished_semaphores.reserve(swapchain_images.size());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+    }
 
     vk::CommandBufferAllocateInfo cmd_buf_alloc_info{};
     cmd_buf_alloc_info.commandPool = command_pool;

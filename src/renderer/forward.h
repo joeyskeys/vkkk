@@ -72,8 +72,6 @@ public:
     bool initialize(Context* context) override;
     void shutdown() override;
 
-    void set_scene(Scene* scene) override;
-
     void set_overlay_draw(std::function<void(vk::CommandBuffer)> draw) {
         overlay_draw_ = std::move(draw);
     }
@@ -119,8 +117,6 @@ private:
     PipelineOption make_post_pipeline_option() const;
 
 private:
-    Context* ctx_ = nullptr;
-    Scene* scene_ = nullptr;
     std::vector<ForwardDrawItem> draw_items_;
     std::vector<std::string> missing_shaders_;
 
@@ -129,9 +125,6 @@ private:
     PostParamsUBO post_params_ubo_{};
 
     bool post_pipeline_ready_ = false;
-
-    uint32_t width_ = 0;
-    uint32_t height_ = 0;
 
     std::function<void(vk::CommandBuffer)> overlay_draw_;
 };

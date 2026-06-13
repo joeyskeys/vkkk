@@ -90,7 +90,7 @@ bool ForwardRenderer::create_shader_pipeline(const char* pipeline_name,
     const char* vert_file, const char* frag_file,
     const std::vector<VERT_COMP>& components, PipelineOption& option)
 {
-    if (!ctx_) {
+    if (!ctx) {
         return false;
     }
 
@@ -98,22 +98,22 @@ bool ForwardRenderer::create_shader_pipeline(const char* pipeline_name,
     if (!load_shader_pair(vert_file, frag_file, pack)) {
         return false;
     }
-    return ctx_->create_pipeline(pipeline_name, pack, option, components);
+    return ctx->create_pipeline(pipeline_name, pack, option, components);
 }
 
 bool ForwardRenderer::initialize(Context* context) {
-    ctx_ = context;
-    if (!ctx_) {
+    ctx = context;
+    if (!ctx) {
         return false;
     }
 
     missing_shaders_.clear();
-    if (ctx_->get_window()) {
+    if (ctx->get_window()) {
         int w = 0;
         int h = 0;
-        glfwGetFramebufferSize(ctx_->get_window(), &w, &h);
-        width_ = static_cast<uint32_t>(std::max(w, 1));
-        height_ = static_cast<uint32_t>(std::max(h, 1));
+        glfwGetFramebufferSize(ctx->get_window(), &w, &h);
+        width = static_cast<uint32_t>(std::max(w, 1));
+        height = static_cast<uint32_t>(std::max(h, 1));
     }
 
     return create_pass_pipelines();
@@ -122,14 +122,10 @@ bool ForwardRenderer::initialize(Context* context) {
 void ForwardRenderer::shutdown() {
     destroy_pass_pipelines();
     draw_items_.clear();
-    ctx_ = nullptr;
-    scene_ = nullptr;
+    ctx = nullptr;
+    scene = nullptr;
     camera = nullptr;
     post_pipeline_ready_ = false;
-}
-
-void ForwardRenderer::set_scene(Scene* scene) {
-    scene_ = scene;
 }
 
 void ForwardRenderer::add_draw_item(const ForwardDrawItem& item) {
@@ -140,10 +136,10 @@ void ForwardRenderer::add_draw_item(const ForwardDrawItem& item) {
 }
 
 bool ForwardRenderer::ensure_draw_item_pipeline(const ForwardDrawItem& item) {
-    if (!ctx_ || item.pipeline_name.empty()) {
+    if (!ctx || item.pipeline_name.empty()) {
         return false;
     }
-    if (ctx_->pipelines.find(item.pipeline_name) != ctx_->pipelines.end()) {
+    if (ctx->pipelines.find(item.pipeline_name) != ctx->pipelines.end()) {
         return true;
     }
 
@@ -164,18 +160,18 @@ void ForwardRenderer::clear_draw_items() {
 }
 
 void ForwardRenderer::on_resize(uint32_t width, uint32_t height) {
-    width_ = width;
-    height_ = height;
+    this->width = width;
+    this->height = height;
 }
 
 PipelineOption ForwardRenderer::make_base_pipeline_option() const {
     PipelineOption option;
-    option.setup_multisampling(true, ctx_->nsample);
+    option.setup_multisampling(true, ctx->nsample);
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(true, true, vk::CompareOp::eLess, false, false);
-    option.setup_viewport(0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_), 0.0f, 1.0f);
-    option.setup_scissor(0, 0, width_, height_);
+    option.setup_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+    option.setup_scissor(0, 0, width, height);
     return option;
 }
 
@@ -194,17 +190,17 @@ PipelineOption ForwardRenderer::make_transparent_pipeline_option() const {
 
 PipelineOption ForwardRenderer::make_post_pipeline_option() const {
     PipelineOption option;
-    option.setup_multisampling(true, ctx_->nsample);
+    option.setup_multisampling(true, ctx->nsample);
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(false, false, vk::CompareOp::eAlways, false, false);
-    option.setup_viewport(0.0f, 0.0f, static_cast<float>(width_), static_cast<float>(height_), 0.0f, 1.0f);
-    option.setup_scissor(0, 0, width_, height_);
+    option.setup_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+    option.setup_scissor(0, 0, width, height);
     return option;
 }
 
 bool ForwardRenderer::create_pass_pipelines() {
-    if (!ctx_) {
+    if (!ctx) {
         return false;
     }
 
@@ -233,18 +229,18 @@ bool ForwardRenderer::create_pass_pipelines() {
 }
 
 void ForwardRenderer::update_camera_aspect() {
-    if (!camera || height_ == 0) {
+    if (!camera || height == 0) {
         return;
     }
-    camera->ratio = width_ / static_cast<float>(height_);
+    camera->ratio = width / static_cast<float>(height);
 }
 
 void ForwardRenderer::update_lights_from_scene() {
     light_ubo_.lightPos = glm::vec4(0.0f, 5.0f, 5.0f, 1.0f);
     light_ubo_.lightColor = glm::vec4(1.0f);
 
-    if (scene_ && scene_->light_mgr) {
-        const auto& pt_lights = scene_->light_mgr->point_lights();
+    if (scene && scene->light_mgr) {
+        const auto& pt_lights = scene->light_mgr->point_lights();
         if (!pt_lights.empty()) {
             light_ubo_.lightPos = pt_lights[0].pos;
             light_ubo_.lightColor = pt_lights[0].color;
@@ -258,7 +254,7 @@ void ForwardRenderer::update_lights_from_scene() {
 }
 
 void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
-    if (!ctx_) {
+    if (!ctx) {
         return;
     }
 
@@ -274,11 +270,11 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     auto sync_global_ubo = [&](const char* pipeline_name, const char* suffix,
                                const void* data, size_t size) {
         const auto ubo_name = std::string(pipeline_name) + suffix;
-        auto found = ctx_->ubos.find(ubo_name);
-        if (found == ctx_->ubos.end() || swapchain_idx >= found->second.memos.size()) {
+        auto found = ctx->ubos.find(ubo_name);
+        if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
             return;
         }
-        ctx_->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
+        ctx->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
     };
 
     for (const auto* pipeline_name : {kOpaquePipeline, kTransparentPipeline}) {
@@ -295,7 +291,7 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
 void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     const ForwardDrawItem& item, const std::string& pipeline_name)
 {
-    if (!ctx_ || !camera || pipeline_name.empty()) {
+    if (!ctx || !camera || pipeline_name.empty()) {
         return;
     }
 
@@ -306,11 +302,11 @@ void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
 
     auto sync_if_present = [&](const std::string& ubo_suffix, const void* data, size_t size) {
         const auto ubo_name = pipeline_name + ubo_suffix;
-        auto found = ctx_->ubos.find(ubo_name);
-        if (found == ctx_->ubos.end() || swapchain_idx >= found->second.memos.size()) {
+        auto found = ctx->ubos.find(ubo_name);
+        if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
             return;
         }
-        ctx_->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
+        ctx->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
     };
 
     sync_if_present(":ubo", &transform_ubo, sizeof(transform_ubo));
@@ -332,7 +328,7 @@ void ForwardRenderer::update(const RenderView& view) {
 void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
     const std::vector<const ForwardDrawItem*>& items, const char* fallback_pipeline)
 {
-    if (!ctx_) {
+    if (!ctx) {
         return;
     }
 
@@ -345,13 +341,13 @@ void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
             ? fallback_pipeline
             : item->pipeline_name;
 
-        const auto mesh_found = ctx_->meshes.find(item->mesh_name);
-        if (mesh_found == ctx_->meshes.end()) {
+        const auto mesh_found = ctx->meshes.find(item->mesh_name);
+        if (mesh_found == ctx->meshes.end()) {
             continue;
         }
 
-        const auto pipeline_found = ctx_->pipelines.find(pipeline_name);
-        if (pipeline_found == ctx_->pipelines.end()) {
+        const auto pipeline_found = ctx->pipelines.find(pipeline_name);
+        if (pipeline_found == ctx->pipelines.end()) {
             continue;
         }
 
@@ -406,12 +402,12 @@ void ForwardRenderer::pass_transparent(vk::CommandBuffer cmd, const RenderView& 
 
 void ForwardRenderer::pass_post_process(vk::CommandBuffer cmd, const RenderView& view) {
     (void)view;
-    if (!ctx_ || !post_pipeline_ready_) {
+    if (!ctx || !post_pipeline_ready_) {
         return;
     }
 
-    const auto pipeline_found = ctx_->pipelines.find(kPostPipeline);
-    if (pipeline_found == ctx_->pipelines.end()) {
+    const auto pipeline_found = ctx->pipelines.find(kPostPipeline);
+    if (pipeline_found == ctx->pipelines.end()) {
         return;
     }
 
@@ -430,7 +426,7 @@ void ForwardRenderer::record_commands(VkCommandBuffer cmd, const RenderView& vie
 }
 
 void ForwardRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& view) {
-    if (!ctx_) {
+    if (!ctx) {
         return;
     }
 

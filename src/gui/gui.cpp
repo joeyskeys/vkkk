@@ -55,6 +55,7 @@ bool ImGuiHud::init(Context* ctx) {
     ImGui_ImplGlfw_InitForVulkan(ctx_->get_window(), false);
 
     ImGui_ImplVulkan_InitInfo init_info{};
+    init_info.ApiVersion = VK_API_VERSION_1_3;
     init_info.Instance = ctx_->get_vk_instance();
     init_info.PhysicalDevice = ctx_->get_vk_physical_device();
     init_info.Device = ctx_->get_vk_device();
@@ -62,25 +63,33 @@ bool ImGuiHud::init(Context* ctx) {
     init_info.Queue = ctx_->get_vk_queue();
     init_info.PipelineCache = VK_NULL_HANDLE;
     init_info.DescriptorPool = descriptor_pool_;
-    init_info.Subpass = 0;
+    init_info.DescriptorPoolSize = 0;
     init_info.MinImageCount = ctx_->get_swapchain_count();
     init_info.ImageCount = ctx_->get_swapchain_count();
-    init_info.MSAASamples = static_cast<VkSampleCountFlagBits>(ctx_->nsample);
+    init_info.PipelineInfoMain.RenderPass = VK_NULL_HANDLE;
+    init_info.PipelineInfoMain.Subpass = 0;
+    init_info.PipelineInfoMain.MSAASamples = static_cast<VkSampleCountFlagBits>(ctx_->nsample);
     init_info.UseDynamicRendering = true;
-    init_info.ColorAttachmentFormat = ctx_->get_swapchain_format();
-    init_info.DepthAttachmentFormat = ctx_->get_depth_format();
-    init_info.StencilAttachmentFormat = ctx_->get_depth_format();
+    VkPipelineRenderingCreateInfoKHR rendering_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
+        .pNext = nullptr,
+        .viewMask = 0,
+        .colorAttachmentCount = 1
+    };
+    const VkFormat color_format = ctx_->get_swapchain_format();
+    rendering_info.pColorAttachmentFormats = &color_format;
+    const VkFormat depth_format = ctx_->get_depth_format();
+    rendering_info.depthAttachmentFormat = depth_format;
+    const bool has_stencil = depth_format == VK_FORMAT_D32_SFLOAT_S8_UINT
+        || depth_format == VK_FORMAT_D24_UNORM_S8_UINT;
+    rendering_info.stencilAttachmentFormat = has_stencil ? depth_format : VK_FORMAT_UNDEFINED;
+    init_info.PipelineInfoMain.PipelineRenderingCreateInfo = rendering_info;
     init_info.Allocator = nullptr;
     init_info.CheckVkResultFn = nullptr;
 
-    if (!ImGui_ImplVulkan_Init(&init_info, VK_NULL_HANDLE)) {
+    if (!ImGui_ImplVulkan_Init(&init_info)) {
         return false;
     }
-
-    auto cmd = ctx_->begin_single_commands();
-    ImGui_ImplVulkan_CreateFontsTexture(*cmd);
-    ctx_->end_single_commands(std::move(cmd));
-    ImGui_ImplVulkan_DestroyFontUploadObjects();
 
     initialized_ = true;
     return true;

@@ -7,6 +7,3 @@
 [submodule "plugin/vulender"]
 	path = plugin/vulender
 	url = git@github.com:joeyskeys/vulender.git
-[submodule "thirdparty/imgui"]
-	path = thirdparty/imgui
-	url = git@github.com:joeyskeys/imgui.git

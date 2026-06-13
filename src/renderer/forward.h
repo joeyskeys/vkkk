@@ -69,13 +69,10 @@ public:
 
     const char* type_name() const override { return "Forward"; }
 
-    // Legacy interface entry; old wrapper path is disabled.
-    bool initialize(VkWrappedInstance* instance) override;
-    bool initialize(Context* context);
+    bool initialize(Context* context) override;
     void shutdown() override;
 
     void set_scene(Scene* scene) override;
-    void set_camera(Camera* camera) { camera_ = camera; }
 
     void set_overlay_draw(std::function<void(vk::CommandBuffer)> draw) {
         overlay_draw_ = std::move(draw);
@@ -124,7 +121,6 @@ private:
 private:
     Context* ctx_ = nullptr;
     Scene* scene_ = nullptr;
-    Camera* camera_ = nullptr;
     std::vector<ForwardDrawItem> draw_items_;
     std::vector<std::string> missing_shaders_;
 

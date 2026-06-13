@@ -9,7 +9,8 @@ namespace vkkk
 {
 
 class Scene;
-class VkWrappedInstance;
+class Camera;
+class Context;
 
 struct RenderView {
     uint32_t swapchain_image_idx = 0;
@@ -23,11 +24,14 @@ public:
     virtual const char* type_name() const = 0;
 
     // Bind renderer lifetime to an already initialized Vulkan instance.
-    virtual bool initialize(VkWrappedInstance* instance) = 0;
+    virtual bool initialize(Context* context) = 0;
     virtual void shutdown() = 0;
 
     // Scene data to be consumed by concrete renderer implementation.
     virtual void set_scene(Scene* scene) = 0;
+
+    // Camera data to be consumed by concrete renderer implementation.
+    virtual void set_camera(Camera* c) { camera = c; }
 
     // Called once per frame before command buffer submission.
     virtual void update(const RenderView& view) = 0;
@@ -37,6 +41,9 @@ public:
 
     // Called when swapchain extent or render targets change.
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
+
+public:
+    Camera* camera = nullptr;
 };
 
 } // namespace vkkk

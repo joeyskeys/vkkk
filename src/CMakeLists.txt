@@ -99,6 +99,12 @@ target_link_libraries(vkcornellpluspp
         vkkk
         OpenImageIO::OpenImageIO)
 
+add_executable(vkrendererforwardplus renderer_main_forwardplus.cpp)
+target_link_libraries(vkrendererforwardplus
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
 #add_executable(vkrenderer renderer_main.cpp)
 #target_link_libraries(vkrenderer
     #PRIVATE

@@ -101,12 +101,6 @@ bool ForwardRenderer::create_shader_pipeline(const char* pipeline_name,
     return ctx_->create_pipeline(pipeline_name, pack, option, components);
 }
 
-bool ForwardRenderer::initialize(VkWrappedInstance* instance) {
-    (void)instance;
-    // Legacy wrapper path is intentionally disabled in this renderer implementation.
-    return false;
-}
-
 bool ForwardRenderer::initialize(Context* context) {
     ctx_ = context;
     if (!ctx_) {
@@ -130,7 +124,7 @@ void ForwardRenderer::shutdown() {
     draw_items_.clear();
     ctx_ = nullptr;
     scene_ = nullptr;
-    camera_ = nullptr;
+    camera = nullptr;
     post_pipeline_ready_ = false;
 }
 
@@ -239,10 +233,10 @@ bool ForwardRenderer::create_pass_pipelines() {
 }
 
 void ForwardRenderer::update_camera_aspect() {
-    if (!camera_ || height_ == 0) {
+    if (!camera || height_ == 0) {
         return;
     }
-    camera_->ratio = width_ / static_cast<float>(height_);
+    camera->ratio = width_ / static_cast<float>(height_);
 }
 
 void ForwardRenderer::update_lights_from_scene() {
@@ -257,8 +251,8 @@ void ForwardRenderer::update_lights_from_scene() {
         }
     }
 
-    light_ubo_.viewPos = camera_
-        ? glm::vec4(camera_->pos, 1.0f)
+    light_ubo_.viewPos = camera
+        ? glm::vec4(camera->pos, 1.0f)
         : glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
     // shadow_params_ubo_.lightSpace = glm::mat4(1.0f);
 }
@@ -268,14 +262,14 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
         return;
     }
 
-    if (!camera_) {
+    if (!camera) {
         return;
     }
 
     PhongTransformUBO camera_transform{};
     camera_transform.model = glm::mat4(1.0f);
-    camera_transform.view = camera_->get_view_mat();
-    camera_transform.proj = camera_->get_proj_mat();
+    camera_transform.view = camera->get_view_mat();
+    camera_transform.proj = camera->get_proj_mat();
 
     auto sync_global_ubo = [&](const char* pipeline_name, const char* suffix,
                                const void* data, size_t size) {
@@ -301,14 +295,14 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
 void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     const ForwardDrawItem& item, const std::string& pipeline_name)
 {
-    if (!ctx_ || !camera_ || pipeline_name.empty()) {
+    if (!ctx_ || !camera || pipeline_name.empty()) {
         return;
     }
 
     PhongTransformUBO transform_ubo{};
     transform_ubo.model = item.model;
-    transform_ubo.view = camera_->get_view_mat();
-    transform_ubo.proj = camera_->get_proj_mat();
+    transform_ubo.view = camera->get_view_mat();
+    transform_ubo.proj = camera->get_proj_mat();
 
     auto sync_if_present = [&](const std::string& ubo_suffix, const void* data, size_t size) {
         const auto ubo_name = pipeline_name + ubo_suffix;
@@ -393,7 +387,7 @@ void ForwardRenderer::pass_transparent(vk::CommandBuffer cmd, const RenderView& 
         }
     }
 
-    if (!camera_ || transparent_items.empty()) {
+    if (!camera || transparent_items.empty()) {
         draw_batch(cmd, view, transparent_items, kTransparentPipeline);
         return;
     }
@@ -402,8 +396,8 @@ void ForwardRenderer::pass_transparent(vk::CommandBuffer cmd, const RenderView& 
         [this](const ForwardDrawItem* a, const ForwardDrawItem* b) {
             const glm::vec3 a_center = glm::vec3(a->model * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
             const glm::vec3 b_center = glm::vec3(b->model * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
-            const glm::vec3 to_a = a_center - camera_->pos;
-            const glm::vec3 to_b = b_center - camera_->pos;
+            const glm::vec3 to_a = a_center - camera->pos;
+            const glm::vec3 to_b = b_center - camera->pos;
             return glm::dot(to_a, to_a) > glm::dot(to_b, to_b);
         });
 

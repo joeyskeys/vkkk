@@ -68,6 +68,8 @@ bool ImGuiHud::init(Context* ctx) {
     init_info.MSAASamples = static_cast<VkSampleCountFlagBits>(ctx_->nsample);
     init_info.UseDynamicRendering = true;
     init_info.ColorAttachmentFormat = ctx_->get_swapchain_format();
+    init_info.DepthAttachmentFormat = ctx_->get_depth_format();
+    init_info.StencilAttachmentFormat = ctx_->get_depth_format();
     init_info.Allocator = nullptr;
     init_info.CheckVkResultFn = nullptr;
 

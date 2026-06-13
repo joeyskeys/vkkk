@@ -166,7 +166,7 @@ void ForwardRenderer::on_resize(uint32_t width, uint32_t height) {
 
 PipelineOption ForwardRenderer::make_base_pipeline_option() const {
     PipelineOption option;
-    option.setup_multisampling(true, ctx->nsample);
+    option.setup_multisampling(ctx->sample_rate_shading_enabled, ctx->nsample);
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(true, true, vk::CompareOp::eLess, false, false);
@@ -190,7 +190,7 @@ PipelineOption ForwardRenderer::make_transparent_pipeline_option() const {
 
 PipelineOption ForwardRenderer::make_post_pipeline_option() const {
     PipelineOption option;
-    option.setup_multisampling(true, ctx->nsample);
+    option.setup_multisampling(ctx->sample_rate_shading_enabled, ctx->nsample);
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(false, false, vk::CompareOp::eAlways, false, false);

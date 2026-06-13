@@ -221,6 +221,7 @@ public:
     uint32_t get_graphic_queue_family_index() const { return queue_idx; }
     uint32_t get_swapchain_count() const { return static_cast<uint32_t>(swapchain_images.size()); }
     VkFormat get_swapchain_format() const { return static_cast<VkFormat>(swapchain_surface_format.format); }
+    VkFormat get_depth_format() const { return static_cast<VkFormat>(find_depth_format()); }
     vk::raii::CommandBuffer begin_single_commands() const;
     void end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const;
 
@@ -258,7 +259,7 @@ private:
 
     vk::Format find_supported_format(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
     inline vk::Format find_depth_format() const {
-        return find_supported_format({vk::Format::eD32Sfloat, vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint}, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+        return find_supported_format({vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD32Sfloat}, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
     }
 
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size,
@@ -344,6 +345,7 @@ public:
     std::unordered_map<std::string, MeshGPU> meshes;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
+    bool sample_rate_shading_enabled = false;
 
     std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, Texture> textures;

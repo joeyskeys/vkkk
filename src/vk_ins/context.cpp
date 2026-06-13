@@ -161,8 +161,14 @@ vk::Format Context::find_supported_format(const std::vector<vk::Format>& candida
 
 void Context::create_depth_resources() {
     vk::Format depth_format = find_depth_format();
+    const bool has_stencil = depth_format == vk::Format::eD32SfloatS8Uint
+        || depth_format == vk::Format::eD24UnormS8Uint;
+    vk::ImageAspectFlags depth_aspect = vk::ImageAspectFlagBits::eDepth;
+    if (has_stencil) {
+        depth_aspect |= vk::ImageAspectFlagBits::eStencil;
+    }
     std::tie(depth_image, depth_memo) = create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, vk::SampleCountFlagBits::e1, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
-    depth_view = create_vk_imageview(depth_image, depth_format, 1, vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
+    depth_view = create_vk_imageview(depth_image, depth_format, 1, depth_aspect);
 }
 
 void Context::create_swapchain() {
@@ -363,8 +369,13 @@ void Context::init(GLFWwindow* win,
         throw std::runtime_error("no suitable queue family found");
     }
 
+    const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
+    sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
+
     vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> device_features;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy = VK_TRUE;
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading =
+        sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;
@@ -576,7 +587,9 @@ bool Context::create_pipeline(const std::string& name,
     rendering_create_info.colorAttachmentCount = 1;
     rendering_create_info.pColorAttachmentFormats = &swapchain_surface_format.format;
     rendering_create_info.depthAttachmentFormat = depth_format;
+    rendering_create_info.stencilAttachmentFormat = depth_format;
     vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
+    graphics_pipeline_create_info.pNext = &rendering_create_info;
     graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());
     graphics_pipeline_create_info.pStages = shader_stage_infos.data();
     graphics_pipeline_create_info.pVertexInputState = &local_option.vert_info;
@@ -589,11 +602,13 @@ bool Context::create_pipeline(const std::string& name,
     graphics_pipeline_create_info.pDynamicState = &local_option.dynamic_info;
     graphics_pipeline_create_info.layout = *pipeline_layout;
     graphics_pipeline_create_info.renderPass = nullptr;
-    vk::StructureChain<vk::GraphicsPipelineCreateInfo, vk::PipelineRenderingCreateInfo> pipeline_create_info{
-        graphics_pipeline_create_info,
-        rendering_create_info
-    };
-    vk::raii::Pipeline vk_pipeline(device, nullptr, pipeline_create_info.get<vk::GraphicsPipelineCreateInfo>());
+    graphics_pipeline_create_info.subpass = 0;
+    vk::raii::Pipelines vk_pipelines(device, nullptr, {graphics_pipeline_create_info});
+    if (vk_pipelines.empty()) {
+        std::cout << "Pipeline " << name << " creation failed" << std::endl;
+        return false;
+    }
+    vk::raii::Pipeline vk_pipeline = std::move(vk_pipelines.front());
 
     Pipeline pipeline;
     pipeline.vk_pipeline = std::move(vk_pipeline);
@@ -631,6 +646,7 @@ bool Context::create_pipeline(const std::string& name,
 
     if (!pool_sizes.empty()) {
         vk::DescriptorPoolCreateInfo descriptor_pool_info{};
+        descriptor_pool_info.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
         descriptor_pool_info.maxSets = swapchain_cnt;
         descriptor_pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
         descriptor_pool_info.pPoolSizes = pool_sizes.data();
@@ -719,7 +735,7 @@ void Context::record_cmds(uint32_t image_index,
         vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
         vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
         vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::ImageAspectFlagBits::eDepth);
+        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
 
     vk::ClearValue clear_value = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
     vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);

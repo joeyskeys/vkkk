@@ -22,6 +22,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include "concepts/mesh.h"
+#include "vk_ins/compute_shader.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 #include "vk_ins/types.h"
 
@@ -48,6 +49,14 @@ constexpr uint32_t max_frames_in_flight = 2;
 class Camera;
 
 struct Pipeline {
+    vk::raii::Pipeline vk_pipeline{nullptr};
+    vk::raii::PipelineLayout vk_pipeline_layout{nullptr};
+    vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
+    vk::raii::DescriptorPool descriptor_pool{nullptr};
+    std::vector<vk::raii::DescriptorSet> descriptor_sets;
+};
+
+struct ComputePipeline {
     vk::raii::Pipeline vk_pipeline{nullptr};
     vk::raii::PipelineLayout vk_pipeline_layout{nullptr};
     vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
@@ -183,6 +192,10 @@ public:
         const PipelineOption& option,
         const std::vector<VERT_COMP>& comps,
         bool interleaved = true);
+    bool create_compute_pipeline(const std::string& name, const ComputeShader& shader);
+    bool load_compute_pipeline(const std::string& name, const fs::path& path);
+    void dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y = 1,
+        uint32_t group_z = 1, uint32_t descriptor_set_index = 0);
     void draw_frame();
     void wait_idle() const { device.waitIdle(); }
     void recreate_swapchain();
@@ -218,7 +231,9 @@ public:
     VkPhysicalDevice get_vk_physical_device() const { return static_cast<VkPhysicalDevice>(*physical_device); }
     VkDevice get_vk_device() const { return static_cast<VkDevice>(*device); }
     VkQueue get_vk_queue() const { return static_cast<VkQueue>(*queue); }
+    VkQueue get_vk_compute_queue() const { return static_cast<VkQueue>(*compute_queue); }
     uint32_t get_graphic_queue_family_index() const { return queue_idx; }
+    uint32_t get_compute_queue_family_index() const { return compute_queue_idx; }
     uint32_t get_swapchain_count() const { return static_cast<uint32_t>(swapchain_images.size()); }
     VkFormat get_swapchain_format() const { return static_cast<VkFormat>(swapchain_surface_format.format); }
     VkFormat get_depth_format() const { return static_cast<VkFormat>(find_depth_format()); }
@@ -243,6 +258,9 @@ private:
     static vk::Extent2D choose_swap_extent(
         const vk::SurfaceCapabilitiesKHR& surface_capabilities,
         GLFWwindow* window);
+    uint32_t find_graphics_queue_family_index() const;
+    uint32_t find_compute_queue_family_index(uint32_t preferred_graphics_index) const;
+    static vk::DescriptorType to_vk_descriptor_type(ComputeDescriptorKind kind);
     void transit_presentation_image_layout(
         vk::raii::CommandBuffer& cmd_buf,
         vk::Image img,
@@ -268,6 +286,8 @@ private:
 
     void copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const;
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
+    vk::raii::CommandBuffer begin_single_commands(const vk::raii::CommandPool& pool) const;
+    void end_single_commands(vk::raii::CommandBuffer&& cmd_buf, const vk::raii::Queue& submit_queue) const;
 
     template <vk::BufferUsageFlagBits buf_type>
     void create_input_attr_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
@@ -315,7 +335,9 @@ private:
     vk::raii::PhysicalDevice physical_device = nullptr;
     vk::raii::Device device = nullptr;
     vk::raii::Queue queue = nullptr;
+    vk::raii::Queue compute_queue = nullptr;
     uint32_t queue_idx = ~0;
+    uint32_t compute_queue_idx = ~0;
 
     vk::raii::SwapchainKHR swapchain = nullptr;
     std::vector<vk::Image> swapchain_images;
@@ -328,6 +350,7 @@ private:
     vk::raii::ImageView depth_view = nullptr;
 
     vk::raii::CommandPool command_pool = nullptr;
+    vk::raii::CommandPool compute_command_pool = nullptr;
 
     std::vector<vk::raii::Semaphore> image_available_semaphores;
     std::vector<vk::raii::Semaphore> render_finished_semaphores;
@@ -342,6 +365,7 @@ private:
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
+    std::unordered_map<std::string, ComputePipeline> compute_pipelines;
     std::unordered_map<std::string, MeshGPU> meshes;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;

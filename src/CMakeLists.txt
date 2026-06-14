@@ -19,6 +19,7 @@ set(HEADERS
     utils/singleton.h
     vk_ins/cmd_buf.h
     vk_ins/misc.h
+    vk_ins/compute_shader.hpp
     #vk_ins/vkabstraction.h
     #vk_ins/shader_mgr.h
     vk_ins/shader_module_pack.hpp
@@ -43,6 +44,7 @@ set(SRCS
     renderer/forward_plus.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
+    vk_ins/compute_shader.cpp
     #vk_ins/vkabstraction.cpp
     #vk_ins/shader_mgr.cpp
     vk_ins/shader_module_pack.cpp

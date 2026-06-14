@@ -9,6 +9,7 @@
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/scene.h"
 #include "concepts/camera.h"
+#include "vk_ins/compute_shader.hpp"
 
 namespace vkkk
 {
@@ -24,6 +25,14 @@ constexpr std::array<const char*, 4> kShaderSearchRoots = {
     "../../resource/shaders/forward/",
     "../../../resource/shaders/forward/",
 };
+
+constexpr const char* kLightClusterComputePipeline = "forward_plus_light_clusters";
+constexpr const char* kLightClusterComputeShader = R"(
+#version 450
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+void main() {
+}
+)";
 
 } // namespace
 
@@ -266,8 +275,23 @@ void ForwardPlusRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
 }
 
 void ForwardPlusRenderer::prepare_light_clusters(const RenderView& view) {
-    (void)view;
-    // TODO(forward-plus): build cluster grid and cull lights in compute pass.
+    if (!ctx) {
+        return;
+    }
+
+    if (ctx->compute_pipelines.find(kLightClusterComputePipeline) == ctx->compute_pipelines.end()) {
+        ComputeShader cluster_shader;
+        if (!cluster_shader.load(kLightClusterComputeShader, "forward_plus_light_clusters.comp")) {
+            return;
+        }
+        if (!ctx->create_compute_pipeline(kLightClusterComputePipeline, cluster_shader)) {
+            return;
+        }
+    }
+
+    const uint32_t dispatch_x = std::max(1u, (width + 15u) / 16u);
+    const uint32_t dispatch_y = std::max(1u, (height + 15u) / 16u);
+    ctx->dispatch_compute(kLightClusterComputePipeline, dispatch_x, dispatch_y, 1u, view.swapchain_image_idx);
 }
 
 void ForwardPlusRenderer::pass_shadow_placeholder(vk::CommandBuffer cmd, const RenderView& view) {

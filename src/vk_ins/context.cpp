@@ -104,6 +104,51 @@ Context::Context(bool enable_debug_m)
     : enable_debug_messenger(enable_debug_m)
 {}
 
+uint32_t Context::find_graphics_queue_family_index() const {
+    const auto queue_family_properties = physical_device.getQueueFamilyProperties();
+    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
+        if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics)
+            && physical_device.getSurfaceSupportKHR(i, *surface))
+        {
+            return i;
+        }
+    }
+    return ~0u;
+}
+
+uint32_t Context::find_compute_queue_family_index(uint32_t preferred_graphics_index) const {
+    const auto queue_family_properties = physical_device.getQueueFamilyProperties();
+    // Prefer a dedicated compute queue family when available.
+    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
+        const bool supports_compute = (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) == vk::QueueFlagBits::eCompute;
+        const bool supports_graphics = (queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) == vk::QueueFlagBits::eGraphics;
+        if (supports_compute && !supports_graphics) {
+            return i;
+        }
+    }
+    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
+        if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eCompute) == vk::QueueFlagBits::eCompute) {
+            return i;
+        }
+    }
+    return preferred_graphics_index;
+}
+
+vk::DescriptorType Context::to_vk_descriptor_type(ComputeDescriptorKind kind) {
+    switch (kind) {
+        case ComputeDescriptorKind::UniformBuffer:
+            return vk::DescriptorType::eUniformBuffer;
+        case ComputeDescriptorKind::StorageBuffer:
+            return vk::DescriptorType::eStorageBuffer;
+        case ComputeDescriptorKind::CombinedImageSampler:
+            return vk::DescriptorType::eCombinedImageSampler;
+        case ComputeDescriptorKind::StorageImage:
+            return vk::DescriptorType::eStorageImage;
+        default:
+            throw std::runtime_error("unsupported compute descriptor kind");
+    }
+}
+
 void Context::setup_debug_messenger() {
     vk::DebugUtilsMessageSeverityFlagsEXT severity_flags(vk::DebugUtilsMessageSeverityFlagBitsEXT::eWarning |
                                                           vk::DebugUtilsMessageSeverityFlagBitsEXT::eError);
@@ -236,9 +281,9 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Context::create_buffer(vk::D
     return std::make_pair(std::move(buffer), std::move(memo));
 }
 
-vk::raii::CommandBuffer Context::begin_single_commands() const {
+vk::raii::CommandBuffer Context::begin_single_commands(const vk::raii::CommandPool& pool) const {
     vk::CommandBufferAllocateInfo alloc_info{};
-    alloc_info.commandPool = *command_pool;
+    alloc_info.commandPool = *pool;
     alloc_info.level = vk::CommandBufferLevel::ePrimary;
     alloc_info.commandBufferCount = 1;
     vk::raii::CommandBuffers command_buffers(device, alloc_info);
@@ -250,14 +295,22 @@ vk::raii::CommandBuffer Context::begin_single_commands() const {
     return std::move(command_buffer);
 }
 
-void Context::end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const {
+vk::raii::CommandBuffer Context::begin_single_commands() const {
+    return begin_single_commands(command_pool);
+}
+
+void Context::end_single_commands(vk::raii::CommandBuffer&& cmd_buf, const vk::raii::Queue& submit_queue) const {
     cmd_buf.end();
     vk::CommandBuffer raw_cmd = *cmd_buf;
     vk::SubmitInfo submit_info{};
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &raw_cmd;
-    queue.submit(submit_info, nullptr);
-    queue.waitIdle();
+    submit_queue.submit(submit_info, nullptr);
+    submit_queue.waitIdle();
+}
+
+void Context::end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const {
+    end_single_commands(std::move(cmd_buf), queue);
 }
 
 void Context::copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const {
@@ -358,16 +411,11 @@ void Context::init(GLFWwindow* win,
     }
     physical_device = *dev_iter;
 
-    const std::vector<vk::QueueFamilyProperties> queue_family_properties = physical_device.getQueueFamilyProperties();
-    for (uint32_t i = 0; i < queue_family_properties.size(); ++i) {
-        if ((queue_family_properties[i].queueFlags & vk::QueueFlagBits::eGraphics) && physical_device.getSurfaceSupportKHR(i, *surface)) {
-            queue_idx = i;
-            break;
-        }
-    }
+    queue_idx = find_graphics_queue_family_index();
     if (queue_idx == ~0u) {
-        throw std::runtime_error("no suitable queue family found");
+        throw std::runtime_error("no suitable graphics queue family found");
     }
+    compute_queue_idx = find_compute_queue_family_index(queue_idx);
 
     const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
@@ -381,18 +429,27 @@ void Context::init(GLFWwindow* win,
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;
 
     float queue_priority = 0.5f;
-    vk::DeviceQueueCreateInfo queue_create_info{};
-    queue_create_info.queueFamilyIndex = queue_idx;
-    queue_create_info.queueCount = 1;
-    queue_create_info.pQueuePriorities = &queue_priority;
+    std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
+    queue_create_infos.reserve(queue_idx == compute_queue_idx ? 1 : 2);
+    queue_create_infos.push_back(vk::DeviceQueueCreateInfo{}
+        .setQueueFamilyIndex(queue_idx)
+        .setQueueCount(1)
+        .setPQueuePriorities(&queue_priority));
+    if (compute_queue_idx != queue_idx) {
+        queue_create_infos.push_back(vk::DeviceQueueCreateInfo{}
+            .setQueueFamilyIndex(compute_queue_idx)
+            .setQueueCount(1)
+            .setPQueuePriorities(&queue_priority));
+    }
     vk::DeviceCreateInfo device_create_info{};
     device_create_info.pNext = &device_features.get<vk::PhysicalDeviceFeatures2>();
-    device_create_info.queueCreateInfoCount = 1;
-    device_create_info.pQueueCreateInfos = &queue_create_info;
+    device_create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
+    device_create_info.pQueueCreateInfos = queue_create_infos.data();
     device_create_info.enabledExtensionCount = static_cast<uint32_t>(required_extensions.size());
     device_create_info.ppEnabledExtensionNames = required_extensions.data();
     device = vk::raii::Device(physical_device, device_create_info);
     queue = vk::raii::Queue(device, queue_idx, 0);
+    compute_queue = vk::raii::Queue(device, compute_queue_idx, 0);
 
     create_swapchain();
     create_imageviews();
@@ -406,6 +463,10 @@ void Context::init(GLFWwindow* win,
     command_pool_create_info.queueFamilyIndex = queue_idx;
     command_pool_create_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
     command_pool = vk::raii::CommandPool(device, command_pool_create_info);
+    vk::CommandPoolCreateInfo compute_command_pool_create_info{};
+    compute_command_pool_create_info.queueFamilyIndex = compute_queue_idx;
+    compute_command_pool_create_info.flags = vk::CommandPoolCreateFlagBits::eResetCommandBuffer;
+    compute_command_pool = vk::raii::CommandPool(device, compute_command_pool_create_info);
 
     // create the depth resources
     create_depth_resources();
@@ -706,6 +767,199 @@ bool Context::create_pipeline(const std::string& name,
 
     pipelines.emplace(name, std::move(pipeline));
     return true;
+}
+
+bool Context::load_compute_pipeline(const std::string& name, const fs::path& path) {
+    ComputeShader shader;
+    if (!shader.load(path)) {
+        return false;
+    }
+    return create_compute_pipeline(name, shader);
+}
+
+bool Context::create_compute_pipeline(const std::string& name, const ComputeShader& shader) {
+    if (compute_pipelines.find(name) != compute_pipelines.end()) {
+        std::cout << "Compute pipeline " << name << " already exists" << std::endl;
+        return false;
+    }
+    if (shader.spirv_code.empty()) {
+        std::cout << "Compute shader for " << name << " is empty" << std::endl;
+        return false;
+    }
+
+    std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
+    descriptor_layouts.reserve(shader.bindings.size());
+    std::map<uint32_t, std::string> ubo_binding_to_name;
+    std::map<uint32_t, std::string> tex_binding_to_name;
+
+    for (const auto& binding : shader.bindings) {
+        if (binding.kind == ComputeDescriptorKind::StorageBuffer
+            || binding.kind == ComputeDescriptorKind::StorageImage)
+        {
+            std::cout << "Compute descriptor kind for binding " << binding.name
+                << " is not yet wired in Context resource manager" << std::endl;
+            return false;
+        }
+
+        if (binding.kind == ComputeDescriptorKind::UniformBuffer) {
+            const auto ubo_name = name + ":" + binding.name;
+            const uint32_t struct_size = binding.struct_size == 0 ? 16u : binding.struct_size;
+            add_ubo(ubo_name, binding.binding, struct_size, binding.descriptor_count);
+            ubo_binding_to_name[binding.binding] = ubo_name;
+        }
+        else if (binding.kind == ComputeDescriptorKind::CombinedImageSampler) {
+            const auto tex_name = name + ":" + binding.name;
+            tex_binding_to_name[binding.binding] = tex_name;
+        }
+
+        vk::DescriptorSetLayoutBinding layout_binding{};
+        layout_binding.binding = binding.binding;
+        layout_binding.descriptorType = to_vk_descriptor_type(binding.kind);
+        layout_binding.descriptorCount = binding.descriptor_count;
+        layout_binding.stageFlags = vk::ShaderStageFlagBits::eCompute;
+        descriptor_layouts.push_back(layout_binding);
+    }
+
+    vk::raii::ShaderModule shader_module{nullptr};
+    {
+        vk::ShaderModuleCreateInfo shader_module_create_info{};
+        shader_module_create_info.codeSize = shader.spirv_code.size() * sizeof(uint32_t);
+        shader_module_create_info.pCode = shader.spirv_code.data();
+        shader_module = vk::raii::ShaderModule(device, shader_module_create_info);
+    }
+
+    vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
+    if (!descriptor_layouts.empty()) {
+        vk::DescriptorSetLayoutCreateInfo descriptor_set_layout_info{};
+        descriptor_set_layout_info.bindingCount = static_cast<uint32_t>(descriptor_layouts.size());
+        descriptor_set_layout_info.pBindings = descriptor_layouts.data();
+        descriptor_set_layout = vk::raii::DescriptorSetLayout(device, descriptor_set_layout_info);
+    }
+
+    vk::DescriptorSetLayout set_layout_handle = descriptor_set_layout != nullptr
+        ? static_cast<vk::DescriptorSetLayout>(*descriptor_set_layout)
+        : nullptr;
+    vk::PipelineLayoutCreateInfo pipeline_layout_info{};
+    pipeline_layout_info.setLayoutCount = descriptor_set_layout != nullptr ? 1u : 0u;
+    pipeline_layout_info.pSetLayouts = descriptor_set_layout != nullptr ? &set_layout_handle : nullptr;
+    vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
+
+    vk::PipelineShaderStageCreateInfo shader_stage_info{};
+    shader_stage_info.stage = vk::ShaderStageFlagBits::eCompute;
+    shader_stage_info.module = *shader_module;
+    shader_stage_info.pName = "main";
+
+    vk::ComputePipelineCreateInfo compute_pipeline_create_info{};
+    compute_pipeline_create_info.stage = shader_stage_info;
+    compute_pipeline_create_info.layout = *pipeline_layout;
+    vk::raii::Pipeline compute_pipeline(device, nullptr, compute_pipeline_create_info);
+
+    ComputePipeline pipeline{};
+    pipeline.vk_pipeline = std::move(compute_pipeline);
+    pipeline.vk_pipeline_layout = std::move(pipeline_layout);
+    pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
+
+    const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
+    std::unordered_map<vk::DescriptorType, uint32_t> descriptor_type_counts;
+    for (const auto& binding : shader.bindings) {
+        const auto descriptor_type = to_vk_descriptor_type(binding.kind);
+        descriptor_type_counts[descriptor_type] += binding.descriptor_count * swapchain_cnt;
+    }
+    std::vector<vk::DescriptorPoolSize> pool_sizes;
+    pool_sizes.reserve(descriptor_type_counts.size());
+    for (const auto& [descriptor_type, descriptor_count] : descriptor_type_counts) {
+        vk::DescriptorPoolSize pool_size{};
+        pool_size.type = descriptor_type;
+        pool_size.descriptorCount = descriptor_count;
+        pool_sizes.push_back(pool_size);
+    }
+
+    if (!pool_sizes.empty()) {
+        vk::DescriptorPoolCreateInfo descriptor_pool_info{};
+        descriptor_pool_info.flags = vk::DescriptorPoolCreateFlagBits::eFreeDescriptorSet;
+        descriptor_pool_info.maxSets = swapchain_cnt;
+        descriptor_pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
+        descriptor_pool_info.pPoolSizes = pool_sizes.data();
+        pipeline.descriptor_pool = vk::raii::DescriptorPool(device, descriptor_pool_info);
+
+        std::vector<vk::DescriptorSetLayout> set_layouts(swapchain_cnt, *pipeline.descriptor_set_layout);
+        vk::DescriptorSetAllocateInfo descriptor_set_alloc_info{};
+        descriptor_set_alloc_info.descriptorPool = *pipeline.descriptor_pool;
+        descriptor_set_alloc_info.descriptorSetCount = swapchain_cnt;
+        descriptor_set_alloc_info.pSetLayouts = set_layouts.data();
+        pipeline.descriptor_sets = vk::raii::DescriptorSets(device, descriptor_set_alloc_info);
+
+        for (uint32_t i = 0; i < swapchain_cnt; ++i) {
+            std::vector<vk::DescriptorBufferInfo> buffer_infos;
+            std::vector<vk::DescriptorImageInfo> image_infos;
+            std::vector<vk::WriteDescriptorSet> writes;
+            buffer_infos.reserve(ubo_binding_to_name.size());
+            image_infos.reserve(tex_binding_to_name.size());
+            writes.reserve(ubo_binding_to_name.size() + tex_binding_to_name.size());
+
+            for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+                auto& ubo = require_ubo(ubo_name);
+                vk::DescriptorBufferInfo buffer_info{};
+                buffer_info.buffer = *ubo.gpu_bufs[i];
+                buffer_info.offset = 0;
+                buffer_info.range = ubo.size * ubo.vecsize;
+                buffer_infos.push_back(buffer_info);
+
+                vk::WriteDescriptorSet write{};
+                write.dstSet = *pipeline.descriptor_sets[i];
+                write.dstBinding = binding;
+                write.descriptorCount = 1;
+                write.descriptorType = vk::DescriptorType::eUniformBuffer;
+                write.pBufferInfo = &buffer_infos.back();
+                writes.push_back(write);
+            }
+
+            for (const auto& [binding, tex_name] : tex_binding_to_name) {
+                const auto tex_found = textures.find(tex_name);
+                if (tex_found == textures.end()) {
+                    std::cout << "Compute texture " << tex_name << " not found for pipeline " << name << std::endl;
+                    return false;
+                }
+                image_infos.push_back(tex_found->second.descriptor);
+
+                vk::WriteDescriptorSet write{};
+                write.dstSet = *pipeline.descriptor_sets[i];
+                write.dstBinding = binding;
+                write.descriptorCount = 1;
+                write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+                write.pImageInfo = &image_infos.back();
+                writes.push_back(write);
+            }
+
+            if (!writes.empty()) {
+                device.updateDescriptorSets(writes, {});
+            }
+        }
+    }
+
+    compute_pipelines.emplace(name, std::move(pipeline));
+    return true;
+}
+
+void Context::dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y,
+    uint32_t group_z, uint32_t descriptor_set_index)
+{
+    const auto found = compute_pipelines.find(pipeline_name);
+    if (found == compute_pipelines.end()) {
+        std::cout << "Compute pipeline " << pipeline_name << " not found" << std::endl;
+        return;
+    }
+
+    auto cmd = begin_single_commands(compute_command_pool);
+    cmd.bindPipeline(vk::PipelineBindPoint::eCompute, *found->second.vk_pipeline);
+    if (!found->second.descriptor_sets.empty()) {
+        const auto idx = std::min<uint32_t>(descriptor_set_index,
+            static_cast<uint32_t>(found->second.descriptor_sets.size() - 1));
+        vk::DescriptorSet desc_set = *found->second.descriptor_sets[idx];
+        cmd.bindDescriptorSets(vk::PipelineBindPoint::eCompute, *found->second.vk_pipeline_layout, 0, {desc_set}, {});
+    }
+    cmd.dispatch(group_x, group_y, group_z);
+    end_single_commands(std::move(cmd), compute_queue);
 }
 
 void Context::record_cmds(uint32_t image_index,

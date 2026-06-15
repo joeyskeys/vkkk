@@ -101,6 +101,20 @@ static bool shader_kind_from_stage(const vk::ShaderStageFlagBits t, shaderc_shad
             return true;
         }
 
+#ifdef shaderc_glsl_mesh_shader
+        case vk::ShaderStageFlagBits::eMeshEXT: {
+            out_kind = shaderc_glsl_mesh_shader;
+            return true;
+        }
+#endif
+
+#ifdef shaderc_glsl_task_shader
+        case vk::ShaderStageFlagBits::eTaskEXT: {
+            out_kind = shaderc_glsl_task_shader;
+            return true;
+        }
+#endif
+
         default: {
             return false;
         }
@@ -133,7 +147,7 @@ bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
     options.SetSourceLanguage(shaderc_source_language_glsl);
-    options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_0);
+    options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
     options.SetForcedVersionProfile(450, shaderc_profile_none);
 
     const std::string source_text(source_code.begin(), source_code.end());
@@ -180,11 +194,29 @@ bool ShaderModule::load(const fs::path& path, const vk::ShaderStageFlagBits t) {
 }
 
 bool ShaderModulePack::add_shader_module(const ShaderModule& module, bool replace) {
+    const bool is_vertex_stage = module.type == vk::ShaderStageFlagBits::eVertex;
+    const bool is_mesh_stage = module.type == vk::ShaderStageFlagBits::eMeshEXT
+        || module.type == vk::ShaderStageFlagBits::eTaskEXT;
+
+    if (is_mesh_stage && modules.contains(vk::ShaderStageFlagBits::eVertex)) {
+        std::cout << "Cannot mix mesh/task shader with vertex shader in one pipeline pack." << std::endl;
+        return false;
+    }
+    if (is_vertex_stage && (modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
+        || modules.contains(vk::ShaderStageFlagBits::eTaskEXT)))
+    {
+        std::cout << "Cannot mix vertex shader with mesh/task shader in one pipeline pack." << std::endl;
+        return false;
+    }
+
     if (modules.find(module.type) != modules.end() && !replace) {
         std::cout << "Shader module for stage " << static_cast<uint32_t>(module.type) << " already exists" << std::endl;
         return false;
     }
     modules[module.type] = module;
+    if (is_mesh_stage) {
+        use_mesh_shader = true;
+    }
     return true;
 }
 

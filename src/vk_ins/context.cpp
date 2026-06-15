@@ -402,9 +402,14 @@ void Context::init(GLFWwindow* win,
     }
     surface = vk::raii::SurfaceKHR(instance, raw_surface);
 
+    std::vector<const char*> required_device_extensions = required_extensions;
+    if (use_mesh_shader) {
+        required_device_extensions.push_back(vk::EXTMeshShaderExtensionName);
+    }
+
     std::vector<vk::raii::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
     auto const dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
-        return is_device_suitable(device, surface, required_extensions);
+        return is_device_suitable(device, surface, required_device_extensions);
     });
     if (dev_iter == devices.end()) {
         throw std::runtime_error("no suitable Vulkan 1.3 device with dynamic rendering support");
@@ -413,20 +418,26 @@ void Context::init(GLFWwindow* win,
 
     queue_idx = find_graphics_queue_family_index();
     if (queue_idx == ~0u) {
-        throw std::runtime_error("no suitable graphics queue family found");
+        throw std::runtime_error("no suitable queue family found");
     }
     compute_queue_idx = find_compute_queue_family_index(queue_idx);
 
     const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
 
-    vk::StructureChain<vk::PhysicalDeviceFeatures2, vk::PhysicalDeviceVulkan13Features, vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT> device_features;
+    vk::StructureChain<vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT,
+        vk::PhysicalDeviceMeshShaderFeaturesEXT> device_features;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy = VK_TRUE;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading =
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;
+    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader = use_mesh_shader ? vk::True : vk::False;
+    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().taskShader = vk::False;
+    mesh_shader_available = use_mesh_shader;
 
     float queue_priority = 0.5f;
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
@@ -528,6 +539,16 @@ bool Context::create_pipeline(const std::string& name,
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
     std::map<uint32_t, std::string> ubo_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
+    const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
+        || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
+        || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eTaskEXT);
+    bool has_vertex_stage = false;
+    bool has_task_stage = false;
+
+    if (pipeline_uses_mesh_shader && (!use_mesh_shader || !mesh_shader_available)) {
+        std::cout << "Pipeline " << name << " requested mesh shader, but mesh shader support is disabled." << std::endl;
+        return false;
+    }
 
     std::vector<vk::raii::ShaderModule> shader_modules;
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos;
@@ -546,7 +567,11 @@ bool Context::create_pipeline(const std::string& name,
         shader_stage_info.pName = "main";
         shader_stage_infos.push_back(shader_stage_info);
 
+        if (stage == vk::ShaderStageFlagBits::eTaskEXT) {
+            has_task_stage = true;
+        }
         if (stage == vk::ShaderStageFlagBits::eVertex) {
+            has_vertex_stage = true;
             input_binding_descs = gen_binding_desc(comps, interleaved);
 
             uint32_t offset = 0;
@@ -623,6 +648,19 @@ bool Context::create_pipeline(const std::string& name,
         }
     }
 
+    if (!pipeline_uses_mesh_shader && !has_vertex_stage) {
+        std::cout << "Pipeline " << name << " has no vertex stage." << std::endl;
+        return false;
+    }
+    if (pipeline_uses_mesh_shader && has_vertex_stage) {
+        std::cout << "Pipeline " << name << " mixes mesh/task and vertex shader stages." << std::endl;
+        return false;
+    }
+    if (has_task_stage) {
+        std::cout << "Pipeline " << name << " uses task shader, which is not enabled in Context yet." << std::endl;
+        return false;
+    }
+
     PipelineOption local_option = option;
     local_option.vert_info.vertexBindingDescriptionCount = static_cast<uint32_t>(input_binding_descs.size());
     local_option.vert_info.pVertexBindingDescriptions = input_binding_descs.data();
@@ -653,8 +691,8 @@ bool Context::create_pipeline(const std::string& name,
     graphics_pipeline_create_info.pNext = &rendering_create_info;
     graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());
     graphics_pipeline_create_info.pStages = shader_stage_infos.data();
-    graphics_pipeline_create_info.pVertexInputState = &local_option.vert_info;
-    graphics_pipeline_create_info.pInputAssemblyState = &local_option.assembly_info;
+    graphics_pipeline_create_info.pVertexInputState = pipeline_uses_mesh_shader ? nullptr : &local_option.vert_info;
+    graphics_pipeline_create_info.pInputAssemblyState = pipeline_uses_mesh_shader ? nullptr : &local_option.assembly_info;
     graphics_pipeline_create_info.pViewportState = &local_option.viewport_info;
     graphics_pipeline_create_info.pRasterizationState = &local_option.raster_info;
     graphics_pipeline_create_info.pMultisampleState = &local_option.multisample_info;

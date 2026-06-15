@@ -17,7 +17,9 @@ namespace built_in_shader
 enum class BuiltInShaderType : uint8_t {
     FixedColor = 0,
     Phong,
-    PBR
+    PBR,
+    FixedColorMS,
+    PhongMS
 };
 
 struct UniformDefaultValue {
@@ -46,6 +48,7 @@ public:
 private:
     struct ShaderSetSource {
         const char* vert;
+        const char* mesh;
         const char* frag;
     };
 

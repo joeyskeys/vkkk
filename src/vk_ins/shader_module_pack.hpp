@@ -53,8 +53,10 @@ public:
     ShaderModulePack() = default;
 
     bool add_shader_module(const ShaderModule& module, bool replace = false);
+    bool uses_mesh_shader() const { return use_mesh_shader; }
 
     std::unordered_map<vk::ShaderStageFlagBits, ShaderModule> modules;
+    bool use_mesh_shader = false;
 };
 
 } // namespace vkkk

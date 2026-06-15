@@ -32,6 +32,35 @@ void main() {
 }
 )";
 
+inline constexpr const char fixed_color_mesh[] = R"(
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 1) in;
+layout(triangles) out;
+layout(max_vertices = 3, max_primitives = 1) out;
+
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+void main() {
+    const vec3 positions[3] = vec3[](
+        vec3(-0.5, -0.5, 0.0),
+        vec3(0.5, -0.5, 0.0),
+        vec3(0.0, 0.5, 0.0)
+    );
+
+    SetMeshOutputsEXT(3, 1);
+    for (uint i = 0; i < 3; ++i) {
+        gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * ubo.model * vec4(positions[i], 1.0);
+    }
+    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+}
+)";
+
 inline constexpr const char fixed_color_frag[] = R"(
 #version 450
 

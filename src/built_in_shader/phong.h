@@ -51,6 +51,43 @@ void main() {
 }
 )";
 
+inline constexpr const char phong_mesh[] = R"(
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 1) in;
+layout(triangles) out;
+layout(max_vertices = 3, max_primitives = 1) out;
+
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 model;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+layout(location = 0) out vec3 fragPos[];
+layout(location = 1) out vec3 fragNormal[];
+
+void main() {
+    const vec3 positions[3] = vec3[](
+        vec3(-0.5, -0.5, 0.0),
+        vec3(0.5, -0.5, 0.0),
+        vec3(0.0, 0.5, 0.0)
+    );
+    const vec3 base_normal = vec3(0.0, 0.0, 1.0);
+    const mat3 normal_mat = mat3(transpose(inverse(ubo.model)));
+
+    SetMeshOutputsEXT(3, 1);
+    for (uint i = 0; i < 3; ++i) {
+        vec4 world_pos = ubo.model * vec4(positions[i], 1.0);
+        gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * world_pos;
+        fragPos[i] = world_pos.xyz;
+        fragNormal[i] = normal_mat * base_normal;
+    }
+    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+}
+)";
+
 inline constexpr const char phong_frag[] = R"(
 #version 450
 

@@ -243,6 +243,9 @@ public:
     using UpdateCallback = std::function<void(uint32_t image_index, float dt)>;
     void set_update_cbk(UpdateCallback cbk) { update_cbk_ = std::move(cbk); }
 
+    // Global runtime toggle: try to use mesh shaders for compatible pipelines.
+    // When true, Context enables VK_EXT_mesh_shader + required feature bits during init.
+    bool use_mesh_shader = true;
     vk::SampleCountFlagBits nsample = vk::SampleCountFlagBits::e1;
 
 private:
@@ -362,6 +365,7 @@ private:
     UpdateCallback update_cbk_;
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
     bool enable_debug_messenger = true;
+    bool mesh_shader_available = false;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;

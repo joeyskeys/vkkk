@@ -35,20 +35,25 @@ bool BuiltInShaderMgr::compile(BuiltInShaderType type) {
     }
 
     const auto shader_set = get_shader_set_source(type);
-    if (shader_set.vert == nullptr || shader_set.frag == nullptr) {
+    const bool has_mesh = shader_set.mesh != nullptr;
+    const bool has_vert = shader_set.vert != nullptr;
+    if ((!has_mesh && !has_vert) || shader_set.frag == nullptr) {
         return false;
     }
 
     ShaderModulePack pack;
-    ShaderModule vert;
+    ShaderModule stage0;
     ShaderModule frag;
-    if (!vert.load(shader_set.vert, vk::ShaderStageFlagBits::eVertex, "built_in_vert")) {
+    const auto stage0_type = has_mesh ? vk::ShaderStageFlagBits::eMeshEXT : vk::ShaderStageFlagBits::eVertex;
+    const char* stage0_src = has_mesh ? shader_set.mesh : shader_set.vert;
+    const char* stage0_name = has_mesh ? "built_in_mesh" : "built_in_vert";
+    if (!stage0.load(stage0_src, stage0_type, stage0_name)) {
         return false;
     }
     if (!frag.load(shader_set.frag, vk::ShaderStageFlagBits::eFragment, "built_in_frag")) {
         return false;
     }
-    if (!pack.add_shader_module(vert, true)) {
+    if (!pack.add_shader_module(stage0, true)) {
         return false;
     }
     if (!pack.add_shader_module(frag, true)) {
@@ -94,13 +99,15 @@ bool BuiltInShaderMgr::create_pipeline(const std::string& pipeline_name,
 std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInShaderType type) const {
     std::vector<UniformDefaultValue> defaults;
     switch (type) {
-        case BuiltInShaderType::FixedColor: {
+        case BuiltInShaderType::FixedColor:
+        case BuiltInShaderType::FixedColorMS: {
             defaults.push_back({"UniformBufferObject", to_bytes(FixedColorTransformUBO{})});
             defaults.push_back({"FixedColor", to_bytes(FixedColorUBO{})});
             break;
         }
 
-        case BuiltInShaderType::Phong: {
+        case BuiltInShaderType::Phong:
+        case BuiltInShaderType::PhongMS: {
             defaults.push_back({"UniformBufferObject", to_bytes(PhongTransformUBO{})});
             defaults.push_back({"PhongMaterial", to_bytes(PhongMaterialUBO{})});
             defaults.push_back({"PhongLight", to_bytes(PhongLightUBO{})});
@@ -152,6 +159,9 @@ std::vector<VERT_COMP> BuiltInShaderMgr::default_vertex_components(BuiltInShader
             return {VERTEX, NORMAL};
         case BuiltInShaderType::PBR:
             return {VERTEX, NORMAL};
+        case BuiltInShaderType::FixedColorMS:
+        case BuiltInShaderType::PhongMS:
+            return {};
     }
     return {};
 }
@@ -159,13 +169,17 @@ std::vector<VERT_COMP> BuiltInShaderMgr::default_vertex_components(BuiltInShader
 BuiltInShaderMgr::ShaderSetSource BuiltInShaderMgr::get_shader_set_source(BuiltInShaderType type) const {
     switch (type) {
         case BuiltInShaderType::FixedColor:
-            return {fixed_color_vert, fixed_color_frag};
+            return {fixed_color_vert, nullptr, fixed_color_frag};
         case BuiltInShaderType::Phong:
-            return {phong_vert, phong_frag};
+            return {phong_vert, nullptr, phong_frag};
         case BuiltInShaderType::PBR:
-            return {pbr_vert, pbr_frag};
+            return {pbr_vert, nullptr, pbr_frag};
+        case BuiltInShaderType::FixedColorMS:
+            return {nullptr, fixed_color_ms, fixed_color_frag};
+        case BuiltInShaderType::PhongMS:
+            return {nullptr, phong_ms, phong_frag};
     }
-    return {nullptr, nullptr};
+    return {nullptr, nullptr, nullptr};
 }
 
 bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,

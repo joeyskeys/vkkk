@@ -732,6 +732,7 @@ bool Context::create_pipeline(const std::string& name,
     pipeline.vk_pipeline = std::move(vk_pipeline);
     pipeline.vk_pipeline_layout = std::move(pipeline_layout);
     pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
+    pipeline.uses_mesh_shader = pipeline_uses_mesh_shader;
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     uint32_t uniform_desc_count = 0;
@@ -1023,6 +1024,19 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     }
 
     compute_pipelines.emplace(name, std::move(pipeline));
+    return true;
+}
+
+bool Context::draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y,
+    uint32_t group_z) const
+{
+    const auto draw_mesh_tasks = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(
+        device.getProcAddr("vkCmdDrawMeshTasksEXT"));
+    if (draw_mesh_tasks == nullptr) {
+        std::cout << "vkCmdDrawMeshTasksEXT is not available on this device" << std::endl;
+        return false;
+    }
+    draw_mesh_tasks(static_cast<VkCommandBuffer>(cmd), group_x, group_y, group_z);
     return true;
 }
 

@@ -36,42 +36,52 @@ void main() {
 
 } // namespace
 
-std::optional<fs::path> ForwardPlusRenderer::resolve_shader_path(const char* filename) {
+std::optional<fs::path> ForwardPlusRenderer::resolve_shader_path(const char* filename, bool track_missing) {
     for (const auto* root : kShaderSearchRoots) {
         const fs::path candidate = fs::path(root) / filename;
         if (fs::exists(candidate)) {
             return candidate;
         }
     }
-    if (std::find(missing_shaders_.begin(), missing_shaders_.end(), filename) == missing_shaders_.end()) {
+    if (track_missing && std::find(missing_shaders_.begin(), missing_shaders_.end(), filename) == missing_shaders_.end()) {
         missing_shaders_.push_back(filename);
     }
     return std::nullopt;
 }
 
-bool ForwardPlusRenderer::load_shader_pair(const char* vert_file, const char* frag_file,
+bool ForwardPlusRenderer::load_shader_pair(const char* vert_file, const char* frag_file, const char* mesh_file,
     ShaderModulePack& pack)
 {
-    const auto vert_path = resolve_shader_path(vert_file);
+    const auto mesh_path = resolve_shader_path(mesh_file, false);
+    const bool prefer_mesh = mesh_path.has_value();
+
+    const auto vert_path = prefer_mesh ? std::optional<fs::path>{} : resolve_shader_path(vert_file);
     const auto frag_path = resolve_shader_path(frag_file);
-    if (!vert_path || !frag_path) {
+    if ((!prefer_mesh && !vert_path) || !frag_path) {
         return false;
     }
 
-    ShaderModule vert;
+    ShaderModule stage0;
     ShaderModule frag;
-    if (!vert.load(*vert_path, vk::ShaderStageFlagBits::eVertex)) {
-        return false;
+    if (prefer_mesh) {
+        if (!stage0.load(*mesh_path, vk::ShaderStageFlagBits::eMeshEXT)) {
+            return false;
+        }
+    }
+    else {
+        if (!stage0.load(*vert_path, vk::ShaderStageFlagBits::eVertex)) {
+            return false;
+        }
     }
     if (!frag.load(*frag_path, vk::ShaderStageFlagBits::eFragment)) {
         return false;
     }
 
-    return pack.add_shader_module(vert, true) && pack.add_shader_module(frag, true);
+    return pack.add_shader_module(stage0, true) && pack.add_shader_module(frag, true);
 }
 
 bool ForwardPlusRenderer::create_shader_pipeline(const char* pipeline_name,
-    const char* vert_file, const char* frag_file,
+    const char* vert_file, const char* frag_file, const char* mesh_file,
     const std::vector<VERT_COMP>& components, PipelineOption& option)
 {
     if (!ctx) {
@@ -79,7 +89,7 @@ bool ForwardPlusRenderer::create_shader_pipeline(const char* pipeline_name,
     }
 
     ShaderModulePack pack;
-    if (!load_shader_pair(vert_file, frag_file, pack)) {
+    if (!load_shader_pair(vert_file, frag_file, mesh_file, pack)) {
         return false;
     }
     return ctx->create_pipeline(pipeline_name, pack, option, components);
@@ -132,10 +142,10 @@ bool ForwardPlusRenderer::ensure_draw_item_pipeline(const ForwardPlusDrawItem& i
         : make_base_pipeline_option();
     if (item.transparent) {
         return create_shader_pipeline(item.pipeline_name.c_str(),
-            kShaderTransparentVert, kShaderTransparentFrag, components, option);
+            kShaderTransparentVert, kShaderTransparentFrag, kShaderTransparentMesh, components, option);
     }
     return create_shader_pipeline(item.pipeline_name.c_str(),
-        kShaderOpaqueVert, kShaderOpaqueFrag, components, option);
+        kShaderOpaqueVert, kShaderOpaqueFrag, kShaderOpaqueMesh, components, option);
 }
 
 void ForwardPlusRenderer::clear_draw_items() {
@@ -179,14 +189,14 @@ bool ForwardPlusRenderer::create_pass_pipelines() {
     const std::vector<VERT_COMP> phong_components{VERTEX, NORMAL};
     auto opaque_option = make_base_pipeline_option();
     if (!create_shader_pipeline(kOpaquePipeline,
-            kShaderOpaqueVert, kShaderOpaqueFrag, phong_components, opaque_option))
+            kShaderOpaqueVert, kShaderOpaqueFrag, kShaderOpaqueMesh, phong_components, opaque_option))
     {
         return false;
     }
 
     auto transparent_option = make_transparent_pipeline_option();
     if (!create_shader_pipeline(kTransparentPipeline,
-            kShaderTransparentVert, kShaderTransparentFrag,
+            kShaderTransparentVert, kShaderTransparentFrag, kShaderTransparentMesh,
             phong_components, transparent_option))
     {
         return false;
@@ -324,11 +334,6 @@ void ForwardPlusRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& vi
             ? fallback_pipeline
             : item->pipeline_name;
 
-        const auto mesh_found = ctx->meshes.find(item->mesh_name);
-        if (mesh_found == ctx->meshes.end()) {
-            continue;
-        }
-
         const auto pipeline_found = ctx->pipelines.find(pipeline_name);
         if (pipeline_found == ctx->pipelines.end()) {
             continue;
@@ -338,6 +343,20 @@ void ForwardPlusRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& vi
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
         sync_draw_item_uniforms(view.swapchain_image_idx, *item, pipeline_name);
+
+        if (pipeline.uses_mesh_shader) {
+            if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
+                const vk::DescriptorSet desc_set = *pipeline.descriptor_sets[view.swapchain_image_idx];
+                cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline_layout, 0, {desc_set}, {});
+            }
+            ctx->draw_mesh_tasks(cmd, 1, 1, 1);
+            continue;
+        }
+
+        const auto mesh_found = ctx->meshes.find(item->mesh_name);
+        if (mesh_found == ctx->meshes.end()) {
+            continue;
+        }
 
         const vk::DescriptorSet* desc_set = nullptr;
         if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {

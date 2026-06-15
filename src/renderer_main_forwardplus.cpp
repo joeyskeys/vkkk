@@ -163,6 +163,7 @@ void upload_mesh(vkkk::Context& ctx, const vkkk::Scene& scene, const std::string
 
 int main() {
     vkkk::Context ctx;
+    ctx.use_mesh_shader = true;
     GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Forward+ Renderer Main (HPP)");
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);

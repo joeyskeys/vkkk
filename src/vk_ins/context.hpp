@@ -54,6 +54,7 @@ struct Pipeline {
     vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
     vk::raii::DescriptorPool descriptor_pool{nullptr};
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
+    bool uses_mesh_shader = false;
 };
 
 struct ComputePipeline {
@@ -197,6 +198,8 @@ public:
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
     void dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1, uint32_t descriptor_set_index = 0);
+    bool draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y = 1,
+        uint32_t group_z = 1) const;
     void draw_frame();
     void wait_idle() const { device.waitIdle(); }
     void recreate_swapchain();

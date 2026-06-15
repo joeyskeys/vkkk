@@ -38,8 +38,10 @@ public:
     // Temporary shader pair while Forward+ specific materials are under migration.
     static constexpr const char* kShaderOpaqueVert = "transparent.vert";
     static constexpr const char* kShaderOpaqueFrag = "transparent.frag";
+    static constexpr const char* kShaderOpaqueMesh = "transparent.mesh";
     static constexpr const char* kShaderTransparentVert = "transparent.vert";
     static constexpr const char* kShaderTransparentFrag = "transparent.frag";
+    static constexpr const char* kShaderTransparentMesh = "transparent.mesh";
 
     const char* type_name() const override { return "Forward+"; }
 
@@ -64,11 +66,11 @@ public:
 private:
     bool create_pass_pipelines();
     void destroy_pass_pipelines() {}
-    std::optional<fs::path> resolve_shader_path(const char* filename);
-    bool load_shader_pair(const char* vert_file, const char* frag_file,
+    std::optional<fs::path> resolve_shader_path(const char* filename, bool track_missing = true);
+    bool load_shader_pair(const char* vert_file, const char* frag_file, const char* mesh_file,
         ShaderModulePack& pack);
     bool create_shader_pipeline(const char* pipeline_name,
-        const char* vert_file, const char* frag_file,
+        const char* vert_file, const char* frag_file, const char* mesh_file,
         const std::vector<VERT_COMP>& components, PipelineOption& option);
 
     void update_camera_aspect();

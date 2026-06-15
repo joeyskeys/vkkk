@@ -175,9 +175,9 @@ BuiltInShaderMgr::ShaderSetSource BuiltInShaderMgr::get_shader_set_source(BuiltI
         case BuiltInShaderType::PBR:
             return {pbr_vert, nullptr, pbr_frag};
         case BuiltInShaderType::FixedColorMS:
-            return {nullptr, fixed_color_ms, fixed_color_frag};
+            return {nullptr, fixed_color_mesh, fixed_color_frag};
         case BuiltInShaderType::PhongMS:
-            return {nullptr, phong_ms, phong_frag};
+            return {nullptr, phong_mesh, phong_frag};
     }
     return {nullptr, nullptr, nullptr};
 }

@@ -28,6 +28,28 @@ struct PhongLightUBO {
     glm::vec4 viewPos{0.0f, 0.0f, 5.0f, 1.0f};
 };
 
+struct PhongMeshVerticesSSBO {
+    glm::vec4 positions[3] = {
+        glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
+        glm::vec4(0.5f, -0.5f, 0.0f, 1.0f),
+        glm::vec4(0.0f, 0.5f, 0.0f, 1.0f)
+    };
+};
+
+struct PhongMeshNormalsSSBO {
+    glm::vec4 normals[3] = {
+        glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
+        glm::vec4(0.0f, 0.0f, 1.0f, 0.0f),
+        glm::vec4(0.0f, 0.0f, 1.0f, 0.0f)
+    };
+};
+
+struct PhongMeshIndicesSSBO {
+    glm::uvec4 triangles[1] = {
+        glm::uvec4(0u, 1u, 2u, 0u)
+    };
+};
+
 inline constexpr const char phong_vert[] = R"(
 #version 450
 
@@ -65,26 +87,36 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
+layout(std430, binding = 3) readonly buffer MeshPositions {
+    vec4 positions[3];
+} mesh_positions;
+
+layout(std430, binding = 4) readonly buffer MeshNormals {
+    vec4 normals[3];
+} mesh_normals;
+
+layout(std430, binding = 5) readonly buffer MeshIndices {
+    uvec4 triangles[1];
+} mesh_indices;
+
 layout(location = 0) out vec3 fragPos[];
 layout(location = 1) out vec3 fragNormal[];
 
 void main() {
-    const vec3 positions[3] = vec3[](
-        vec3(-0.5, -0.5, 0.0),
-        vec3(0.5, -0.5, 0.0),
-        vec3(0.0, 0.5, 0.0)
-    );
-    const vec3 base_normal = vec3(0.0, 0.0, 1.0);
+    const uint vertex_count = 3u;
+    const uint triangle_count = 1u;
     const mat3 normal_mat = mat3(transpose(inverse(ubo.model)));
 
-    SetMeshOutputsEXT(3, 1);
-    for (uint i = 0; i < 3; ++i) {
-        vec4 world_pos = ubo.model * vec4(positions[i], 1.0);
+    SetMeshOutputsEXT(vertex_count, triangle_count);
+    for (uint i = 0; i < vertex_count; ++i) {
+        vec4 world_pos = ubo.model * mesh_positions.positions[i];
         gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * world_pos;
         fragPos[i] = world_pos.xyz;
-        fragNormal[i] = normal_mat * base_normal;
+        fragNormal[i] = normal_mat * mesh_normals.normals[i].xyz;
     }
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+    for (uint i = 0; i < triangle_count; ++i) {
+        gl_PrimitiveTriangleIndicesEXT[i] = mesh_indices.triangles[i].xyz;
+    }
 }
 )";
 

@@ -23,6 +23,7 @@ static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {
 
 static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBits t) {
     mod.buf_infos.clear();
+    mod.storage_buf_infos.clear();
     mod.img_infos.clear();
     mod.attr_infos.clear();
 
@@ -49,6 +50,21 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
     for (auto& img : res.sampled_images) {
         auto binding_idx = comp.get_decoration(img.id, spv::DecorationBinding);
         mod.img_infos.emplace(img.name, binding_idx);
+    }
+
+    // Storage buffers
+    for (auto& ssbo : res.storage_buffers) {
+        auto name = comp.get_name(ssbo.id);
+        if (name.empty())
+            name = comp.get_name(ssbo.base_type_id);
+        if (name.empty())
+            name = fmt::format("ssbo_{}", comp.get_decoration(ssbo.id, spv::DecorationBinding));
+        auto type_info = comp.get_type(ssbo.type_id);
+        auto base_type_info = comp.get_type(ssbo.base_type_id);
+        auto binding_idx = comp.get_decoration(ssbo.id, spv::DecorationBinding);
+        auto struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
+        auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
+        mod.storage_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
     }
 
     // input attrs

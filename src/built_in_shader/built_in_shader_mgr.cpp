@@ -99,18 +99,34 @@ bool BuiltInShaderMgr::create_pipeline(const std::string& pipeline_name,
 std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInShaderType type) const {
     std::vector<UniformDefaultValue> defaults;
     switch (type) {
-        case BuiltInShaderType::FixedColor:
-        case BuiltInShaderType::FixedColorMS: {
+        case BuiltInShaderType::FixedColor: {
             defaults.push_back({"UniformBufferObject", to_bytes(FixedColorTransformUBO{})});
             defaults.push_back({"FixedColor", to_bytes(FixedColorUBO{})});
             break;
         }
 
-        case BuiltInShaderType::Phong:
+        case BuiltInShaderType::FixedColorMS: {
+            defaults.push_back({"UniformBufferObject", to_bytes(FixedColorTransformUBO{})});
+            defaults.push_back({"FixedColor", to_bytes(FixedColorUBO{})});
+            defaults.push_back({"MeshPositions", to_bytes(FixedColorMeshVerticesSSBO{})});
+            defaults.push_back({"MeshIndices", to_bytes(FixedColorMeshIndicesSSBO{})});
+            break;
+        }
+
+        case BuiltInShaderType::Phong: {
+            defaults.push_back({"UniformBufferObject", to_bytes(PhongTransformUBO{})});
+            defaults.push_back({"PhongMaterial", to_bytes(PhongMaterialUBO{})});
+            defaults.push_back({"PhongLight", to_bytes(PhongLightUBO{})});
+            break;
+        }
+
         case BuiltInShaderType::PhongMS: {
             defaults.push_back({"UniformBufferObject", to_bytes(PhongTransformUBO{})});
             defaults.push_back({"PhongMaterial", to_bytes(PhongMaterialUBO{})});
             defaults.push_back({"PhongLight", to_bytes(PhongLightUBO{})});
+            defaults.push_back({"MeshPositions", to_bytes(PhongMeshVerticesSSBO{})});
+            defaults.push_back({"MeshNormals", to_bytes(PhongMeshNormalsSSBO{})});
+            defaults.push_back({"MeshIndices", to_bytes(PhongMeshIndicesSSBO{})});
             break;
         }
 

@@ -538,6 +538,7 @@ bool Context::create_pipeline(const std::string& name,
     std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
     std::map<uint32_t, std::string> ubo_binding_to_name;
+    std::map<uint32_t, std::string> storage_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
     const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
@@ -608,6 +609,24 @@ bool Context::create_pipeline(const std::string& name,
             vk::DescriptorSetLayoutBinding layout_binding{};
             layout_binding.binding = binding;
             layout_binding.descriptorType = vk::DescriptorType::eUniformBuffer;
+            layout_binding.descriptorCount = array_size;
+            layout_binding.stageFlags = stage;
+            descriptor_layouts.push_back(layout_binding);
+        }
+
+        for (const auto& [ssbo_name, ssbo_info] : module.storage_buf_infos) {
+            const auto& [struct_size, array_size, binding] = ssbo_info;
+            const auto ppl_ssbo_name = name + ":" + ssbo_name;
+            const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
+            add_ubo(
+                ppl_ssbo_name, binding, alloc_size, array_size,
+                vk::BufferUsageFlagBits::eStorageBuffer,
+                vk::DescriptorType::eStorageBuffer);
+            storage_binding_to_name[binding] = ppl_ssbo_name;
+
+            vk::DescriptorSetLayoutBinding layout_binding{};
+            layout_binding.binding = binding;
+            layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
             layout_binding.descriptorCount = array_size;
             layout_binding.stageFlags = stage;
             descriptor_layouts.push_back(layout_binding);
@@ -720,6 +739,11 @@ bool Context::create_pipeline(const std::string& name,
         (void)binding;
         uniform_desc_count += static_cast<uint32_t>(require_ubo(ubo_name).vecsize);
     }
+    uint32_t storage_desc_count = 0;
+    for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
+        (void)binding;
+        storage_desc_count += static_cast<uint32_t>(require_ubo(ssbo_name).vecsize);
+    }
     uint32_t image_desc_count = 0;
     for (const auto& [binding, tex_name] : tex_binding_to_name) {
         (void)binding;
@@ -740,6 +764,12 @@ bool Context::create_pipeline(const std::string& name,
         vk::DescriptorPoolSize pool_size{};
         pool_size.type = vk::DescriptorType::eCombinedImageSampler;
         pool_size.descriptorCount = image_desc_count * swapchain_cnt;
+        pool_sizes.push_back(pool_size);
+    }
+    if (storage_desc_count > 0) {
+        vk::DescriptorPoolSize pool_size{};
+        pool_size.type = vk::DescriptorType::eStorageBuffer;
+        pool_size.descriptorCount = storage_desc_count * swapchain_cnt;
         pool_sizes.push_back(pool_size);
     }
 
@@ -763,8 +793,9 @@ bool Context::create_pipeline(const std::string& name,
             std::vector<vk::DescriptorImageInfo> image_infos;
             std::vector<vk::WriteDescriptorSet> writes;
             buffer_infos.reserve(ubo_binding_to_name.size());
+            buffer_infos.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size());
             image_infos.reserve(tex_binding_to_name.size());
-            writes.reserve(ubo_binding_to_name.size() + tex_binding_to_name.size());
+            writes.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size() + tex_binding_to_name.size());
 
             for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
                 auto& ubo = require_ubo(ubo_name);
@@ -778,6 +809,22 @@ bool Context::create_pipeline(const std::string& name,
                 write.dstBinding = binding;
                 write.descriptorCount = 1;
                 write.descriptorType = vk::DescriptorType::eUniformBuffer;
+                write.pBufferInfo = &buffer_infos.back();
+                writes.push_back(write);
+            }
+
+            for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
+                auto& ssbo = require_ubo(ssbo_name);
+                vk::DescriptorBufferInfo buffer_info{};
+                buffer_info.buffer = *ssbo.gpu_bufs[i];
+                buffer_info.offset = 0;
+                buffer_info.range = ssbo.size * ssbo.vecsize;
+                buffer_infos.push_back(buffer_info);
+                vk::WriteDescriptorSet write{};
+                write.dstSet = *pipeline.descriptor_sets[i];
+                write.dstBinding = binding;
+                write.descriptorCount = 1;
+                write.descriptorType = vk::DescriptorType::eStorageBuffer;
                 write.pBufferInfo = &buffer_infos.back();
                 writes.push_back(write);
             }
@@ -1130,7 +1177,9 @@ void Context::draw_frame() {
 }
 
 bool Context::add_ubo(const std::string& name, uint32_t binding,
-    uint32_t size, uint32_t vecsize)
+    uint32_t size, uint32_t vecsize,
+    vk::BufferUsageFlags usage,
+    vk::DescriptorType descriptor_type)
 {
     if (ubos.find(name) != ubos.end()) {
         std::cout << "UBO " << name << " already exists" << std::endl;
@@ -1141,6 +1190,7 @@ bool Context::add_ubo(const std::string& name, uint32_t binding,
     ubo.size = size;
     ubo.vecsize = vecsize;
     ubo.binding = binding;
+    ubo.descriptor_type = descriptor_type;
     ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
     ubo.gpu_bufs.reserve(swapchain_images.size());
     ubo.memos.reserve(swapchain_images.size());
@@ -1151,7 +1201,7 @@ bool Context::add_ubo(const std::string& name, uint32_t binding,
         vk::raii::DeviceMemory memo{nullptr};
         std::tie(gpu_buf, memo) = create_buffer(
             size * vecsize,
-            vk::BufferUsageFlagBits::eUniformBuffer,
+            usage,
             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         ubo.descriptors.push_back(vk::DescriptorBufferInfo{*gpu_buf, 0, size * vecsize});
         ubo.gpu_bufs.push_back(std::move(gpu_buf));

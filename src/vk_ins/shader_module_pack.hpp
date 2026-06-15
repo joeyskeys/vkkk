@@ -17,6 +17,7 @@ namespace vkkk
 {
 
 using BufInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, uint32_t, uint32_t>>;
+using StorageBufInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, uint32_t, uint32_t>>;
 using ImgInfoMap = std::unordered_map<std::string, uint32_t>;
 using AttrInfoMap = std::vector<std::tuple<uint32_t, uint32_t, std::string>>;
 using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
@@ -27,6 +28,7 @@ public:
     std::vector<char>                               source_code;
     std::vector<uint32_t>                           spirv_code;
     BufInfoMap                                      buf_infos;
+    StorageBufInfoMap                               storage_buf_infos;
     ImgInfoMap                                      img_infos;
     AttrInfoMap                                     attr_infos;
     TexImgPairs                                     tex_img_pairs;

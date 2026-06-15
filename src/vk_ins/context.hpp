@@ -131,6 +131,7 @@ struct UBO {
     size_t                                  size;
     size_t                                  vecsize;
     uint32_t                                binding;
+    vk::DescriptorType                      descriptor_type = vk::DescriptorType::eUniformBuffer;
     std::shared_ptr<char[]>                 cpu_buf;
     std::vector<vk::raii::Buffer>           gpu_bufs;
     std::vector<vk::raii::DeviceMemory>     memos;
@@ -203,7 +204,9 @@ public:
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func);
 
     bool add_ubo(const std::string& name, uint32_t binding,
-        uint32_t size, uint32_t vecsize = 1);
+        uint32_t size, uint32_t vecsize = 1,
+        vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
     bool add_texture(const std::string& name, uint32_t binding,
         const fs::path& path);
     bool add_cubemap(const std::string& name, uint32_t binding,

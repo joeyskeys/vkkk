@@ -16,6 +16,20 @@ struct FixedColorUBO {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
+struct FixedColorMeshVerticesSSBO {
+    glm::vec4 positions[3] = {
+        glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
+        glm::vec4(0.5f, -0.5f, 0.0f, 1.0f),
+        glm::vec4(0.0f, 0.5f, 0.0f, 1.0f)
+    };
+};
+
+struct FixedColorMeshIndicesSSBO {
+    glm::uvec4 triangles[1] = {
+        glm::uvec4(0u, 1u, 2u, 0u)
+    };
+};
+
 inline constexpr const char fixed_color_vert[] = R"(
 #version 450
 
@@ -46,18 +60,25 @@ layout(binding = 0) uniform UniformBufferObject {
     mat4 proj;
 } ubo;
 
-void main() {
-    const vec3 positions[3] = vec3[](
-        vec3(-0.5, -0.5, 0.0),
-        vec3(0.5, -0.5, 0.0),
-        vec3(0.0, 0.5, 0.0)
-    );
+layout(std430, binding = 2) readonly buffer MeshPositions {
+    vec4 positions[3];
+} mesh_positions;
 
-    SetMeshOutputsEXT(3, 1);
-    for (uint i = 0; i < 3; ++i) {
-        gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * ubo.model * vec4(positions[i], 1.0);
+layout(std430, binding = 3) readonly buffer MeshIndices {
+    uvec4 triangles[1];
+} mesh_indices;
+
+void main() {
+    const uint vertex_count = 3u;
+    const uint triangle_count = 1u;
+
+    SetMeshOutputsEXT(vertex_count, triangle_count);
+    for (uint i = 0; i < vertex_count; ++i) {
+        gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * ubo.model * mesh_positions.positions[i];
     }
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+    for (uint i = 0; i < triangle_count; ++i) {
+        gl_PrimitiveTriangleIndicesEXT[i] = mesh_indices.triangles[i].xyz;
+    }
 }
 )";
 

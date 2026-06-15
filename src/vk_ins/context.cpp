@@ -456,8 +456,8 @@ void Context::init(GLFWwindow* win,
     device_create_info.pNext = &device_features.get<vk::PhysicalDeviceFeatures2>();
     device_create_info.queueCreateInfoCount = static_cast<uint32_t>(queue_create_infos.size());
     device_create_info.pQueueCreateInfos = queue_create_infos.data();
-    device_create_info.enabledExtensionCount = static_cast<uint32_t>(required_extensions.size());
-    device_create_info.ppEnabledExtensionNames = required_extensions.data();
+    device_create_info.enabledExtensionCount = static_cast<uint32_t>(required_device_extensions.size());
+    device_create_info.ppEnabledExtensionNames = required_device_extensions.data();
     device = vk::raii::Device(physical_device, device_create_info);
     queue = vk::raii::Queue(device, queue_idx, 0);
     compute_queue = vk::raii::Queue(device, compute_queue_idx, 0);

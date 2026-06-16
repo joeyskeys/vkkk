@@ -7,6 +7,7 @@
 #include <vector>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec4.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
 #include "built_in_shader/phong.h"
@@ -30,14 +31,33 @@ struct ForwardPlusDrawItem {
     built_in_shader::PhongMaterialUBO material{};
 };
 
+struct ShadowTransformUBO {
+    glm::mat4 model{1.0f};
+    glm::mat4 lightView{1.0f};
+    glm::mat4 lightProj{1.0f};
+};
+
+struct ShadowParamsUBO {
+    glm::mat4 lightSpace{1.0f};
+    glm::vec4 params{0.0025f, 1.0f, 0.0f, 0.0f};
+};
+
 class ForwardPlusRenderer final : public Renderer {
 public:
+    static constexpr const char* kShadowPipeline = "forward_plus_shadow_depth";
     static constexpr const char* kOpaquePipeline = "forward_plus_opaque";
     static constexpr const char* kTransparentPipeline = "forward_plus_transparent";
 
-    // Temporary shader pair while Forward+ specific materials are under migration.
-    static constexpr const char* kShaderOpaqueVert = "transparent.vert";
-    static constexpr const char* kShaderOpaqueFrag = "transparent.frag";
+    static constexpr const char* kShaderShadowVert = "shadow_depth.vert";
+    static constexpr const char* kShaderShadowFrag = "shadow_depth.frag";
+    static constexpr const char* kShaderOpaqueShadowVert = "opaque_shadow.vert";
+    static constexpr const char* kShaderOpaqueShadowFrag = "opaque_shadow.frag";
+    // Fallback pair while shadow resources are unavailable.
+    static constexpr const char* kShaderOpaqueFallbackVert = "transparent.vert";
+    static constexpr const char* kShaderOpaqueFallbackFrag = "transparent.frag";
+    // Temporary shader pair while Forward+ mesh materials are under migration.
+    static constexpr const char* kShaderOpaqueVert = kShaderOpaqueFallbackVert;
+    static constexpr const char* kShaderOpaqueFrag = kShaderOpaqueFallbackFrag;
     static constexpr const char* kShaderOpaqueMesh = "transparent.mesh";
     static constexpr const char* kShaderTransparentVert = "transparent.vert";
     static constexpr const char* kShaderTransparentFrag = "transparent.frag";
@@ -72,18 +92,20 @@ private:
     bool create_shader_pipeline(const char* pipeline_name,
         const char* vert_file, const char* frag_file, const char* mesh_file,
         const std::vector<VERT_COMP>& components, PipelineOption& option);
+    bool create_shadow_pipeline();
 
     void update_camera_aspect();
     void update_lights_from_scene();
+    void update_shadow_from_scene();
     void update_global_uniforms(uint32_t swapchain_idx);
     void sync_draw_item_uniforms(uint32_t swapchain_idx, const ForwardPlusDrawItem& item,
         const std::string& pipeline_name);
+    void sync_shadow_uniforms(uint32_t swapchain_idx, const ForwardPlusDrawItem& item);
 
     // Forward+ light clustering placeholder (compute path pending).
     void prepare_light_clusters(const RenderView& view);
 
-    // Shadow pass placeholder. Infrastructure is intentionally not wired yet.
-    void pass_shadow_placeholder(vk::CommandBuffer cmd, const RenderView& view);
+    void pass_shadow(vk::CommandBuffer cmd, const RenderView& view);
 
     void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
     void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
@@ -101,6 +123,11 @@ private:
     std::vector<std::string> missing_shaders_;
 
     built_in_shader::PhongLightUBO light_ubo_{};
+    ShadowTransformUBO shadow_transform_ubo_{};
+    ShadowParamsUBO shadow_params_ubo_{};
+    glm::mat4 shadow_light_view_{1.0f};
+    glm::mat4 shadow_light_proj_{1.0f};
+    bool opaque_pipeline_uses_shadow_ = false;
 
     std::function<void(vk::CommandBuffer)> overlay_draw_;
 };

@@ -34,6 +34,22 @@ void main() {
 }
 )";
 
+constexpr std::array<const char*, 4> kShadowTextureFallbackRoots = {
+    "resource/textures/shadow_map.png",
+    "../resource/textures/shadow_map.png",
+    "resource/textures/8k_moon.jpg",
+    "../resource/textures/8k_moon.jpg",
+};
+
+std::optional<std::string> resolve_shadow_texture_path() {
+    for (const auto* path : kShadowTextureFallbackRoots) {
+        if (fs::exists(path)) {
+            return std::string(path);
+        }
+    }
+    return std::nullopt;
+}
+
 } // namespace
 
 std::optional<fs::path> ForwardPlusRenderer::resolve_shader_path(const char* filename, bool track_missing) {
@@ -52,7 +68,7 @@ std::optional<fs::path> ForwardPlusRenderer::resolve_shader_path(const char* fil
 bool ForwardPlusRenderer::load_shader_pair(const char* vert_file, const char* frag_file, const char* mesh_file,
     ShaderModulePack& pack)
 {
-    const auto mesh_path = resolve_shader_path(mesh_file, false);
+    const auto mesh_path = mesh_file ? resolve_shader_path(mesh_file, false) : std::optional<fs::path>{};
     const bool prefer_mesh = mesh_path.has_value();
 
     const auto vert_path = prefer_mesh ? std::optional<fs::path>{} : resolve_shader_path(vert_file);
@@ -77,6 +93,14 @@ bool ForwardPlusRenderer::load_shader_pair(const char* vert_file, const char* fr
         return false;
     }
 
+    if (frag.img_infos.find("shadowMap") != frag.img_infos.end()) {
+        const auto shadow_map_path = resolve_shadow_texture_path();
+        if (!shadow_map_path) {
+            return false;
+        }
+        frag.tex_img_pairs["shadowMap"] = std::make_pair(*shadow_map_path, false);
+    }
+
     return pack.add_shader_module(stage0, true) && pack.add_shader_module(frag, true);
 }
 
@@ -93,6 +117,27 @@ bool ForwardPlusRenderer::create_shader_pipeline(const char* pipeline_name,
         return false;
     }
     return ctx->create_pipeline(pipeline_name, pack, option, components);
+}
+
+bool ForwardPlusRenderer::create_shadow_pipeline() {
+    if (!ctx) {
+        return false;
+    }
+
+    PipelineOption shadow_option;
+    shadow_option.setup_multisampling(ctx->sample_rate_shading_enabled, ctx->nsample);
+    shadow_option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+        vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, false);
+    shadow_option.setup_depth_stencil(true, true, vk::CompareOp::eLessOrEqual, false, false);
+    shadow_option.setup_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+    shadow_option.setup_scissor(0, 0, width, height);
+    shadow_option.blend_attachment_info.colorWriteMask = {};
+
+    ShaderModulePack pack;
+    if (!load_shader_pair(kShaderShadowVert, kShaderShadowFrag, nullptr, pack)) {
+        return false;
+    }
+    return ctx->create_pipeline(kShadowPipeline, pack, shadow_option, {VERTEX});
 }
 
 bool ForwardPlusRenderer::initialize(Context* context) {
@@ -144,8 +189,12 @@ bool ForwardPlusRenderer::ensure_draw_item_pipeline(const ForwardPlusDrawItem& i
         return create_shader_pipeline(item.pipeline_name.c_str(),
             kShaderTransparentVert, kShaderTransparentFrag, kShaderTransparentMesh, components, option);
     }
+    if (opaque_pipeline_uses_shadow_) {
+        return create_shader_pipeline(item.pipeline_name.c_str(),
+            kShaderOpaqueShadowVert, kShaderOpaqueShadowFrag, nullptr, components, option);
+    }
     return create_shader_pipeline(item.pipeline_name.c_str(),
-        kShaderOpaqueVert, kShaderOpaqueFrag, kShaderOpaqueMesh, components, option);
+        kShaderOpaqueFallbackVert, kShaderOpaqueFallbackFrag, kShaderOpaqueMesh, components, option);
 }
 
 void ForwardPlusRenderer::clear_draw_items() {
@@ -186,12 +235,20 @@ bool ForwardPlusRenderer::create_pass_pipelines() {
         return false;
     }
 
+    if (!create_shadow_pipeline()) {
+        return false;
+    }
+
     const std::vector<VERT_COMP> phong_components{VERTEX, NORMAL};
     auto opaque_option = make_base_pipeline_option();
-    if (!create_shader_pipeline(kOpaquePipeline,
-            kShaderOpaqueVert, kShaderOpaqueFrag, kShaderOpaqueMesh, phong_components, opaque_option))
-    {
-        return false;
+    opaque_pipeline_uses_shadow_ = create_shader_pipeline(kOpaquePipeline,
+        kShaderOpaqueShadowVert, kShaderOpaqueShadowFrag, nullptr, phong_components, opaque_option);
+    if (!opaque_pipeline_uses_shadow_) {
+        if (!create_shader_pipeline(kOpaquePipeline,
+                kShaderOpaqueFallbackVert, kShaderOpaqueFallbackFrag, kShaderOpaqueMesh, phong_components, opaque_option))
+        {
+            return false;
+        }
     }
 
     auto transparent_option = make_transparent_pipeline_option();
@@ -229,6 +286,16 @@ void ForwardPlusRenderer::update_lights_from_scene() {
         : glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
 }
 
+void ForwardPlusRenderer::update_shadow_from_scene() {
+    const glm::vec3 light_pos = glm::vec3(light_ubo_.lightPos);
+    const glm::vec3 light_target(0.0f, 0.0f, 0.0f);
+    const glm::vec3 light_up(0.0f, 1.0f, 0.0f);
+    shadow_light_view_ = glm::lookAt(light_pos, light_target, light_up);
+    shadow_light_proj_ = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, 0.1f, 100.0f);
+    shadow_light_proj_[1][1] *= -1.0f;
+    shadow_params_ubo_.lightSpace = shadow_light_proj_ * shadow_light_view_;
+}
+
 void ForwardPlusRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     if (!ctx || !camera) {
         return;
@@ -252,6 +319,7 @@ void ForwardPlusRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     for (const auto* pipeline_name : {kOpaquePipeline, kTransparentPipeline}) {
         sync_global_ubo(pipeline_name, ":UniformBufferObject", &camera_transform, sizeof(camera_transform));
         sync_global_ubo(pipeline_name, ":PhongLight", &light_ubo_, sizeof(light_ubo_));
+        sync_global_ubo(pipeline_name, ":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
     }
 }
 
@@ -282,6 +350,24 @@ void ForwardPlusRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     sync_if_present(":PhongMaterial", &item.material, sizeof(item.material));
     sync_if_present(":light", &light_ubo_, sizeof(light_ubo_));
     sync_if_present(":PhongLight", &light_ubo_, sizeof(light_ubo_));
+    sync_if_present(":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
+}
+
+void ForwardPlusRenderer::sync_shadow_uniforms(uint32_t swapchain_idx, const ForwardPlusDrawItem& item) {
+    if (!ctx) {
+        return;
+    }
+
+    shadow_transform_ubo_.model = item.model;
+    shadow_transform_ubo_.lightView = shadow_light_view_;
+    shadow_transform_ubo_.lightProj = shadow_light_proj_;
+
+    const auto ubo_name = std::string(kShadowPipeline) + ":ShadowTransform";
+    auto found = ctx->ubos.find(ubo_name);
+    if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
+        return;
+    }
+    ctx->sync_uniform(found->second.memos[swapchain_idx], &shadow_transform_ubo_, sizeof(shadow_transform_ubo_));
 }
 
 void ForwardPlusRenderer::prepare_light_clusters(const RenderView& view) {
@@ -304,15 +390,41 @@ void ForwardPlusRenderer::prepare_light_clusters(const RenderView& view) {
     ctx->dispatch_compute(kLightClusterComputePipeline, dispatch_x, dispatch_y, 1u, view.swapchain_image_idx);
 }
 
-void ForwardPlusRenderer::pass_shadow_placeholder(vk::CommandBuffer cmd, const RenderView& view) {
-    (void)cmd;
-    (void)view;
-    // TODO(shadow): add shadow-map render pass once infrastructure is ready.
+void ForwardPlusRenderer::pass_shadow(vk::CommandBuffer cmd, const RenderView& view) {
+    if (!ctx) {
+        return;
+    }
+    const auto pipeline_found = ctx->pipelines.find(kShadowPipeline);
+    if (pipeline_found == ctx->pipelines.end()) {
+        return;
+    }
+
+    const auto& pipeline = pipeline_found->second;
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+
+    for (const auto& item : draw_items_) {
+        if (item.transparent) {
+            continue;
+        }
+
+        const auto mesh_found = ctx->meshes.find(item.mesh_name);
+        if (mesh_found == ctx->meshes.end()) {
+            continue;
+        }
+
+        sync_shadow_uniforms(view.swapchain_image_idx, item);
+        const vk::DescriptorSet* desc_set = nullptr;
+        if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
+            desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
+        }
+        mesh_found->second.emit_draw_cmd(cmd, *pipeline.vk_pipeline_layout, desc_set);
+    }
 }
 
 void ForwardPlusRenderer::update(const RenderView& view) {
     update_camera_aspect();
     update_lights_from_scene();
+    update_shadow_from_scene();
     prepare_light_clusters(view);
     update_global_uniforms(view.swapchain_image_idx);
     (void)view.delta_seconds;
@@ -411,7 +523,7 @@ void ForwardPlusRenderer::record_commands(vk::CommandBuffer cmd, const RenderVie
         return;
     }
 
-    pass_shadow_placeholder(cmd, view);
+    pass_shadow(cmd, view);
     pass_opaque(cmd, view);
     pass_transparent(cmd, view);
     if (overlay_draw_) {

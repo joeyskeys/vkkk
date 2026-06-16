@@ -424,6 +424,17 @@ void Context::init(GLFWwindow* win,
 
     const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
+    const auto supported_feature_chain = physical_device.getFeatures2<
+        vk::PhysicalDeviceFeatures2,
+        vk::PhysicalDeviceVulkan13Features,
+        vk::PhysicalDeviceMeshShaderFeaturesEXT>();
+    const bool supports_shader_demote =
+        supported_feature_chain.get<vk::PhysicalDeviceVulkan13Features>().shaderDemoteToHelperInvocation == vk::True;
+    const bool supports_mesh_shader =
+        supported_feature_chain.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader == vk::True;
+    if (use_mesh_shader && !supports_mesh_shader) {
+        throw std::runtime_error("mesh shader requested but device does not support meshShader feature");
+    }
 
     vk::StructureChain<vk::PhysicalDeviceFeatures2,
         vk::PhysicalDeviceVulkan13Features,
@@ -434,10 +445,13 @@ void Context::init(GLFWwindow* win,
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
+    device_features.get<vk::PhysicalDeviceVulkan13Features>().shaderDemoteToHelperInvocation =
+        supports_shader_demote ? vk::True : vk::False;
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;
-    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader = use_mesh_shader ? vk::True : vk::False;
+    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader =
+        (use_mesh_shader && supports_mesh_shader) ? vk::True : vk::False;
     device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().taskShader = vk::False;
-    mesh_shader_available = use_mesh_shader;
+    mesh_shader_available = use_mesh_shader && supports_mesh_shader;
 
     float queue_priority = 0.5f;
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;

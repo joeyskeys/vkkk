@@ -1083,6 +1083,13 @@ void Context::record_cmds(uint32_t image_index,
     cmd_buf.reset({});
     cmd_buf.begin({});
 
+    Texture* active_target = nullptr;
+    if (active_render_target_index_ >= 0
+        && static_cast<size_t>(active_render_target_index_) < targets.size())
+    {
+        active_target = &targets[static_cast<size_t>(active_render_target_index_)];
+    }
+
     transit_presentation_image_layout(
         cmd_buf,
         swapchain_images[image_index],
@@ -1124,8 +1131,24 @@ void Context::record_cmds(uint32_t image_index,
 
     vk::ClearValue clear_value = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
     vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);
+
+    if (active_target != nullptr) {
+        transit_presentation_image_layout(
+            cmd_buf,
+            static_cast<vk::Image>(*active_target->image),
+            active_target->layout,
+            vk::ImageLayout::eColorAttachmentOptimal,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+            vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::ImageAspectFlagBits::eColor);
+    }
+
     vk::RenderingAttachmentInfo color_attachment_info{};
-    color_attachment_info.imageView = *swapchain_image_views[image_index];
+    color_attachment_info.imageView = active_target == nullptr
+        ? *swapchain_image_views[image_index]
+        : *active_target->view;
     color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
     color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
     color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
@@ -1138,7 +1161,10 @@ void Context::record_cmds(uint32_t image_index,
     depth_attachment_info.clearValue = depth_clear_value;
     vk::RenderingInfo rendering_info{};
     rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-    rendering_info.renderArea.extent = swapchain_extent;
+    const vk::Extent2D render_extent = active_target == nullptr
+        ? swapchain_extent
+        : vk::Extent2D{active_target->width, active_target->height};
+    rendering_info.renderArea.extent = render_extent;
     rendering_info.layerCount = 1;
     rendering_info.colorAttachmentCount = 1;
     rendering_info.pColorAttachments = &color_attachment_info;
@@ -1146,15 +1172,28 @@ void Context::record_cmds(uint32_t image_index,
     cmd_buf.beginRendering(rendering_info);
     cmd_buf.setViewport(0, vk::Viewport{
         0.f, 0.f,
-        static_cast<float>(swapchain_extent.width),
-        static_cast<float>(swapchain_extent.height),
+        static_cast<float>(render_extent.width),
+        static_cast<float>(render_extent.height),
         0.f, 1.f
     });
-    cmd_buf.setScissor(0, vk::Rect2D{{0, 0}, swapchain_extent});
+    cmd_buf.setScissor(0, vk::Rect2D{{0, 0}, render_extent});
 
     emit_func(cmd_buf, image_index);
 
     cmd_buf.endRendering();
+
+    if (active_target != nullptr) {
+        transit_presentation_image_layout(
+            cmd_buf,
+            static_cast<vk::Image>(*active_target->image),
+            vk::ImageLayout::eColorAttachmentOptimal,
+            active_target->layout,
+            vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::ImageAspectFlagBits::eColor);
+    }
     transit_presentation_image_layout(
         cmd_buf,
         swapchain_images[image_index],
@@ -1279,6 +1318,58 @@ bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
     return true;
 }
 
+bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
+    uint32_t width, uint32_t height, vk::ImageLayout layout, vk::SampleCountFlagBits samples)
+{
+    Texture target{};
+    target.binding = static_cast<uint32_t>(targets.size());
+    target.vecsize = 1;
+
+    const uint32_t target_width = width == 0 ? swapchain_extent.width : width;
+    const uint32_t target_height = height == 0 ? swapchain_extent.height : height;
+    if (target_width == 0 || target_height == 0) {
+        std::cout << "Render target dimensions must be non-zero" << std::endl;
+        return false;
+    }
+    target.width = target_width;
+    target.height = target_height;
+
+    std::tie(target.image, target.memo) = create_vk_image(
+        target_width, target_height, 1, samples, format, vk::ImageTiling::eOptimal,
+        usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+
+    vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor;
+    if (format == vk::Format::eD32SfloatS8Uint || format == vk::Format::eD24UnormS8Uint) {
+        aspect_mask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    }
+    else if (format == vk::Format::eD16Unorm || format == vk::Format::eD32Sfloat
+        || format == vk::Format::eX8D24UnormPack32)
+    {
+        aspect_mask = vk::ImageAspectFlagBits::eDepth;
+    }
+
+    target.view = create_vk_imageview(target.image, format, aspect_mask);
+    target.sampler = create_vk_sampler();
+    target.layout = layout;
+    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
+
+    targets.emplace_back(std::move(target));
+    return true;
+}
+
+bool Context::set_render_target(uint32_t target_index) {
+    if (target_index >= targets.size()) {
+        std::cout << "Render target index out of range: " << target_index << std::endl;
+        return false;
+    }
+    active_render_target_index_ = static_cast<int32_t>(target_index);
+    return true;
+}
+
+void Context::set_render_to_framebuffer() {
+    active_render_target_index_ = -1;
+}
+
 bool Context::add_texture(const std::string& name, const uint32_t binding,
     const fs::path& path) {
     if (textures.find(name) != textures.end()) {
@@ -1312,6 +1403,8 @@ bool Context::add_texture(const std::string& name, const uint32_t binding,
         ch_vals, ch_names);
     
     auto spec = with_alpha_buf.spec();
+    tex.width = static_cast<uint32_t>(spec.width);
+    tex.height = static_cast<uint32_t>(spec.height);
     // Default to R8G8B8A8
     vk::DeviceSize image_size = spec.width * spec.height * sizeof(float);
     std::vector<float> pixels;
@@ -1374,6 +1467,8 @@ bool Context::add_cubemap(const std::string& name, const uint32_t binding,
     oiio_buf.read();
     const auto spec = oiio_buf.spec();
     const uint32_t face_size = spec.width / 4;
+    tex.width = face_size;
+    tex.height = face_size;
 
     const auto top_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size, face_size * 2, 0, face_size));
     const auto bottom_buf = OIIO::ImageBufAlgo::cut(oiio_buf, OIIO::ROI(face_size, face_size * 2, face_size * 2, face_size * 3));

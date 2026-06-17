@@ -46,6 +46,7 @@ constexpr uint32_t max_frames_in_flight = 2;
 
 }
 
+
 class Camera;
 
 struct Pipeline {
@@ -142,6 +143,8 @@ struct UBO {
 struct Texture {
     uint32_t                                binding;
     size_t                                  vecsize;
+    uint32_t                                width = 0;
+    uint32_t                                height = 0;
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
     vk::raii::ImageView                     view{nullptr};
@@ -214,6 +217,12 @@ public:
         const fs::path& path);
     bool add_cubemap(const std::string& name, uint32_t binding,
         const fs::path& path);
+    bool add_render_target(vk::ImageUsageFlags usage, vk::Format format,
+        uint32_t width = 0, uint32_t height = 0,
+        vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+        vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    bool set_render_target(uint32_t target_index);
+    void set_render_to_framebuffer();
     bool load_mesh(const std::string& name, const Mesh& mesh);
 
     void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
@@ -373,6 +382,7 @@ private:
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
     bool depth_image_initialized = false;
+    int32_t active_render_target_index_ = -1;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
@@ -384,6 +394,7 @@ public:
 
     std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, Texture> textures;
+    std::vector<Texture> targets;
 };
 
 }

@@ -214,6 +214,7 @@ void Context::create_depth_resources() {
     }
     std::tie(depth_image, depth_memo) = create_vk_image(swapchain_extent.width, swapchain_extent.height, 1, vk::SampleCountFlagBits::e1, depth_format, vk::ImageTiling::eOptimal, vk::ImageUsageFlagBits::eDepthStencilAttachment, vk::MemoryPropertyFlagBits::eDeviceLocal);
     depth_view = create_vk_imageview(depth_image, depth_format, 1, depth_aspect);
+    depth_image_initialized = false;
 }
 
 void Context::create_swapchain() {
@@ -1093,16 +1094,33 @@ void Context::record_cmds(uint32_t image_index,
         vk::PipelineStageFlagBits2::eColorAttachmentOutput,
         vk::ImageAspectFlagBits::eColor);
 
-    transit_presentation_image_layout(
-        cmd_buf,
-        static_cast<vk::Image>(*depth_image),
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        {},
-        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
+    if (!depth_image_initialized) {
+        transit_presentation_image_layout(
+            cmd_buf,
+            static_cast<vk::Image>(*depth_image),
+            vk::ImageLayout::eUndefined,
+            vk::ImageLayout::eDepthStencilAttachmentOptimal,
+            {},
+            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            vk::PipelineStageFlagBits2::eTopOfPipe,
+            vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
+        depth_image_initialized = true;
+    }
+    else {
+        // Keep depth image in attachment layout across frames and insert
+        // an explicit dependency between consecutive depth write passes.
+        transit_presentation_image_layout(
+            cmd_buf,
+            static_cast<vk::Image>(*depth_image),
+            vk::ImageLayout::eDepthStencilAttachmentOptimal,
+            vk::ImageLayout::eDepthStencilAttachmentOptimal,
+            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            vk::PipelineStageFlagBits2::eLateFragmentTests,
+            vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
+            vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil);
+    }
 
     vk::ClearValue clear_value = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
     vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);

@@ -110,6 +110,7 @@ std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInS
             defaults.push_back({"FixedColor", to_bytes(FixedColorUBO{})});
             defaults.push_back({"MeshPositions", to_bytes(FixedColorMeshVerticesSSBO{})});
             defaults.push_back({"MeshIndices", to_bytes(FixedColorMeshIndicesSSBO{})});
+            defaults.push_back({"DrawMode", to_bytes(FixedColorDrawModeUBO{})});
             break;
         }
 
@@ -127,6 +128,7 @@ std::vector<UniformDefaultValue> BuiltInShaderMgr::get_default_uniforms(BuiltInS
             defaults.push_back({"MeshPositions", to_bytes(PhongMeshVerticesSSBO{})});
             defaults.push_back({"MeshNormals", to_bytes(PhongMeshNormalsSSBO{})});
             defaults.push_back({"MeshIndices", to_bytes(PhongMeshIndicesSSBO{})});
+            defaults.push_back({"DrawMode", to_bytes(PhongDrawModeUBO{})});
             break;
         }
 
@@ -191,9 +193,9 @@ BuiltInShaderMgr::ShaderSetSource BuiltInShaderMgr::get_shader_set_source(BuiltI
         case BuiltInShaderType::PBR:
             return {pbr_vert, nullptr, pbr_frag};
         case BuiltInShaderType::FixedColorMS:
-            return {nullptr, fixed_color_mesh, fixed_color_frag};
+            return {nullptr, fixed_color_mesh, fixed_color_mesh_frag};
         case BuiltInShaderType::PhongMS:
-            return {nullptr, phong_mesh, phong_frag};
+            return {nullptr, phong_mesh, phong_mesh_frag};
     }
     return {nullptr, nullptr, nullptr};
 }

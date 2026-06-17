@@ -28,6 +28,11 @@ struct PhongLightUBO {
     glm::vec4 viewPos{0.0f, 0.0f, 5.0f, 1.0f};
 };
 
+// draw_mode.x: 0=wireframe, 1=shaded, 2=shaded_wireframe
+struct PhongDrawModeUBO {
+    glm::ivec4 draw_mode{1, 0, 0, 0};
+};
+
 struct PhongMeshVerticesSSBO {
     glm::vec4 positions[3] = {
         glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
@@ -101,11 +106,21 @@ layout(std430, binding = 5) readonly buffer MeshIndices {
 
 layout(location = 0) out vec3 fragPos[];
 layout(location = 1) out vec3 fragNormal[];
+layout(location = 2) out vec3 bary[];
+
+layout(binding = 6) uniform DrawMode {
+    ivec4 drawMode;
+} draw_mode;
 
 void main() {
     const uint vertex_count = 3u;
     const uint triangle_count = 1u;
     const mat3 normal_mat = mat3(transpose(inverse(ubo.model)));
+    const vec3 barycentric[3] = vec3[](
+        vec3(1.0, 0.0, 0.0),
+        vec3(0.0, 1.0, 0.0),
+        vec3(0.0, 0.0, 1.0)
+    );
 
     SetMeshOutputsEXT(vertex_count, triangle_count);
     for (uint i = 0; i < vertex_count; ++i) {
@@ -113,6 +128,7 @@ void main() {
         gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * world_pos;
         fragPos[i] = world_pos.xyz;
         fragNormal[i] = normal_mat * mesh_normals.normals[i].xyz;
+        bary[i] = (draw_mode.drawMode.x == 1) ? vec3(0.0) : barycentric[i];
     }
     for (uint i = 0; i < triangle_count; ++i) {
         gl_PrimitiveTriangleIndicesEXT[i] = mesh_indices.triangles[i].xyz;
@@ -155,6 +171,76 @@ void main() {
     vec3 specular = material.specular.rgb * spec * light.lightColor.rgb;
 
     outColor = vec4(ambient + diffuse + specular, material.diffuse.a);
+}
+)";
+
+inline constexpr const char phong_mesh_frag[] = R"(
+#version 450
+
+layout(binding = 1) uniform PhongMaterial {
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    float shininess;
+} material;
+
+layout(binding = 2) uniform PhongLight {
+    vec4 lightPos;
+    vec4 lightColor;
+    vec4 viewPos;
+} light;
+
+layout(binding = 6) uniform DrawMode {
+    ivec4 drawMode;
+} draw_mode;
+
+layout(location = 0) in vec3 fragPos;
+layout(location = 1) in vec3 fragNormal;
+layout(location = 2) in vec3 bary;
+
+layout(location = 0) out vec4 outColor;
+
+float wire_factor(vec3 b) {
+    vec3 d = fwidth(b);
+    vec3 s = smoothstep(vec3(0.0), d * 1.2, b);
+    return min(min(s.x, s.y), s.z);
+}
+
+vec3 phong_lit_color() {
+    vec3 normal = normalize(fragNormal);
+    vec3 light_dir = normalize(light.lightPos.xyz - fragPos);
+    vec3 view_dir = normalize(light.viewPos.xyz - fragPos);
+    vec3 reflect_dir = reflect(-light_dir, normal);
+
+    float diff = max(dot(normal, light_dir), 0.0);
+    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), max(material.shininess, 1.0));
+
+    vec3 ambient = material.ambient.rgb * light.lightColor.rgb;
+    vec3 diffuse = material.diffuse.rgb * diff * light.lightColor.rgb;
+    vec3 specular = material.specular.rgb * spec * light.lightColor.rgb;
+    return ambient + diffuse + specular;
+}
+
+void main() {
+    const int mode = draw_mode.drawMode.x;
+    vec3 shaded = phong_lit_color();
+    if (mode == 1) {
+        outColor = vec4(shaded, material.diffuse.a);
+        return;
+    }
+
+    float edge = 1.0 - wire_factor(bary);
+    if (mode == 0) {
+        if (edge < 0.45) {
+            discard;
+        }
+        outColor = vec4(vec3(0.0), material.diffuse.a);
+        return;
+    }
+
+    vec3 line = vec3(0.0);
+    float wire_alpha = smoothstep(0.25, 0.85, edge);
+    outColor = vec4(mix(shaded, line, wire_alpha), material.diffuse.a);
 }
 )";
 

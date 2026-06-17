@@ -372,6 +372,7 @@ private:
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
+    bool depth_image_initialized = false;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;

@@ -33,6 +33,33 @@ vkkk::Camera cam{
     100.0f
 };
 
+int g_draw_mode = 1; // 0=wireframe, 1=shaded, 2=shaded_wireframe
+
+struct DrawModeUBO {
+    int mode = 1;
+    int _pad0 = 0;
+    int _pad1 = 0;
+    int _pad2 = 0;
+};
+
+void sync_draw_mode_uniforms(vkkk::Context& ctx, uint32_t swapchain_idx) {
+    DrawModeUBO mode_ubo{};
+    mode_ubo.mode = g_draw_mode;
+    for (auto& [name, ubo] : ctx.ubos) {
+        const bool matches_block_name =
+            name.size() >= 9 && name.substr(name.size() - 9) == ":DrawMode";
+        const bool matches_instance_name =
+            name.size() >= 10 && name.substr(name.size() - 10) == ":draw_mode";
+        if (!matches_block_name && !matches_instance_name) {
+            continue;
+        }
+        if (swapchain_idx >= ubo.memos.size()) {
+            continue;
+        }
+        ctx.sync_uniform(ubo.memos[swapchain_idx], &mode_ubo, static_cast<uint32_t>(sizeof(mode_ubo)));
+    }
+}
+
 void key_callback(GLFWwindow* /*win*/, int key, int /*code*/, int action, int /*mods*/) {
     const bool key_down = action == GLFW_PRESS || action == GLFW_REPEAT;
     const bool key_up = action == GLFW_RELEASE;
@@ -54,6 +81,15 @@ void key_callback(GLFWwindow* /*win*/, int key, int /*code*/, int action, int /*
     }
     else if (key == GLFW_KEY_D) {
         cam.x = key_down ? 0.01f : (key_up ? 0.0f : cam.x);
+    }
+    else if (action == GLFW_PRESS && key == GLFW_KEY_1) {
+        g_draw_mode = 0; // wireframe
+    }
+    else if (action == GLFW_PRESS && key == GLFW_KEY_2) {
+        g_draw_mode = 1; // shaded
+    }
+    else if (action == GLFW_PRESS && key == GLFW_KEY_3) {
+        g_draw_mode = 2; // shaded + wireframe
     }
 }
 
@@ -215,6 +251,7 @@ int main() {
         view.swapchain_image_idx = idx;
         view.delta_seconds = frame_dt;
         renderer.update(view);
+        sync_draw_mode_uniforms(ctx, idx);
 
         hud.begin_frame();
         ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
@@ -232,6 +269,15 @@ int main() {
         ImGui::Text("FPS: %.1f", current_fps);
         ImGui::Text("Frame: %.2f ms", frame_dt * 1000.0f);
         ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
+        const char* draw_mode_label = "Shaded";
+        if (g_draw_mode == 0) {
+            draw_mode_label = "Wireframe";
+        }
+        else if (g_draw_mode == 2) {
+            draw_mode_label = "Shaded + Wireframe";
+        }
+        ImGui::Text("Draw Mode: %s", draw_mode_label);
+        ImGui::Text("Hotkeys: 1/2/3");
         ImGui::End();
 
         ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {

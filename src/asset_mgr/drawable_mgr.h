@@ -6,13 +6,18 @@
 #include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "utils/singleton.h"
+#include "vk_ins/ubo.hpp"
 
 namespace fs = std::filesystem;
 
 namespace vkkk
 {
 
-// class VkWrappedInstance; // Legacy wrapper forward declaration.
+struct Drawable {
+    std::string pipeline_name;
+    bool transparent = false;
+    UBOBase* ubo = nullptr;
+};
 
 class DrawableMgr : public Singleton<DrawableMgr> {
 private:

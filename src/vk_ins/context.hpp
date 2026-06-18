@@ -129,6 +129,13 @@ struct PipelineOption {
     }
 };
 
+// We have a design division here. ubo is actually bound to pipeline, the GPU part.
+// But the CPU part is actually not, it can be included here as a singleton here, or
+// helded with multiple copies by objs which might use the pipeline to draw. The
+// two different design means whether or not you should update entire uniform buffer
+// each time.
+// And especially, if the uniform members have logic relationships, or time related,
+// then you ultimately need multi-copies anyway.
 struct UBO {
     size_t                                  size;
     size_t                                  vecsize;

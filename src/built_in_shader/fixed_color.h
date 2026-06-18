@@ -3,36 +3,58 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-namespace vkkk::built_in_shader
+#include "vk_ins/ubo.hpp"
+
+namespace vkkk
 {
 
-struct FixedColorTransformUBO {
+struct FixedColorTransformUBO : public UBOBase {
     glm::mat4 model{1.0f};
     glm::mat4 view{1.0f};
     glm::mat4 proj{1.0f};
+
+    size_t size() const override {
+        return sizeof(FixedColorTransformUBO);
+    }
 };
 
-struct FixedColorUBO {
+struct FixedColorUBO : public UBOBase {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
+
+    size_t size() const override {
+        return sizeof(FixedColorUBO);
+    }
 };
 
 // draw_mode.x: 0=wireframe, 1=shaded, 2=shaded_wireframe
-struct FixedColorDrawModeUBO {
+struct FixedColorDrawModeUBO : public UBOBase {
     glm::ivec4 draw_mode{1, 0, 0, 0};
+
+    size_t size() const override {
+        return sizeof(FixedColorDrawModeUBO);
+    }
 };
 
-struct FixedColorMeshVerticesSSBO {
+struct FixedColorMeshVerticesSSBO : public UBOBase {
     glm::vec4 positions[3] = {
         glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
         glm::vec4(0.5f, -0.5f, 0.0f, 1.0f),
         glm::vec4(0.0f, 0.5f, 0.0f, 1.0f)
     };
+
+    size_t size() const override {
+        return sizeof(FixedColorMeshVerticesSSBO);
+    }
 };
 
-struct FixedColorMeshIndicesSSBO {
+struct FixedColorMeshIndicesSSBO : public UBOBase {
     glm::uvec4 triangles[1] = {
         glm::uvec4(0u, 1u, 2u, 0u)
     };
+
+    size_t size() const override {
+        return sizeof(FixedColorMeshIndicesSSBO);
+    }
 };
 
 inline constexpr const char fixed_color_vert[] = R"(

@@ -1,7 +1,12 @@
 #pragma once
 
+namespace vkkk
+{
+
 class UBOBase {
 public:
     virtual ~UBOBase() = default;
-    virtual void sync(uint32_t swapchain_idx) = 0;
+    virtual size_t size() const = 0;
 };
+
+}

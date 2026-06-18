@@ -3,7 +3,7 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-namespace vkkk::built_in_shader
+namespace vkkk
 {
 
 struct PBRTransformUBO {
@@ -143,4 +143,4 @@ void main() {
 }
 )";
 
-} // namespace vkkk::built_in_shader
+} // namespace vkkk

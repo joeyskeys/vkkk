@@ -4,7 +4,7 @@
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 
-namespace vkkk::built_in_shader
+namespace vkkk
 {
 
 // One light entry for shadow-atlas resolve in a single fullscreen pass.
@@ -169,4 +169,4 @@ void main() {
 }
 )";
 
-} // namespace vkkk::built_in_shader
+} // namespace vkkk

@@ -10,9 +10,6 @@
 namespace vkkk
 {
 
-namespace built_in_shader
-{
-
 namespace
 {
 
@@ -231,7 +228,5 @@ bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,
     ctx_->sync_uniform(ubo.memos[swapchain_image_idx], upload_data.data(), upload_size);
     return true;
 }
-
-} // namespace built_in_shader
 
 } // namespace vkkk

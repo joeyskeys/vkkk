@@ -11,9 +11,6 @@
 namespace vkkk
 {
 
-namespace built_in_shader
-{
-
 enum class BuiltInShaderType : uint8_t {
     FixedColor = 0,
     Phong,
@@ -61,7 +58,5 @@ private:
     Context* ctx_ = nullptr;
     std::unordered_map<BuiltInShaderType, ShaderModulePack> modules_;
 };
-
-} // namespace built_in_shader
 
 } // namespace vkkk

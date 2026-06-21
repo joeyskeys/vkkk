@@ -37,7 +37,7 @@ public:
     virtual void update(const RenderView& view) = 0;
 
     // Record draw commands into the active swapchain command buffer.
-    virtual void record_commands(VkCommandBuffer cmd, const RenderView& view) {}
+    virtual void record_commands(vk::CommandBuffer cmd, const RenderView& view) {}
 
     // Called when swapchain extent or render targets change.
     virtual void on_resize(uint32_t width, uint32_t height) = 0;

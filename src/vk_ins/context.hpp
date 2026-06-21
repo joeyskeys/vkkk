@@ -170,6 +170,8 @@ struct MeshGPU {
     void sync(const Mesh& mesh, class Context* ctx);
     void emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
         const vk::DescriptorSet* desc_set = nullptr) const;
+    void emit_draw_cmd_instanced(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
+        uint32_t instance_count, const vk::DescriptorSet* desc_set = nullptr) const;
 };
 
 struct CameraGPU {
@@ -210,6 +212,9 @@ public:
         uint32_t group_z = 1, uint32_t descriptor_set_index = 0);
     bool draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1) const;
+    bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
+        vk::PipelineLayout pipeline_layout, uint32_t instance_count,
+        const vk::DescriptorSet* desc_set = nullptr) const;
     void draw_frame();
     void wait_idle() const { device.waitIdle(); }
     void recreate_swapchain();

@@ -3,6 +3,8 @@
 #include <filesystem>
 #include <unordered_map>
 
+#include <glm/mat4x4.hpp>
+
 #include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "utils/singleton.h"
@@ -16,7 +18,9 @@ namespace vkkk
 // a Drawable is a content with necessary props to draw a obj, it doesn't directly
 // store any mesh.
 struct Drawable {
+    std::string mesh_name;
     std::string pipeline_name;
+    glm::mat4 model{1.0f};
     bool transparent = false;
     UBOBase* ubo = nullptr;
 };
@@ -50,7 +54,8 @@ public:
     const Mesh* find_mesh(const std::string& name) const;
 
     // drawable management
-    void setup_drawable(const std::string& name, const std::string& pipeline_name, bool transparent, UBOBase* ubo);
+    void setup_drawable(const std::string& name, const std::string& mesh_name, const std::string& pipeline_name,
+        const glm::mat4& model, bool transparent, UBOBase* ubo);
 
 private:
     std::unordered_map<std::string, Mesh>   meshes;

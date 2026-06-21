@@ -88,6 +88,17 @@ void MeshGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_la
     cmd_buf.drawIndexed(icnt * 3, 1, 0, 0, 0);
 }
 
+void MeshGPU::emit_draw_cmd_instanced(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
+    uint32_t instance_count, const vk::DescriptorSet* desc_set) const
+{
+    cmd_buf.bindVertexBuffers(0, *vbuf, {0});
+    if (desc_set != nullptr) {
+        cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, ppl_layout, 0, {*desc_set}, {});
+    }
+    cmd_buf.bindIndexBuffer(*ibuf, 0, vk::IndexType::eUint32);
+    cmd_buf.drawIndexed(icnt * 3, instance_count, 0, 0, 0);
+}
+
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
     vk::DebugUtilsMessageTypeFlagsEXT type,
@@ -1052,6 +1063,18 @@ bool Context::draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t 
         return false;
     }
     draw_mesh_tasks(static_cast<VkCommandBuffer>(cmd), group_x, group_y, group_z);
+    return true;
+}
+
+bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
+    vk::PipelineLayout pipeline_layout, uint32_t instance_count,
+    const vk::DescriptorSet* desc_set) const
+{
+    const auto mesh_found = meshes.find(mesh_name);
+    if (mesh_found == meshes.end()) {
+        return false;
+    }
+    mesh_found->second.emit_draw_cmd_instanced(cmd, pipeline_layout, instance_count, desc_set);
     return true;
 }
 

@@ -265,27 +265,21 @@ void DrawableMgr::add_line(const std::string& name, const std::vector<VERT_COMP>
     lines.insert_or_assign(name, std::move(line));
 }
 
-// Legacy path (old VkWrappedInstance wrapper). Temporarily disabled while testing Context.
-// void DrawableMgr::upload_gpu(VkWrappedInstance* ins, const std::string& name) const {
-//     auto m_found = meshes.find(name);
-//     if (m_found != meshes.end()) {
-//         ins->load_mesh(name, m_found->second);
-//         return;
-//     }
-//
-//     auto l_found = lines.find(name);
-//     if (l_found != lines.end()) {
-//         std::cout << "Drawable " << name << " is a line. "
-//             << "Line GPU upload path is not implemented yet." << std::endl;
-//         return;
-//     }
-//
-//     std::cout << "Drawable with name " << name << " not found.." << std::endl;
-// }
-
 const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
     const auto found = meshes.find(name);
     return found != meshes.end() ? &found->second : nullptr;
+}
+
+void DrawableMgr::setup_drawable(const std::string& name, const std::string& mesh_name,
+    const std::string& pipeline_name, const glm::mat4& model, bool transparent, UBOBase* ubo)
+{
+    Drawable drawable;
+    drawable.mesh_name = mesh_name;
+    drawable.pipeline_name = pipeline_name;
+    drawable.model = model;
+    drawable.transparent = transparent;
+    drawable.ubo = ubo;
+    drawables.emplace(name, std::move(drawable));
 }
 
 } // namespace vkkk

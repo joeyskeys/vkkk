@@ -1,8 +1,10 @@
 #include <chrono>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,6 +13,7 @@
 #include "asset_mgr/drawable_mgr.h"
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/scene.h"
+#include "built_in_shader/phong.h"
 #include "concepts/camera.h"
 #include "gui/gui.h"
 #include "renderer/forward_plus.h"
@@ -118,8 +121,18 @@ void mouse_pos_callback(GLFWwindow* /*win*/, double x, double y) {
     cam.rotation = glm::angleAxis(-delta_y, glm::vec3(1.0f, 0.0f, 0.0f)) * cam.rotation;
 }
 
-vkkk::built_in_shader::PhongMaterialUBO make_material(const glm::vec3& color, float shininess = 16.0f) {
-    vkkk::built_in_shader::PhongMaterialUBO material{};
+struct MaterialUBO : public vkkk::UBOBase {
+    vkkk::PhongMaterialUBO data{};
+
+    explicit MaterialUBO(const vkkk::PhongMaterialUBO& material) : data(material) {}
+
+    size_t size() const override {
+        return sizeof(data);
+    }
+};
+
+vkkk::PhongMaterialUBO make_material(const glm::vec3& color, float shininess = 16.0f) {
+    vkkk::PhongMaterialUBO material{};
     material.ambient = glm::vec4(color * 0.08f, 1.0f);
     material.diffuse = glm::vec4(color, 1.0f);
     material.specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f);
@@ -127,62 +140,62 @@ vkkk::built_in_shader::PhongMaterialUBO make_material(const glm::vec3& color, fl
     return material;
 }
 
-void setup_cornell_scene(vkkk::Scene& scene, vkkk::ForwardPlusRenderer& renderer) {
+void setup_cornell_scene(vkkk::Scene& scene, std::vector<std::unique_ptr<MaterialUBO>>& materials) {
     scene.drawable_mgr->add_plane("cornell_plane", {vkkk::VERTEX, vkkk::NORMAL}, 2.0f);
     scene.drawable_mgr->add_cube("cornell_cube", {vkkk::VERTEX, vkkk::NORMAL}, 1.0f);
     scene.light_mgr->add_pt_light(
         glm::vec4(0.0f, 0.85f, 0.0f, 1.0f),
         glm::vec4(1.0f, 1.0f, 1.0f, 1.0f));
 
-    const auto add_plane = [&](const char* pipeline_name, const glm::mat4& model,
-                               const glm::vec3& color, float shininess) {
-        vkkk::ForwardPlusDrawItem item{};
-        item.mesh_name = "cornell_plane";
-        item.pipeline_name = pipeline_name;
-        item.model = model;
-        item.material = make_material(color, shininess);
-        renderer.add_draw_item(item);
-    };
-
-    const auto add_cube = [&](const char* pipeline_name, const glm::mat4& model,
-                              const glm::vec3& color, float shininess) {
-        vkkk::ForwardPlusDrawItem item{};
-        item.mesh_name = "cornell_cube";
-        item.pipeline_name = pipeline_name;
-        item.model = model;
-        item.material = make_material(color, shininess);
-        renderer.add_draw_item(item);
-    };
-
-    add_plane("cornell_floor",
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.78f, 0.78f, 0.78f), 8.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_floor", "cornell_plane", "cornell_floor",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
-    add_plane("cornell_ceiling",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.78f, 0.78f, 0.78f), 8.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_ceiling", "cornell_plane", "cornell_ceiling",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
-    add_plane("cornell_back",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.78f, 0.78f, 0.78f), 8.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_back", "cornell_plane", "cornell_back",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-        glm::vec3(0.78f, 0.78f, 0.78f), 8.0f);
-    add_plane("cornell_left",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.72f, 0.12f, 0.12f), 8.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_left", "cornell_plane", "cornell_left",
         glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-        glm::vec3(0.72f, 0.12f, 0.12f), 8.0f);
-    add_plane("cornell_right",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.14f, 0.62f, 0.18f), 8.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_right", "cornell_plane", "cornell_right",
         glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-        glm::vec3(0.14f, 0.62f, 0.18f), 8.0f);
-    add_cube("cornell_short_box",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.82f, 0.82f, 0.82f), 24.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_short_box", "cornell_cube", "cornell_short_box",
         glm::translate(glm::mat4(1.0f), glm::vec3(-0.45f, -0.6f, -0.15f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(-18.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, 0.8f, 0.6f)),
-        glm::vec3(0.82f, 0.82f, 0.82f), 24.0f);
-    add_cube("cornell_tall_box",
+        false, materials.back().get());
+
+    materials.push_back(std::make_unique<MaterialUBO>(make_material(glm::vec3(0.82f, 0.82f, 0.82f), 24.0f)));
+    scene.drawable_mgr->setup_drawable(
+        "cornell_tall_box", "cornell_cube", "cornell_tall_box",
         glm::translate(glm::mat4(1.0f), glm::vec3(0.38f, -0.35f, 0.32f)) *
             glm::rotate(glm::mat4(1.0f), glm::radians(14.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
             glm::scale(glm::mat4(1.0f), glm::vec3(0.55f, 1.3f, 0.55f)),
-        glm::vec3(0.82f, 0.82f, 0.82f), 24.0f);
+        false, materials.back().get());
 }
 
 void upload_mesh(vkkk::Context& ctx, const vkkk::Scene& scene, const std::string& name) {
@@ -211,26 +224,16 @@ int main() {
     renderer.set_camera(&cam);
 
     vkkk::Scene scene;
-    setup_cornell_scene(scene, renderer);
+    std::vector<std::unique_ptr<MaterialUBO>> cornell_materials;
+    setup_cornell_scene(scene, cornell_materials);
     upload_mesh(ctx, scene, "cornell_plane");
     upload_mesh(ctx, scene, "cornell_cube");
     renderer.set_scene(&scene);
-
-    if (!renderer.missing_shaders().empty()) {
-        std::cerr << "missing forward+ shaders:";
-        for (const auto& shader : renderer.missing_shaders()) {
-            std::cerr << ' ' << shader;
-        }
-        std::cerr << std::endl;
-    }
 
     vkkk::ImGuiHud hud;
     if (!hud.init(&ctx)) {
         throw std::runtime_error("failed to initialize imgui hud");
     }
-    renderer.set_overlay_draw([&](vk::CommandBuffer cmd) {
-        hud.render(static_cast<VkCommandBuffer>(cmd));
-    });
 
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_btn_callback);
@@ -283,6 +286,7 @@ int main() {
         ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
             (void)image_index;
             renderer.record_commands(static_cast<vk::CommandBuffer>(*cmd_buf), view);
+            hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
         });
     });
 

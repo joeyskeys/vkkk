@@ -78,6 +78,28 @@ void main() {
 }
 )";
 
+inline constexpr const char phong_vert_instanced[] = R"(
+#version 460
+
+layout(std430, binding = 0) readonly buffer InstanceAttrs {
+    mat4 model;
+    vec4 color;
+} instance_attrs;
+
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inNormal;
+
+layout(location = 0) out vec3 fragPos;
+layout(location = 1) out vec3 fragNormal;
+
+void main() {
+    vec4 world_pos = instance_attrs.model * vec4(inPosition, 1.0);
+    fragPos = world_pos.xyz;
+    fragNormal = mat3(transpose(inverse(instance_attrs.model))) * inNormal;
+    gl_Position = ubo.proj * ubo.view * world_pos;
+}
+)";
+
 inline constexpr const char phong_mesh[] = R"(
 #version 460
 #extension GL_EXT_mesh_shader : require

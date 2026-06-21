@@ -57,7 +57,7 @@ struct FixedColorMeshIndicesSSBO : public UBOBase {
     }
 };
 
-inline constexpr const char fixed_color_vert[] = R"(
+inline constexpr char fixed_color_vert[] = R"(
 #version 450
 
 layout(binding = 0) uniform UniformBufferObject {
@@ -70,6 +70,23 @@ layout(location = 0) in vec3 inPosition;
 
 void main() {
     gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
+}
+)";
+
+inline constexpr const char fixed_color_vert_instanced[] = R"(
+#version 460
+
+layout(std430, binding = 0) readonly buffer InstanceAttrs {
+    mat4 model;
+    vec4 color;
+} instance_attrs;
+
+layout(location = 0) in vec3 inPosition;
+layout(location = 0) out vec4 fragColor;
+
+void main() {
+    gl_Position = ubo.proj * ubo.view * instance_attrs.model * vec4(inPosition, 1.0);
+    fragColor = instance_attrs.color;
 }
 )";
 

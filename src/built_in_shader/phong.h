@@ -81,9 +81,14 @@ void main() {
 inline constexpr const char phong_vert_instanced[] = R"(
 #version 460
 
-layout(std430, binding = 0) readonly buffer InstanceAttrs {
+layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
-    vec4 color;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+layout(std430, binding = 3) readonly buffer InstanceAttrs {
+    mat4 model[16];
 } instance_attrs;
 
 layout(location = 0) in vec3 inPosition;
@@ -93,9 +98,10 @@ layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
 
 void main() {
-    vec4 world_pos = instance_attrs.model * vec4(inPosition, 1.0);
+    mat4 model = instance_attrs.model[gl_InstanceIndex];
+    vec4 world_pos = model * vec4(inPosition, 1.0);
     fragPos = world_pos.xyz;
-    fragNormal = mat3(transpose(inverse(instance_attrs.model))) * inNormal;
+    fragNormal = mat3(transpose(inverse(model))) * inNormal;
     gl_Position = ubo.proj * ubo.view * world_pos;
 }
 )";
@@ -265,5 +271,21 @@ void main() {
     outColor = vec4(mix(shaded, line, wire_alpha), material.diffuse.a);
 }
 )";
+
+namespace built_in_shader
+{
+using PhongTransformUBO = ::vkkk::PhongTransformUBO;
+using PhongMaterialUBO = ::vkkk::PhongMaterialUBO;
+using PhongLightUBO = ::vkkk::PhongLightUBO;
+using PhongDrawModeUBO = ::vkkk::PhongDrawModeUBO;
+using PhongMeshVerticesSSBO = ::vkkk::PhongMeshVerticesSSBO;
+using PhongMeshNormalsSSBO = ::vkkk::PhongMeshNormalsSSBO;
+using PhongMeshIndicesSSBO = ::vkkk::PhongMeshIndicesSSBO;
+inline constexpr auto& phong_vert = ::vkkk::phong_vert;
+inline constexpr auto& phong_vert_instanced = ::vkkk::phong_vert_instanced;
+inline constexpr auto& phong_mesh = ::vkkk::phong_mesh;
+inline constexpr auto& phong_frag = ::vkkk::phong_frag;
+inline constexpr auto& phong_mesh_frag = ::vkkk::phong_mesh_frag;
+} // namespace built_in_shader
 
 } // namespace vkkk

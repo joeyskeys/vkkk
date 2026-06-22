@@ -76,17 +76,23 @@ void main() {
 inline constexpr const char fixed_color_vert_instanced[] = R"(
 #version 460
 
-layout(std430, binding = 0) readonly buffer InstanceAttrs {
+layout(binding = 0) uniform UniformBufferObject {
     mat4 model;
-    vec4 color;
+    mat4 view;
+    mat4 proj;
+} ubo;
+
+layout(std430, binding = 2) readonly buffer InstanceAttrs {
+    mat4 model[16];
+    vec4 color[16];
 } instance_attrs;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * instance_attrs.model * vec4(inPosition, 1.0);
-    fragColor = instance_attrs.color;
+    gl_Position = ubo.proj * ubo.view * instance_attrs.model[gl_InstanceIndex] * vec4(inPosition, 1.0);
+    fragColor = instance_attrs.color[gl_InstanceIndex];
 }
 )";
 
@@ -195,4 +201,18 @@ void main() {
 }
 )";
 
-} // namespace vkkk::built_in_shader
+namespace built_in_shader
+{
+using FixedColorTransformUBO = ::vkkk::FixedColorTransformUBO;
+using FixedColorUBO = ::vkkk::FixedColorUBO;
+using FixedColorDrawModeUBO = ::vkkk::FixedColorDrawModeUBO;
+using FixedColorMeshVerticesSSBO = ::vkkk::FixedColorMeshVerticesSSBO;
+using FixedColorMeshIndicesSSBO = ::vkkk::FixedColorMeshIndicesSSBO;
+inline constexpr auto& fixed_color_vert = ::vkkk::fixed_color_vert;
+inline constexpr auto& fixed_color_vert_instanced = ::vkkk::fixed_color_vert_instanced;
+inline constexpr auto& fixed_color_mesh = ::vkkk::fixed_color_mesh;
+inline constexpr auto& fixed_color_frag = ::vkkk::fixed_color_frag;
+inline constexpr auto& fixed_color_mesh_frag = ::vkkk::fixed_color_mesh_frag;
+} // namespace built_in_shader
+
+} // namespace vkkk

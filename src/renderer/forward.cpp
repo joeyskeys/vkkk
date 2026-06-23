@@ -421,10 +421,6 @@ void ForwardRenderer::pass_post_process(vk::CommandBuffer cmd, const RenderView&
     cmd.draw(3, 1, 0, 0);
 }
 
-void ForwardRenderer::record_commands(VkCommandBuffer cmd, const RenderView& view) {
-    record_commands(vk::CommandBuffer(cmd), view);
-}
-
 void ForwardRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& view) {
     if (!ctx) {
         return;

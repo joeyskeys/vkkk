@@ -109,6 +109,12 @@ target_link_libraries(vkrendererforwardplus
         vkkk
         OpenImageIO::OpenImageIO)
 
+add_executable(vkrendererfp renderer_main_fp.cpp)
+target_link_libraries(vkrendererfp
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
 #add_executable(vkrenderer renderer_main.cpp)
 #target_link_libraries(vkrenderer
     #PRIVATE

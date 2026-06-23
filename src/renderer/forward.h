@@ -45,8 +45,8 @@ struct PostParamsUBO {
 struct ForwardDrawItem {
     std::string mesh_name;
     std::string pipeline_name;
-    built_in_shader::BuiltInShaderType shader_type{
-        built_in_shader::BuiltInShaderType::Phong
+    vkkk::BuiltInShaderType shader_type{
+        vkkk::BuiltInShaderType::Phong
     };
     glm::mat4 model{1.0f};
     bool transparent = false;
@@ -80,8 +80,7 @@ public:
     void clear_draw_items();
 
     void update(const RenderView& view) override;
-    void record_commands(VkCommandBuffer cmd, const RenderView& view) override;
-    void record_commands(vk::CommandBuffer cmd, const RenderView& view);
+    void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
 
     void on_resize(uint32_t width, uint32_t height) override;
 

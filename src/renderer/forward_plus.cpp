@@ -14,6 +14,108 @@
 namespace vkkk
 {
 
+namespace
+{
+
+using built_in_shader::PhongTransformUBO;
+
+constexpr std::array<const char*, 4> kShaderSearchRoots = {
+    "resource/shaders/forward/",
+    "../resource/shaders/forward/",
+    "../../resource/shaders/forward/",
+    "../../../resource/shaders/forward/",
+};
+
+} // namespace
+
+std::optional<fs::path> ForwardPlusRenderer::resolve_shader_path(const char* filename) {
+    for (const auto* root : kShaderSearchRoots) {
+        const fs::path candidate = fs::path(root) / filename;
+        if (fs::exists(candidate)) {
+            return candidate;
+        }
+    }
+    if (std::find(missing_shaders_.begin(), missing_shaders_.end(), filename) == missing_shaders_.end()) {
+        missing_shaders_.push_back(filename);
+    }
+    return std::nullopt;
+}
+
+bool ForwardPlusRenderer::load_shader_pair(const char* vert_file, const char* frag_file,
+    ShaderModulePack& pack)
+{
+    const auto vert_path = resolve_shader_path(vert_file);
+    const auto frag_path = resolve_shader_path(frag_file);
+    if (!vert_path || !frag_path) {
+        return false;
+    }
+
+    ShaderModule vert;
+    ShaderModule frag;
+    if (!vert.load(*vert_path, vk::ShaderStageFlagBits::eVertex)) {
+        return false;
+    }
+    if (!frag.load(*frag_path, vk::ShaderStageFlagBits::eFragment)) {
+        return false;
+    }
+    return pack.add_shader_module(vert, true) && pack.add_shader_module(frag, true);
+}
+
+bool ForwardPlusRenderer::create_shader_pipeline(const char* pipeline_name,
+    const char* vert_file, const char* frag_file,
+    const std::vector<VERT_COMP>& components, PipelineOption& option)
+{
+    if (!ctx) {
+        return false;
+    }
+    ShaderModulePack pack;
+    if (!load_shader_pair(vert_file, frag_file, pack)) {
+        return false;
+    }
+    return ctx->create_pipeline(pipeline_name, pack, option, components);
+}
+
+PipelineOption ForwardPlusRenderer::make_base_pipeline_option() const {
+    PipelineOption option;
+    option.setup_multisampling(ctx->sample_rate_shading_enabled, ctx->nsample);
+    option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+        vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
+    option.setup_depth_stencil(true, true, vk::CompareOp::eLess, false, false);
+    option.setup_viewport(0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height), 0.0f, 1.0f);
+    option.setup_scissor(0, 0, width, height);
+    return option;
+}
+
+PipelineOption ForwardPlusRenderer::make_transparent_pipeline_option() const {
+    auto option = make_base_pipeline_option();
+    option.setup_depth_stencil(true, false, vk::CompareOp::eLess, false, false);
+    option.blend_attachment_info.blendEnable = vk::True;
+    option.blend_attachment_info.srcColorBlendFactor = vk::BlendFactor::eSrcAlpha;
+    option.blend_attachment_info.dstColorBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    option.blend_attachment_info.colorBlendOp = vk::BlendOp::eAdd;
+    option.blend_attachment_info.srcAlphaBlendFactor = vk::BlendFactor::eOne;
+    option.blend_attachment_info.dstAlphaBlendFactor = vk::BlendFactor::eOneMinusSrcAlpha;
+    option.blend_attachment_info.alphaBlendOp = vk::BlendOp::eAdd;
+    return option;
+}
+
+bool ForwardPlusRenderer::create_pass_pipelines() {
+    if (!ctx) {
+        return false;
+    }
+    const std::vector<VERT_COMP> phong_components{VERTEX, NORMAL};
+    auto opaque_option = make_base_pipeline_option();
+    if (!create_shader_pipeline(kOpaquePipeline, kShaderOpaqueVert, kShaderOpaqueFrag, phong_components, opaque_option)) {
+        return false;
+    }
+
+    auto transparent_option = make_transparent_pipeline_option();
+    if (!create_shader_pipeline(kTransparentPipeline, kShaderTransparentVert, kShaderTransparentFrag, phong_components, transparent_option)) {
+        return false;
+    }
+    return true;
+}
+
 bool ForwardPlusRenderer::initialize(Context* context) {
     ctx = context;
     if (!ctx) {
@@ -28,13 +130,42 @@ bool ForwardPlusRenderer::initialize(Context* context) {
         height = static_cast<uint32_t>(std::max(h, 1));
     }
 
-    return true;
+    missing_shaders_.clear();
+    return create_pass_pipelines();
 }
 
 void ForwardPlusRenderer::shutdown() {
+    destroy_pass_pipelines();
+    draw_items_.clear();
     ctx = nullptr;
     scene = nullptr;
     camera = nullptr;
+}
+
+void ForwardPlusRenderer::add_draw_item(const ForwardPlusDrawItem& item) {
+    if (!item.pipeline_name.empty()) {
+        ensure_draw_item_pipeline(item);
+    }
+    draw_items_.push_back(item);
+}
+
+void ForwardPlusRenderer::clear_draw_items() {
+    draw_items_.clear();
+}
+
+bool ForwardPlusRenderer::ensure_draw_item_pipeline(const ForwardPlusDrawItem& item) {
+    if (!ctx || item.pipeline_name.empty()) {
+        return false;
+    }
+    if (ctx->pipelines.find(item.pipeline_name) != ctx->pipelines.end()) {
+        return true;
+    }
+    const std::vector<VERT_COMP> components{VERTEX, NORMAL};
+    auto option = item.transparent ? make_transparent_pipeline_option() : make_base_pipeline_option();
+    return create_shader_pipeline(item.pipeline_name.c_str(),
+        item.transparent ? kShaderTransparentVert : kShaderOpaqueVert,
+        item.transparent ? kShaderTransparentFrag : kShaderOpaqueFrag,
+        components, option);
 }
 
 void ForwardPlusRenderer::on_resize(uint32_t width, uint32_t height) {
@@ -73,7 +204,7 @@ void ForwardPlusRenderer::update_shadow_from_scene() {
     shadow_light_view_ = glm::lookAt(light_pos, light_target, light_up);
     shadow_light_proj_ = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, 0.1f, 100.0f);
     shadow_light_proj_[1][1] *= -1.0f;
-    shadow_params_ubo_.lightSpace = shadow_light_proj_ * shadow_light_view_;
+    //shadow_params_ubo_.lightSpace = shadow_light_proj_ * shadow_light_view_;
 }
 
 void ForwardPlusRenderer::update_global_uniforms(uint32_t swapchain_idx) {
@@ -96,11 +227,13 @@ void ForwardPlusRenderer::update_global_uniforms(uint32_t swapchain_idx) {
         ctx->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
     };
 
+    /*
     for (const auto* pipeline_name : {kOpaquePipeline, kTransparentPipeline}) {
         sync_global_ubo(pipeline_name, ":UniformBufferObject", &camera_transform, sizeof(camera_transform));
         sync_global_ubo(pipeline_name, ":PhongLight", &light_ubo_, sizeof(light_ubo_));
         sync_global_ubo(pipeline_name, ":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
     }
+    */
 }
 
 void ForwardPlusRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
@@ -130,75 +263,11 @@ void ForwardPlusRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     sync_if_present(":PhongMaterial", &item.material, sizeof(item.material));
     sync_if_present(":light", &light_ubo_, sizeof(light_ubo_));
     sync_if_present(":PhongLight", &light_ubo_, sizeof(light_ubo_));
-    sync_if_present(":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
-}
-
-void ForwardPlusRenderer::sync_shadow_uniforms(uint32_t swapchain_idx, const ForwardPlusDrawItem& item) {
-    if (!ctx) {
-        return;
-    }
-
-    shadow_transform_ubo_.model = item.model;
-    shadow_transform_ubo_.lightView = shadow_light_view_;
-    shadow_transform_ubo_.lightProj = shadow_light_proj_;
-
-    const auto ubo_name = std::string(kShadowPipeline) + ":ShadowTransform";
-    auto found = ctx->ubos.find(ubo_name);
-    if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
-        return;
-    }
-    ctx->sync_uniform(found->second.memos[swapchain_idx], &shadow_transform_ubo_, sizeof(shadow_transform_ubo_));
+    //sync_if_present(":ShadowParams", &shadow_params_ubo_, sizeof(shadow_params_ubo_));
 }
 
 void ForwardPlusRenderer::prepare_light_clusters(const RenderView& view) {
-    if (!ctx) {
-        return;
-    }
-
-    if (ctx->compute_pipelines.find(kLightClusterComputePipeline) == ctx->compute_pipelines.end()) {
-        ComputeShader cluster_shader;
-        if (!cluster_shader.load(kLightClusterComputeShader, "forward_plus_light_clusters.comp")) {
-            return;
-        }
-        if (!ctx->create_compute_pipeline(kLightClusterComputePipeline, cluster_shader)) {
-            return;
-        }
-    }
-
-    const uint32_t dispatch_x = std::max(1u, (width + 15u) / 16u);
-    const uint32_t dispatch_y = std::max(1u, (height + 15u) / 16u);
-    ctx->dispatch_compute(kLightClusterComputePipeline, dispatch_x, dispatch_y, 1u, view.swapchain_image_idx);
-}
-
-void ForwardPlusRenderer::pass_shadow(vk::CommandBuffer cmd, const RenderView& view) {
-    if (!ctx) {
-        return;
-    }
-    const auto pipeline_found = ctx->pipelines.find(kShadowPipeline);
-    if (pipeline_found == ctx->pipelines.end()) {
-        return;
-    }
-
-    const auto& pipeline = pipeline_found->second;
-    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
-
-    for (const auto& item : draw_items_) {
-        if (item.transparent) {
-            continue;
-        }
-
-        const auto mesh_found = ctx->meshes.find(item.mesh_name);
-        if (mesh_found == ctx->meshes.end()) {
-            continue;
-        }
-
-        sync_shadow_uniforms(view.swapchain_image_idx, item);
-        const vk::DescriptorSet* desc_set = nullptr;
-        if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
-            desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
-        }
-        mesh_found->second.emit_draw_cmd(cmd, *pipeline.vk_pipeline_layout, desc_set);
-    }
+    (void)view;
 }
 
 void ForwardPlusRenderer::update(const RenderView& view) {
@@ -215,9 +284,62 @@ void ForwardPlusRenderer::record_commands(vk::CommandBuffer cmd, const RenderVie
         return;
     }
 
-    pass_shadow(cmd, view);
     pass_opaque(cmd, view);
     pass_transparent(cmd, view);
+    if (overlay_draw_) {
+        overlay_draw_(cmd);
+    }
+}
+
+void ForwardPlusRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
+    const std::vector<const ForwardPlusDrawItem*>& items, const char* fallback_pipeline)
+{
+    if (!ctx) {
+        return;
+    }
+    for (const auto* item : items) {
+        if (!item) {
+            continue;
+        }
+        const std::string& pipeline_name = item->pipeline_name.empty() ? fallback_pipeline : item->pipeline_name;
+        const auto mesh_found = ctx->meshes.find(item->mesh_name);
+        if (mesh_found == ctx->meshes.end()) {
+            continue;
+        }
+        const auto pipeline_found = ctx->pipelines.find(pipeline_name);
+        if (pipeline_found == ctx->pipelines.end()) {
+            continue;
+        }
+        const auto& pipeline = pipeline_found->second;
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+        sync_draw_item_uniforms(view.swapchain_image_idx, *item, pipeline_name);
+        const vk::DescriptorSet* desc_set = nullptr;
+        if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
+            desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
+        }
+        mesh_found->second.emit_draw_cmd(cmd, *pipeline.vk_pipeline_layout, desc_set);
+    }
+}
+
+void ForwardPlusRenderer::pass_opaque(vk::CommandBuffer cmd, const RenderView& view) {
+    std::vector<const ForwardPlusDrawItem*> opaque_items;
+    opaque_items.reserve(draw_items_.size());
+    for (const auto& item : draw_items_) {
+        if (!item.transparent) {
+            opaque_items.push_back(&item);
+        }
+    }
+    draw_batch(cmd, view, opaque_items, kOpaquePipeline);
+}
+
+void ForwardPlusRenderer::pass_transparent(vk::CommandBuffer cmd, const RenderView& view) {
+    std::vector<const ForwardPlusDrawItem*> transparent_items;
+    for (const auto& item : draw_items_) {
+        if (item.transparent) {
+            transparent_items.push_back(&item);
+        }
+    }
+    draw_batch(cmd, view, transparent_items, kTransparentPipeline);
 }
 
 } // namespace vkkk

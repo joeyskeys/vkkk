@@ -42,6 +42,18 @@ public:
     // Called when swapchain extent or render targets change.
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
 
+    // utils
+    inline bool create_pipeline_from_shader_src(const string& ppl_name, const char* vert_or_mesh, const char* frag) {
+        if (!ctx) {
+            return false;
+        }
+        ShaderModulePack pack;
+        if (!(pack.add_shader_module(vert_or_mesh) && pack.add_shader_module(frag))) {
+            return false;
+        }
+        return ctx->create_pipeline(ppl_name, pack, option, components);
+    }
+
 public:
     Context* ctx = nullptr;
     Scene* scene = nullptr;

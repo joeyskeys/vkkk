@@ -12,7 +12,7 @@ set(HEADERS
     concepts/line.h
     concepts/mesh.h
     gui/gui.h
-    renderer/renderer.h
+    renderer/renderer.hpp
     renderer/forward.h
     renderer/forward_plus.h
     renderer/deferred.h

@@ -3,12 +3,12 @@
 #include <glm/mat4x4.hpp>
 #include <glm/vec4.hpp>
 
-#include "vk_ins/ubo.hpp"
+#include "vk_ins/instance_attr.hpp"
 
 namespace vkkk
 {
 
-struct FixedColorTransformUBO : public UBOBase {
+struct FixedColorTransformUBO : public InstanceAttr {
     glm::mat4 model{1.0f};
     glm::mat4 view{1.0f};
     glm::mat4 proj{1.0f};
@@ -18,7 +18,7 @@ struct FixedColorTransformUBO : public UBOBase {
     }
 };
 
-struct FixedColorUBO : public UBOBase {
+struct FixedColorUBO : public InstanceAttr {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 
     size_t size() const override {
@@ -27,7 +27,7 @@ struct FixedColorUBO : public UBOBase {
 };
 
 // draw_mode.x: 0=wireframe, 1=shaded, 2=shaded_wireframe
-struct FixedColorDrawModeUBO : public UBOBase {
+struct FixedColorDrawModeUBO : public InstanceAttr {
     glm::ivec4 draw_mode{1, 0, 0, 0};
 
     size_t size() const override {
@@ -35,7 +35,7 @@ struct FixedColorDrawModeUBO : public UBOBase {
     }
 };
 
-struct FixedColorMeshVerticesSSBO : public UBOBase {
+struct FixedColorMeshVerticesSSBO : public InstanceAttr {
     glm::vec4 positions[3] = {
         glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
         glm::vec4(0.5f, -0.5f, 0.0f, 1.0f),
@@ -47,7 +47,7 @@ struct FixedColorMeshVerticesSSBO : public UBOBase {
     }
 };
 
-struct FixedColorMeshIndicesSSBO : public UBOBase {
+struct FixedColorMeshIndicesSSBO : public InstanceAttr {
     glm::uvec4 triangles[1] = {
         glm::uvec4(0u, 1u, 2u, 0u)
     };

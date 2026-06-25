@@ -15,8 +15,21 @@ class Scene;
 
 class ForwardPRenderer final : public Renderer {
 public:
+    const char* type_name() const override { return "ForwardP"; }
+
+    bool initialize(Context* context) override;
+    void shutdown() override;
+
+    void update(const RenderView& view) override;
+    void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
+
+    void on_resize(uint32_t width, uint32_t height) override;
 
 private:
+    void prepare_light_clusters(const RenderView& view);
+    void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
+    void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
+    void pass_shadow(vk::CommandBuffer cmd, const RenderView& view);
 };
 
 }

@@ -60,6 +60,11 @@ public:
     Camera* camera = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
+
+    // draw info: mesh name & instance attributes
+    using DrawInfos = std::unordered_map<std::string, std::vector<InstanceAttr>>;
+    // batch: value: pipeline name, key: draw infos
+    using Batch = std::unordered_map<std::string, DrawInfos>;
 };
 
 } // namespace vkkk

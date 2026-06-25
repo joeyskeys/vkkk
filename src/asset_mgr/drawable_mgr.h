@@ -15,15 +15,6 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
-// a Drawable is a content with necessary props to draw a obj, it doesn't directly
-// store any mesh.
-struct Drawable {
-    std::string mesh_name;
-    std::string pipeline_name;
-    InstanceAttr* instance_attrs = nullptr;
-    bool transparent = false;
-};
-
 class DrawableMgr : public Singleton<DrawableMgr> {
 private:
     DrawableMgr() {}
@@ -52,15 +43,9 @@ public:
     // void upload_gpu(VkWrappedInstance*, const std::string&) const;
     const Mesh* find_mesh(const std::string& name) const;
 
-    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const InstanceAttr& instance_attr);
-    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, InstanceAttr&& instance_attr);
-
 private:
     std::unordered_map<std::string, Mesh>   meshes;
     std::unordered_map<std::string, Line>   lines;
-    // key: mesh name & pipeline name pair
-    // value: vector of instance attributes
-    std::unordered_map<std::pair<std::string, std::string>, std::vector<InstanceAttr>> batches;
 };
 
 } // namespace vkkk

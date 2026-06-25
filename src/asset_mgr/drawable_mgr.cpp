@@ -270,16 +270,15 @@ const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
     return found != meshes.end() ? &found->second : nullptr;
 }
 
-void DrawableMgr::setup_drawable(const std::string& name, const std::string& mesh_name,
-    const std::string& pipeline_name, const glm::mat4& model, bool transparent, UBOBase* ubo)
+void DrawableMgr::add_drawble(const std::string& name, const std::string& mesh_name,
+    const std::string& pipeline_name, const InstanceAttr& instance_attr)
 {
-    Drawable drawable;
-    drawable.mesh_name = mesh_name;
-    drawable.pipeline_name = pipeline_name;
-    drawable.model = model;
-    drawable.transparent = transparent;
-    drawable.ubo = ubo;
-    drawables.emplace(name, std::move(drawable));
+    batches[std::make_pair(mesh_name, pipeline_name)].push_back(instance_attr);
+}
+
+void DrawableMgr::add_drawable(const std::string& mesh_name, const std::string& pipeline_name, InstanceAttr&& instance_attr)
+{
+    batches[std::make_pair(mesh_name, pipeline_name)].emplace_back(std::move(instance_attr));
 }
 
 } // namespace vkkk

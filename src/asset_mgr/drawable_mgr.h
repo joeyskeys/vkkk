@@ -8,7 +8,7 @@
 #include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "utils/singleton.h"
-#include "vk_ins/ubo.hpp"
+#include "vk_ins/instance_attr.hpp"
 
 namespace fs = std::filesystem;
 
@@ -20,9 +20,8 @@ namespace vkkk
 struct Drawable {
     std::string mesh_name;
     std::string pipeline_name;
-    glm::mat4 model{1.0f};
+    InstanceAttr* instance_attrs = nullptr;
     bool transparent = false;
-    UBOBase* ubo = nullptr;
 };
 
 class DrawableMgr : public Singleton<DrawableMgr> {
@@ -53,14 +52,15 @@ public:
     // void upload_gpu(VkWrappedInstance*, const std::string&) const;
     const Mesh* find_mesh(const std::string& name) const;
 
-    // drawable management
-    void setup_drawable(const std::string& name, const std::string& mesh_name, const std::string& pipeline_name,
-        const glm::mat4& model, bool transparent, UBOBase* ubo);
+    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const InstanceAttr& instance_attr);
+    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, InstanceAttr&& instance_attr);
 
 private:
     std::unordered_map<std::string, Mesh>   meshes;
     std::unordered_map<std::string, Line>   lines;
-    std::unordered_map<std::string, Drawable> drawables;
+    // key: mesh name & pipeline name pair
+    // value: vector of instance attributes
+    std::unordered_map<std::pair<std::string, std::string>, std::vector<InstanceAttr>> batches;
 };
 
 } // namespace vkkk

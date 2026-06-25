@@ -11,7 +11,7 @@
 
 #include "built_in_shader/built_in_shader_mgr.h"
 #include "built_in_shader/phong.h"
-#include "renderer/renderer.h"
+#include "renderer/renderer.hpp"
 #include "vk_ins/context.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 

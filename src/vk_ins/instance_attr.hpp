@@ -3,9 +3,9 @@
 namespace vkkk
 {
 
-class UBOBase {
+class InstanceAttr {
 public:
-    virtual ~UBOBase() = default;
+    virtual ~InstanceAttr() = default;
     virtual size_t size() const = 0;
 };
 

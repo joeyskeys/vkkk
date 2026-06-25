@@ -25,7 +25,8 @@ set(HEADERS
     #vk_ins/vkabstraction.h
     #vk_ins/shader_mgr.h
     vk_ins/shader_module_pack.hpp
-    vk_ins/context.hpp)
+    vk_ins/context.hpp
+    vk_ins/instance_attr.hpp)
 
 set(SRCS
     ../thirdparty/imgui/imgui.cpp

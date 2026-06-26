@@ -43,7 +43,11 @@ public:
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
 
     // utils
-    inline bool create_pipeline_from_shader_src(const string& ppl_name, const char* vert_or_mesh, const char* frag) {
+    inline bool create_pipeline_from_shader_src(const string& ppl_name,
+        const char* vert_or_mesh,
+        const char* frag,
+        const PipelineOption& option)
+    {
         if (!ctx) {
             return false;
         }

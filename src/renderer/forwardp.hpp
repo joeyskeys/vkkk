@@ -22,11 +22,10 @@ public:
 
     bool initialize(Context* context) override;
     void shutdown() override;
+    void on_resize(uint32_t width, uint32_t height) override;
 
     void update(const RenderView& view) override;
     void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
-
-    void on_resize(uint32_t width, uint32_t height) override;
 
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const InstanceAttr& instance_attr) {

@@ -15,6 +15,7 @@ set(HEADERS
     renderer/renderer.hpp
     renderer/forward.h
     renderer/forward_plus.h
+    renderer/forwardp.hpp
     renderer/deferred.h
     utils/common.h
     utils/io.h
@@ -45,6 +46,7 @@ set(SRCS
     gui/gui.cpp
     renderer/forward.cpp
     renderer/forward_plus.cpp
+    renderer/forwardp.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
     vk_ins/compute_shader.cpp

@@ -41,8 +41,15 @@ public:
 
 private:
     void prepare_light_clusters(const RenderView& view);
-    void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
-    void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
+
+    inline void pass_opaque(vk::CommandBuffer cmd, const RenderView& view) {
+        draw_batch(cmd, view, opaque_batch);
+    }
+
+    inline void pass_transparent(vk::CommandBuffer cmd, const RenderView& view) {
+        draw_batch(cmd, view, transparent_batch);
+    }
+
     void pass_shadow(vk::CommandBuffer cmd, const RenderView& view);
     void draw_batch(vk::CommandBuffer cmd, const RenderView& view, const Batch& batch);
 

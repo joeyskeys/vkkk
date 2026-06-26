@@ -49,5 +49,48 @@ void ForwardPRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& 
 }
 
 // private funcs
+void ForwardPRenderer::prepare_light_clusters(const RenderView& view) {
+    (void)view;
+}
+
+void ForwardPRenderer::pass_shadow(vk::CommandBuffer cmd, const RenderView& view) {
+    (void)cmd;
+    (void)view;
+}
+
+void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view, const Batch& batch) {
+    if (!ctx) {
+        return;
+    }
+
+    for (const auto& [pipeline_name, draw_infos] : batch) {
+        const auto pipeline_it = ctx->pipelines.find(pipeline_name);
+        if (pipeline_it == ctx->pipelines.end()) {
+            continue;
+        }
+
+        const auto& pipeline = pipeline_it->second;
+        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+
+        const vk::DescriptorSet* desc_set = nullptr;
+        if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
+            desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
+        }
+
+        for (const auto& [mesh_name, instance_attrs] : draw_infos) {
+            const auto instance_count = static_cast<uint32_t>(instance_attrs.size());
+            if (instance_count == 0u) {
+                continue;
+            }
+
+            ctx->draw_mesh_instanced(
+                cmd,
+                mesh_name,
+                *pipeline.vk_pipeline_layout,
+                instance_count,
+                desc_set);
+        }
+    }
+}
 
 }

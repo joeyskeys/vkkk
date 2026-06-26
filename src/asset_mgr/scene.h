@@ -9,6 +9,7 @@ namespace vkkk
 
 class DrawableMgr;
 class LightMgr;
+class Camera;
 
 class Scene {
 public:
@@ -16,6 +17,7 @@ public:
 
     DrawableMgr*    drawable_mgr;
     LightMgr*       light_mgr;
+    Camera*         camera;
 };
 
 }

@@ -20,14 +20,14 @@ set(HEADERS
     utils/common.h
     utils/io.h
     utils/singleton.h
+    utils/sizeable.hpp
     vk_ins/cmd_buf.h
     vk_ins/misc.h
     vk_ins/compute_shader.hpp
     #vk_ins/vkabstraction.h
     #vk_ins/shader_mgr.h
     vk_ins/shader_module_pack.hpp
-    vk_ins/context.hpp
-    vk_ins/instance_attr.hpp)
+    vk_ins/context.hpp)
 
 set(SRCS
     ../thirdparty/imgui/imgui.cpp

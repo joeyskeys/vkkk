@@ -9,21 +9,9 @@
 namespace vkkk
 {
 
-struct FixedColorUBO : public Sizeable<FixedColorUBO> {
+struct FixedColorInstanceAttrs: public Sizeable<FixedColorUBO> {
+    glm::mat4 model{1.0f};
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
-
-    size_t size() const override {
-        return sizeof(FixedColorUBO);
-    }
-};
-
-// draw_mode.x: 0=wireframe, 1=shaded, 2=shaded_wireframe
-struct FixedColorDrawModeUBO : public Sizeable<FixedColorDrawModeUBO> {
-    glm::ivec4 draw_mode{1, 0, 0, 0};
-
-    size_t size() const override {
-        return sizeof(FixedColorDrawModeUBO);
-    }
 };
 
 inline constexpr const char fixed_color_vert[] = R"(
@@ -34,7 +22,7 @@ layout(binding = 0) uniform CameraUBO {
     mat4 proj;
 } ubo;
 
-layout(std430, binding = 2) readonly buffer InstanceAttrs {
+layout(std430, binding = 2) readonly buffer FixedColorInstanceAttrs {
     mat4 model[16];
     vec4 color[16];
 } instance_attrs;
@@ -64,13 +52,10 @@ void main() {
 
 namespace built_in_shader
 {
-using FixedColorTransformUBO = ::vkkk::FixedColorTransformUBO;
+using FixedColorTransformUBO = ::vkkk::CameraUBO;
 using FixedColorUBO = ::vkkk::FixedColorUBO;
 using FixedColorDrawModeUBO = ::vkkk::FixedColorDrawModeUBO;
-using FixedColorMeshVerticesSSBO = ::vkkk::FixedColorMeshVerticesSSBO;
-using FixedColorMeshIndicesSSBO = ::vkkk::FixedColorMeshIndicesSSBO;
 inline constexpr auto& fixed_color_vert = ::vkkk::fixed_color_vert;
-inline constexpr auto& fixed_color_vert_instanced = ::vkkk::fixed_color_vert_instanced;
 inline constexpr auto& fixed_color_frag = ::vkkk::fixed_color_frag;
 } // namespace built_in_shader
 

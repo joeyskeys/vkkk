@@ -9,15 +9,6 @@
 namespace vkkk
 {
 
-struct FixedColorTransformUBO : public Sizeable<FixedColorTransformUBO> {
-    glm::mat4 view{1.0f};
-    glm::mat4 proj{1.0f};
-
-    size_t size() const override {
-        return sizeof(FixedColorTransformUBO);
-    }
-};
-
 struct FixedColorUBO : public Sizeable<FixedColorUBO> {
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 
@@ -35,49 +26,10 @@ struct FixedColorDrawModeUBO : public Sizeable<FixedColorDrawModeUBO> {
     }
 };
 
-struct FixedColorMeshVerticesSSBO : public Sizeable<FixedColorMeshVerticesSSBO> {
-    glm::vec4 positions[3] = {
-        glm::vec4(-0.5f, -0.5f, 0.0f, 1.0f),
-        glm::vec4(0.5f, -0.5f, 0.0f, 1.0f),
-        glm::vec4(0.0f, 0.5f, 0.0f, 1.0f)
-    };
-
-    size_t size() const override {
-        return sizeof(FixedColorMeshVerticesSSBO);
-    }
-};
-
-struct FixedColorMeshIndicesSSBO : public Sizeable<FixedColorMeshIndicesSSBO> {
-    glm::uvec4 triangles[1] = {
-        glm::uvec4(0u, 1u, 2u, 0u)
-    };
-
-    size_t size() const override {
-        return sizeof(FixedColorMeshIndicesSSBO);
-    }
-};
-
-inline constexpr char fixed_color_vert[] = R"(
-#version 450
-
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
-    mat4 view;
-    mat4 proj;
-} ubo;
-
-layout(location = 0) in vec3 inPosition;
-
-void main() {
-    gl_Position = ubo.proj * ubo.view * ubo.model * vec4(inPosition, 1.0);
-}
-)";
-
-inline constexpr const char fixed_color_vert_instanced[] = R"(
+inline constexpr const char fixed_color_vert[] = R"(
 #version 460
 
-layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
+layout(binding = 0) uniform CameraUBO {
     mat4 view;
     mat4 proj;
 } ubo;
@@ -119,9 +71,7 @@ using FixedColorMeshVerticesSSBO = ::vkkk::FixedColorMeshVerticesSSBO;
 using FixedColorMeshIndicesSSBO = ::vkkk::FixedColorMeshIndicesSSBO;
 inline constexpr auto& fixed_color_vert = ::vkkk::fixed_color_vert;
 inline constexpr auto& fixed_color_vert_instanced = ::vkkk::fixed_color_vert_instanced;
-inline constexpr auto& fixed_color_mesh = ::vkkk::fixed_color_mesh;
 inline constexpr auto& fixed_color_frag = ::vkkk::fixed_color_frag;
-inline constexpr auto& fixed_color_mesh_frag = ::vkkk::fixed_color_mesh_frag;
 } // namespace built_in_shader
 
 } // namespace vkkk

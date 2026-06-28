@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <stdexcept>
 #include <utility>
 
 #include <glm/gtc/matrix_transform.hpp>
@@ -270,11 +271,16 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     auto sync_global_ubo = [&](const char* pipeline_name, const char* suffix,
                                const void* data, size_t size) {
         const auto ubo_name = std::string(pipeline_name) + suffix;
-        auto found = ctx->ubos.find(ubo_name);
-        if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
+        UBO* ubo = nullptr;
+        try {
+            ubo = &ctx->require_ubo(ubo_name);
+        } catch (const std::runtime_error&) {
             return;
         }
-        ctx->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
+        if (swapchain_idx >= ubo->memos.size()) {
+            return;
+        }
+        ctx->sync_uniform(ubo->memos[swapchain_idx], data, static_cast<uint32_t>(size));
     };
 
     for (const auto* pipeline_name : {kOpaquePipeline, kTransparentPipeline}) {
@@ -302,11 +308,16 @@ void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
 
     auto sync_if_present = [&](const std::string& ubo_suffix, const void* data, size_t size) {
         const auto ubo_name = pipeline_name + ubo_suffix;
-        auto found = ctx->ubos.find(ubo_name);
-        if (found == ctx->ubos.end() || swapchain_idx >= found->second.memos.size()) {
+        UBO* ubo = nullptr;
+        try {
+            ubo = &ctx->require_ubo(ubo_name);
+        } catch (const std::runtime_error&) {
             return;
         }
-        ctx->sync_uniform(found->second.memos[swapchain_idx], data, static_cast<uint32_t>(size));
+        if (swapchain_idx >= ubo->memos.size()) {
+            return;
+        }
+        ctx->sync_uniform(ubo->memos[swapchain_idx], data, static_cast<uint32_t>(size));
     };
 
     sync_if_present(":ubo", &transform_ubo, sizeof(transform_ubo));

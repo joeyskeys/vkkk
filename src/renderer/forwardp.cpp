@@ -72,6 +72,10 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         const auto& pipeline = pipeline_it->second;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
+        if (update_ssbo) {
+            ctx->sync_ssbo(pipeline.ssbos[SSBOType_InstanceAttrs]);
+        }
+
         const vk::DescriptorSet* desc_set = nullptr;
         if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
             desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];

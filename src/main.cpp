@@ -130,22 +130,26 @@ int main() {
         throw std::runtime_error("triangle mesh not found");
     auto& tri_mesh_gpu = mesh_found->second;
 
-    auto cam_ubo_found = ins.ubos.find("default:camera");
-    if (cam_ubo_found == ins.ubos.end())
-        cam_ubo_found = ins.ubos.find("default:Camera");
-    if (cam_ubo_found == ins.ubos.end())
-        throw std::runtime_error("camera ubo not found");
-    auto& cam_ubo = cam_ubo_found->second;
+    UBO* cam_ubo = nullptr;
+    try {
+        cam_ubo = &ins.require_ubo("default:camera");
+    } catch (const std::runtime_error&) {
+        try {
+            cam_ubo = &ins.require_ubo("default:Camera");
+        } catch (const std::runtime_error&) {
+            throw std::runtime_error("camera ubo not found");
+        }
+    }
     auto swapchain_cnt = ins.get_swapchain_cnt();
     std::vector<vkkk::CameraGPU> cam_gpus(swapchain_cnt);
     for (uint32_t i = 0; i < swapchain_cnt; ++i) {
         auto& cam_gpu = cam_gpus[i];
-        cam_gpu.binding = cam_ubo.binding;
-        cam_gpu.buf = cam_ubo.gpu_bufs[i];
-        cam_gpu.memo = cam_ubo.memos[i];
+        cam_gpu.binding = cam_ubo->binding;
+        cam_gpu.buf = cam_ubo->gpu_bufs[i];
+        cam_gpu.memo = cam_ubo->memos[i];
         cam_gpu.descriptor.buffer = cam_gpu.buf;
         cam_gpu.descriptor.offset = 0;
-        cam_gpu.descriptor.range = cam_ubo.size * cam_ubo.vecsize;
+        cam_gpu.descriptor.range = cam_ubo->size * cam_ubo->vecsize;
     }
 
     VkDescriptorPoolSize pool_size{

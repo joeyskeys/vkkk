@@ -1,5 +1,6 @@
 #include <cstring>
 #include <iostream>
+#include <stdexcept>
 #include <utility>
 
 #include "built_in_shader/built_in_shader_mgr.h"
@@ -204,20 +205,21 @@ bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,
         return false;
     }
 
-    auto found = ctx_->ubos.find(uniform_full_name);
-    if (found == ctx_->ubos.end()) {
+    UBO* ubo = nullptr;
+    try {
+        ubo = &ctx_->require_ubo(uniform_full_name);
+    } catch (const std::runtime_error&) {
         std::cout << "Uniform " << uniform_full_name << " not found" << std::endl;
         return false;
     }
 
-    auto& ubo = found->second;
-    if (swapchain_image_idx >= ubo.memos.size()) {
+    if (swapchain_image_idx >= ubo->memos.size()) {
         std::cout << "Swapchain image idx " << swapchain_image_idx
             << " is out of range for uniform " << uniform_full_name << std::endl;
         return false;
     }
 
-    const uint32_t upload_size = static_cast<uint32_t>(ubo.size * ubo.vecsize);
+    const uint32_t upload_size = static_cast<uint32_t>(ubo->size * ubo->vecsize);
     if (bytes.size() > upload_size) {
         std::cout << "Uniform default data too large for " << uniform_full_name << std::endl;
         return false;
@@ -225,7 +227,7 @@ bool BuiltInShaderMgr::write_uniform(const std::string& uniform_full_name,
 
     std::vector<uint8_t> upload_data(upload_size, 0);
     std::memcpy(upload_data.data(), bytes.data(), bytes.size());
-    ctx_->sync_uniform(ubo.memos[swapchain_image_idx], upload_data.data(), upload_size);
+    ctx_->sync_uniform(ubo->memos[swapchain_image_idx], upload_data.data(), upload_size);
     return true;
 }
 

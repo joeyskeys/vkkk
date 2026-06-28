@@ -49,6 +49,39 @@ constexpr uint32_t max_frames_in_flight = 2;
 
 class Camera;
 
+// We have a design division here. ubo is actually bound to pipeline, the GPU part.
+// But the CPU part is actually not, it can be included here as a singleton here, or
+// helded with multiple copies by objs which might use the pipeline to draw. The
+// two different design means whether or not you should update entire uniform buffer
+// each time.
+// And especially, if the uniform members have logic relationships, or time related,
+// then you ultimately need multi-copies anyway.
+struct UBO {
+    size_t                                  size;
+    size_t                                  vecsize;
+    uint32_t                                binding;
+    vk::DescriptorType                      descriptor_type = vk::DescriptorType::eUniformBuffer;
+    std::shared_ptr<char[]>                 cpu_buf;
+    std::vector<vk::raii::Buffer>           gpu_bufs;
+    std::vector<vk::raii::DeviceMemory>     memos;
+    std::vector<vk::DescriptorBufferInfo>   descriptors;
+};
+
+using SSBO = UBO;
+
+struct Texture {
+    uint32_t                                binding;
+    size_t                                  vecsize;
+    uint32_t                                width = 0;
+    uint32_t                                height = 0;
+    vk::raii::Image                         image{nullptr};
+    vk::raii::DeviceMemory                  memo{nullptr};
+    vk::raii::ImageView                     view{nullptr};
+    vk::ImageLayout                         layout;
+    vk::DescriptorImageInfo                 descriptor;
+    vk::raii::Sampler                       sampler{nullptr};
+};
+
 struct Pipeline {
     vk::raii::Pipeline vk_pipeline{nullptr};
     vk::raii::PipelineLayout vk_pipeline_layout{nullptr};
@@ -56,6 +89,9 @@ struct Pipeline {
     vk::raii::DescriptorPool descriptor_pool{nullptr};
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
     bool uses_mesh_shader = false;
+
+    std::unordered_map<UBOType, UBO> ubos;
+    std::unordered_map<SSBOType, SSBO> ssbos;
 };
 
 struct ComputePipeline {
@@ -64,6 +100,7 @@ struct ComputePipeline {
     vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
     vk::raii::DescriptorPool descriptor_pool{nullptr};
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
+    std::unordered_map<std::string, UBO> ubos;
 };
 
 struct PipelineOption {
@@ -129,37 +166,6 @@ struct PipelineOption {
     }
 };
 
-// We have a design division here. ubo is actually bound to pipeline, the GPU part.
-// But the CPU part is actually not, it can be included here as a singleton here, or
-// helded with multiple copies by objs which might use the pipeline to draw. The
-// two different design means whether or not you should update entire uniform buffer
-// each time.
-// And especially, if the uniform members have logic relationships, or time related,
-// then you ultimately need multi-copies anyway.
-struct UBO {
-    size_t                                  size;
-    size_t                                  vecsize;
-    uint32_t                                binding;
-    vk::DescriptorType                      descriptor_type = vk::DescriptorType::eUniformBuffer;
-    std::shared_ptr<char[]>                 cpu_buf;
-    std::vector<vk::raii::Buffer>           gpu_bufs;
-    std::vector<vk::raii::DeviceMemory>     memos;
-    std::vector<vk::DescriptorBufferInfo>   descriptors;
-};
-
-struct Texture {
-    uint32_t                                binding;
-    size_t                                  vecsize;
-    uint32_t                                width = 0;
-    uint32_t                                height = 0;
-    vk::raii::Image                         image{nullptr};
-    vk::raii::DeviceMemory                  memo{nullptr};
-    vk::raii::ImageView                     view{nullptr};
-    vk::ImageLayout                         layout;
-    vk::DescriptorImageInfo                 descriptor;
-    vk::raii::Sampler                       sampler{nullptr};
-};
-
 struct MeshGPU {
     vk::raii::Buffer                        vbuf{nullptr};
     vk::raii::DeviceMemory                  vbuf_memo{nullptr};
@@ -221,7 +227,11 @@ public:
     void record_cmds(uint32_t image_index,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func);
 
-    bool add_ubo(const std::string& name, uint32_t binding,
+    bool add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
+        uint32_t size, uint32_t vecsize = 1,
+        vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
+        vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
+    bool add_ubo(std::unordered_map<std::string, UBO>& ubos, const std::string& name, uint32_t binding,
         uint32_t size, uint32_t vecsize = 1,
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
         vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
@@ -252,6 +262,7 @@ public:
     }
 
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
+    void sync_ssbo(const SSBO& ssbo) const;
     UBO& require_ubo(const std::string& full_name);
     GLFWwindow* get_window() const { return window; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
@@ -404,7 +415,6 @@ public:
     bool frame_buffer_resized = false;
     bool sample_rate_shading_enabled = false;
 
-    std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, Texture> textures;
     std::vector<Texture> targets;
 };

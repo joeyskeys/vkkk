@@ -11,7 +11,7 @@ public:
     }
 
     const void* get_data() const {
-        return
+        return static_cast<const void*>(static_cast<const Derived*>(this));
     }
 };
 

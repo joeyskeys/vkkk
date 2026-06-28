@@ -8,6 +8,17 @@
 namespace vkkk
 {
 
+enum UBOType {
+    UBOType_Camera,
+    UBOType_PointLight,
+    UBOType_DirectionalLight,
+    UBOType_SpotLight
+};
+
+enum SSBOType {
+    SSBOType_InstanceAttrs
+};
+
 struct CameraUBO : public Sizeable<CameraUBO> {
     glm::mat4 view{1.0f};
     glm::mat4 proj{1.0f};

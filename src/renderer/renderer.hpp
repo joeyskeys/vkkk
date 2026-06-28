@@ -43,20 +43,17 @@ public:
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
 
     // utils
-    inline bool create_pipeline_from_shader_src(const string& ppl_name,
+    bool create_pipeline_from_shader_src(const string& ppl_name,
         const char* vert_or_mesh,
         const char* frag,
-        const PipelineOption& option)
-    {
-        if (!ctx) {
-            return false;
-        }
-        ShaderModulePack pack;
-        if (!(pack.add_shader_module(vert_or_mesh) && pack.add_shader_module(frag))) {
-            return false;
-        }
-        return ctx->create_pipeline(ppl_name, pack, option, components);
-    }
+        const PipelineOption& option);
+
+    void sync_uniforms(const uint32_t swapchain_idx,
+        const InstanceAttr& instance_attr,
+        const std::string& pipeline_name);
+    void sync_ssbos(const uint32_t swapchain_idx,
+        const InstanceAttr& instance_attr,
+        const Pipeline& pipeline);
 
 public:
     Context* ctx = nullptr;
@@ -64,6 +61,7 @@ public:
     Camera* camera = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
+    bool update_ssbo = false;
 
     // draw info: mesh name & instance attributes
     using DrawInfos = std::unordered_map<std::string, std::vector<InstanceAttr>>;

@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cstring>
 #include <iostream>
@@ -15,6 +16,35 @@
 
 namespace vkkk
 {
+
+namespace {
+
+bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
+    if (reflected_name == "CameraUBO" || reflected_name == "UniformBufferObject"
+        || reflected_name == "ubo" || reflected_name == "camera"
+        || reflected_name == "Camera")
+    {
+        out_type = UBOType_Camera;
+        return true;
+    }
+    if (reflected_name == "PointLightUBO" || reflected_name == "PhongLight"
+        || reflected_name == "light")
+    {
+        out_type = UBOType_PointLight;
+        return true;
+    }
+    if (reflected_name == "DirectionalLightUBO") {
+        out_type = UBOType_DirectionalLight;
+        return true;
+    }
+    if (reflected_name == "SpotLightUBO") {
+        out_type = UBOType_SpotLight;
+        return true;
+    }
+    return false;
+}
+
+} // namespace
 
 PipelineOption::PipelineOption() {
     vert_info = vk::PipelineVertexInputStateCreateInfo{};
@@ -563,9 +593,11 @@ bool Context::create_pipeline(const std::string& name,
     std::vector<vk::VertexInputBindingDescription> input_binding_descs;
     std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
-    std::map<uint32_t, std::string> ubo_binding_to_name;
-    std::map<uint32_t, std::string> storage_binding_to_name;
+    std::map<uint32_t, UBOType> ubo_binding_to_type;
+    std::map<uint32_t, SSBOType> storage_binding_to_type;
     std::map<uint32_t, std::string> tex_binding_to_name;
+    std::unordered_map<UBOType, UBO> pipeline_ubos;
+    std::unordered_map<SSBOType, SSBO> pipeline_ssbos;
     const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eTaskEXT);
@@ -628,9 +660,14 @@ bool Context::create_pipeline(const std::string& name,
 
         for (const auto& [ubo_name, ubo_info] : module.buf_infos) {
             const auto& [struct_size, array_size, binding] = ubo_info;
-            const auto ppl_ubo_name = name + ":" + ubo_name;
-            add_ubo(ppl_ubo_name, binding, struct_size, array_size);
-            ubo_binding_to_name[binding] = ppl_ubo_name;
+            UBOType ubo_type{};
+            if (!resolve_ubo_type(ubo_name, ubo_type)) {
+                assert(false && "Unsupported UBO type in create_pipeline reflection.");
+                continue;
+            }
+            const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
+            add_ubo(pipeline_ubos, ubo_type, binding, alloc_size, array_size);
+            ubo_binding_to_type[binding] = ubo_type;
 
             vk::DescriptorSetLayoutBinding layout_binding{};
             layout_binding.binding = binding;
@@ -640,16 +677,40 @@ bool Context::create_pipeline(const std::string& name,
             descriptor_layouts.push_back(layout_binding);
         }
 
-        for (const auto& [ssbo_name, ssbo_info] : module.storage_buf_infos) {
-            const auto& [struct_size, array_size, binding] = ssbo_info;
-            const auto ppl_ssbo_name = name + ":" + ssbo_name;
-            const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
-            add_ubo(
-                ppl_ssbo_name, binding, alloc_size, array_size,
-                vk::BufferUsageFlagBits::eStorageBuffer,
-                vk::DescriptorType::eStorageBuffer);
-            storage_binding_to_name[binding] = ppl_ssbo_name;
+        if (!module.storage_buf_infos.empty()) {
+            assert(module.storage_buf_infos.size() == 1 && "Only one SSBO per shader module is supported.");
+            assert(pipeline_ssbos.empty() && "Only one SSBO per shader pipeline is supported.");
 
+            const auto& [ssbo_name, ssbo_info] = *module.storage_buf_infos.begin();
+            (void)ssbo_name;
+            const auto& [struct_size, array_size, binding] = ssbo_info;
+            const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
+
+            SSBO ssbo{};
+            ssbo.size = alloc_size;
+            ssbo.vecsize = array_size;
+            ssbo.binding = binding;
+            ssbo.descriptor_type = vk::DescriptorType::eStorageBuffer;
+            ssbo.cpu_buf = std::make_shared<char[]>(static_cast<size_t>(alloc_size) * array_size);
+            ssbo.gpu_bufs.reserve(swapchain_images.size());
+            ssbo.memos.reserve(swapchain_images.size());
+            ssbo.descriptors.reserve(swapchain_images.size());
+
+            for (size_t i = 0; i < swapchain_images.size(); ++i) {
+                vk::raii::Buffer gpu_buf{nullptr};
+                vk::raii::DeviceMemory memo{nullptr};
+                std::tie(gpu_buf, memo) = create_buffer(
+                    static_cast<vk::DeviceSize>(alloc_size) * array_size,
+                    vk::BufferUsageFlagBits::eStorageBuffer,
+                    vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+                ssbo.descriptors.push_back(vk::DescriptorBufferInfo{
+                    *gpu_buf, 0, static_cast<vk::DeviceSize>(alloc_size) * array_size});
+                ssbo.gpu_bufs.push_back(std::move(gpu_buf));
+                ssbo.memos.push_back(std::move(memo));
+            }
+
+            pipeline_ssbos.emplace(SSBOType_InstanceAttrs, std::move(ssbo));
+            storage_binding_to_type[binding] = SSBOType_InstanceAttrs;
             vk::DescriptorSetLayoutBinding layout_binding{};
             layout_binding.binding = binding;
             layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
@@ -759,17 +820,23 @@ bool Context::create_pipeline(const std::string& name,
     pipeline.vk_pipeline_layout = std::move(pipeline_layout);
     pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
     pipeline.uses_mesh_shader = pipeline_uses_mesh_shader;
+    pipeline.ubos = std::move(pipeline_ubos);
+    pipeline.ssbos = std::move(pipeline_ssbos);
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     uint32_t uniform_desc_count = 0;
-    for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+    for (const auto& [binding, ubo_type] : ubo_binding_to_type) {
         (void)binding;
-        uniform_desc_count += static_cast<uint32_t>(require_ubo(ubo_name).vecsize);
+        const auto ubo_found = pipeline.ubos.find(ubo_type);
+        assert(ubo_found != pipeline.ubos.end());
+        uniform_desc_count += static_cast<uint32_t>(ubo_found->second.vecsize);
     }
     uint32_t storage_desc_count = 0;
-    for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
+    for (const auto& [binding, ssbo_type] : storage_binding_to_type) {
         (void)binding;
-        storage_desc_count += static_cast<uint32_t>(require_ubo(ssbo_name).vecsize);
+        const auto ssbo_found = pipeline.ssbos.find(ssbo_type);
+        assert(ssbo_found != pipeline.ssbos.end());
+        storage_desc_count += static_cast<uint32_t>(ssbo_found->second.vecsize);
     }
     uint32_t image_desc_count = 0;
     for (const auto& [binding, tex_name] : tex_binding_to_name) {
@@ -819,13 +886,14 @@ bool Context::create_pipeline(const std::string& name,
             std::vector<vk::DescriptorBufferInfo> buffer_infos;
             std::vector<vk::DescriptorImageInfo> image_infos;
             std::vector<vk::WriteDescriptorSet> writes;
-            buffer_infos.reserve(ubo_binding_to_name.size());
-            buffer_infos.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size());
+            buffer_infos.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size());
             image_infos.reserve(tex_binding_to_name.size());
-            writes.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size() + tex_binding_to_name.size());
+            writes.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size() + tex_binding_to_name.size());
 
-            for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
-                auto& ubo = require_ubo(ubo_name);
+            for (const auto& [binding, ubo_type] : ubo_binding_to_type) {
+                const auto ubo_found = pipeline.ubos.find(ubo_type);
+                assert(ubo_found != pipeline.ubos.end());
+                auto& ubo = ubo_found->second;
                 vk::DescriptorBufferInfo buffer_info{};
                 buffer_info.buffer = *ubo.gpu_bufs[i];
                 buffer_info.offset = 0;
@@ -840,8 +908,10 @@ bool Context::create_pipeline(const std::string& name,
                 writes.push_back(write);
             }
 
-            for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
-                auto& ssbo = require_ubo(ssbo_name);
+            for (const auto& [binding, ssbo_type] : storage_binding_to_type) {
+                const auto ssbo_found = pipeline.ssbos.find(ssbo_type);
+                assert(ssbo_found != pipeline.ssbos.end());
+                auto& ssbo = ssbo_found->second;
                 vk::DescriptorBufferInfo buffer_info{};
                 buffer_info.buffer = *ssbo.gpu_bufs[i];
                 buffer_info.offset = 0;
@@ -903,6 +973,7 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     descriptor_layouts.reserve(shader.bindings.size());
     std::map<uint32_t, std::string> ubo_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
+    std::unordered_map<std::string, UBO> compute_ubos;
 
     for (const auto& binding : shader.bindings) {
         if (binding.kind == ComputeDescriptorKind::StorageBuffer
@@ -916,7 +987,7 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
         if (binding.kind == ComputeDescriptorKind::UniformBuffer) {
             const auto ubo_name = name + ":" + binding.name;
             const uint32_t struct_size = binding.struct_size == 0 ? 16u : binding.struct_size;
-            add_ubo(ubo_name, binding.binding, struct_size, binding.descriptor_count);
+            add_ubo(compute_ubos, ubo_name, binding.binding, struct_size, binding.descriptor_count);
             ubo_binding_to_name[binding.binding] = ubo_name;
         }
         else if (binding.kind == ComputeDescriptorKind::CombinedImageSampler) {
@@ -970,6 +1041,7 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     pipeline.vk_pipeline = std::move(compute_pipeline);
     pipeline.vk_pipeline_layout = std::move(pipeline_layout);
     pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
+    pipeline.ubos = std::move(compute_ubos);
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     std::unordered_map<vk::DescriptorType, uint32_t> descriptor_type_counts;
@@ -1010,7 +1082,11 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
             writes.reserve(ubo_binding_to_name.size() + tex_binding_to_name.size());
 
             for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
-                auto& ubo = require_ubo(ubo_name);
+                const auto ubo_found = pipeline.ubos.find(ubo_name);
+                if (ubo_found == pipeline.ubos.end()) {
+                    continue;
+                }
+                auto& ubo = ubo_found->second;
                 vk::DescriptorBufferInfo buffer_info{};
                 buffer_info.buffer = *ubo.gpu_bufs[i];
                 buffer_info.offset = 0;
@@ -1284,14 +1360,49 @@ void Context::draw_frame() {
     current_frame = (current_frame + 1) % max_frames_in_flight;
 }
 
-bool Context::add_ubo(const std::string& name, uint32_t binding,
+bool Context::add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
+    uint32_t size, uint32_t vecsize,
+    vk::BufferUsageFlags usage,
+    vk::DescriptorType descriptor_type)
+{
+    const auto found = ubos.find(type);
+    if (found != ubos.end()) {
+        return true;
+    }
+
+    UBO ubo{};
+    ubo.size = size;
+    ubo.vecsize = vecsize;
+    ubo.binding = binding;
+    ubo.descriptor_type = descriptor_type;
+    ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
+    ubo.gpu_bufs.reserve(swapchain_images.size());
+    ubo.memos.reserve(swapchain_images.size());
+    ubo.descriptors.reserve(swapchain_images.size());
+
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        vk::raii::Buffer gpu_buf{nullptr};
+        vk::raii::DeviceMemory memo{nullptr};
+        std::tie(gpu_buf, memo) = create_buffer(
+            size * vecsize,
+            usage,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        ubo.descriptors.push_back(vk::DescriptorBufferInfo{*gpu_buf, 0, size * vecsize});
+        ubo.gpu_bufs.push_back(std::move(gpu_buf));
+        ubo.memos.push_back(std::move(memo));
+    }
+
+    ubos.emplace(type, std::move(ubo));
+    return true;
+}
+
+bool Context::add_ubo(std::unordered_map<std::string, UBO>& ubos, const std::string& name, uint32_t binding,
     uint32_t size, uint32_t vecsize,
     vk::BufferUsageFlags usage,
     vk::DescriptorType descriptor_type)
 {
     if (ubos.find(name) != ubos.end()) {
-        std::cout << "UBO " << name << " already exists" << std::endl;
-        return false;
+        return true;
     }
 
     UBO ubo{};
@@ -1326,12 +1437,57 @@ void Context::sync_uniform(const vk::raii::DeviceMemory& memo, const void* data,
     memo.unmapMemory();
 }
 
-UBO& Context::require_ubo(const std::string& full_name) {
-    const auto found = ubos.find(full_name);
-    if (found == ubos.end()) {
-        throw std::runtime_error("ubo not found: " + full_name);
+void Context::sync_ssbo(const SSBO& ssbo) const {
+    const auto upload_size = static_cast<uint32_t>(ssbo.size * ssbo.vecsize);
+    if (ssbo.cpu_buf == nullptr || upload_size == 0 || ssbo.gpu_bufs.empty()) {
+        return;
     }
-    return found->second;
+
+    auto [staging_buf, staging_memo] = create_buffer(
+        upload_size,
+        vk::BufferUsageFlagBits::eTransferSrc,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    void* mapped = staging_memo.mapMemory(0, upload_size);
+    std::memcpy(mapped, ssbo.cpu_buf.get(), upload_size);
+    staging_memo.unmapMemory();
+
+    auto cmd_buf = begin_single_commands();
+    for (const auto& gpu_buf : ssbo.gpu_bufs) {
+        vk::BufferCopy region{};
+        region.srcOffset = 0;
+        region.dstOffset = 0;
+        region.size = upload_size;
+        cmd_buf.copyBuffer(*staging_buf, *gpu_buf, region);
+    }
+    end_single_commands(std::move(cmd_buf));
+}
+
+UBO& Context::require_ubo(const std::string& full_name) {
+    const auto split_pos = full_name.find(':');
+    if (split_pos != std::string::npos) {
+        const auto pipeline_name = full_name.substr(0, split_pos);
+        const auto reflected_name = full_name.substr(split_pos + 1);
+        const auto pipeline_found = pipelines.find(pipeline_name);
+        if (pipeline_found != pipelines.end()) {
+            UBOType ubo_type{};
+            if (resolve_ubo_type(reflected_name, ubo_type)) {
+                const auto ubo_found = pipeline_found->second.ubos.find(ubo_type);
+                if (ubo_found != pipeline_found->second.ubos.end()) {
+                    return ubo_found->second;
+                }
+            }
+        }
+    }
+
+    for (auto& [pipeline_name, pipeline] : compute_pipelines) {
+        (void)pipeline_name;
+        const auto ubo_found = pipeline.ubos.find(full_name);
+        if (ubo_found != pipeline.ubos.end()) {
+            return ubo_found->second;
+        }
+    }
+
+    throw std::runtime_error("ubo not found: " + full_name);
 }
 
 bool Context::load_mesh(const std::string& name, const Mesh& mesh) {

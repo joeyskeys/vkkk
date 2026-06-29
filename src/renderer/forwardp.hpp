@@ -24,7 +24,6 @@ public:
     void shutdown() override;
     void on_resize(uint32_t width, uint32_t height) override;
 
-    void update(const RenderView& view) override;
     void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
 
     template <bool transparent>

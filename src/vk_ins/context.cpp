@@ -691,7 +691,7 @@ bool Context::create_pipeline(const std::string& name,
             ssbo.vecsize = array_size;
             ssbo.binding = binding;
             ssbo.descriptor_type = vk::DescriptorType::eStorageBuffer;
-            ssbo.cpu_buf = std::make_shared<char[]>(static_cast<size_t>(alloc_size) * array_size);
+            //ssbo.cpu_buf = std::make_shared<char[]>(static_cast<size_t>(alloc_size) * array_size);
             ssbo.gpu_bufs.reserve(swapchain_images.size());
             ssbo.memos.reserve(swapchain_images.size());
             ssbo.descriptors.reserve(swapchain_images.size());
@@ -1375,7 +1375,7 @@ bool Context::add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint
     ubo.vecsize = vecsize;
     ubo.binding = binding;
     ubo.descriptor_type = descriptor_type;
-    ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
+    //ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
     ubo.gpu_bufs.reserve(swapchain_images.size());
     ubo.memos.reserve(swapchain_images.size());
     ubo.descriptors.reserve(swapchain_images.size());
@@ -1410,7 +1410,7 @@ bool Context::add_ubo(std::unordered_map<std::string, UBO>& ubos, const std::str
     ubo.vecsize = vecsize;
     ubo.binding = binding;
     ubo.descriptor_type = descriptor_type;
-    ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
+    //ubo.cpu_buf = std::make_shared<char[]>(size * vecsize);
     ubo.gpu_bufs.reserve(swapchain_images.size());
     ubo.memos.reserve(swapchain_images.size());
     ubo.descriptors.reserve(swapchain_images.size());
@@ -1437,9 +1437,9 @@ void Context::sync_uniform(const vk::raii::DeviceMemory& memo, const void* data,
     memo.unmapMemory();
 }
 
-void Context::sync_ssbo(const SSBO& ssbo) const {
+void Context::sync_ssbo(const SSBO& ssbo, const void* data) const {
     const auto upload_size = static_cast<uint32_t>(ssbo.size * ssbo.vecsize);
-    if (ssbo.cpu_buf == nullptr || upload_size == 0 || ssbo.gpu_bufs.empty()) {
+    if (/*ssbo.cpu_buf == nullptr ||*/ upload_size == 0 || ssbo.gpu_bufs.empty()) {
         return;
     }
 
@@ -1448,7 +1448,8 @@ void Context::sync_ssbo(const SSBO& ssbo) const {
         vk::BufferUsageFlagBits::eTransferSrc,
         vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
     void* mapped = staging_memo.mapMemory(0, upload_size);
-    std::memcpy(mapped, ssbo.cpu_buf.get(), upload_size);
+    //std::memcpy(mapped, ssbo.cpu_buf.get(), upload_size);
+    std::memcpy(mapped, data, upload_size);
     staging_memo.unmapMemory();
 
     auto cmd_buf = begin_single_commands();

@@ -61,7 +61,7 @@ struct UBO {
     size_t                                  vecsize;
     uint32_t                                binding;
     vk::DescriptorType                      descriptor_type = vk::DescriptorType::eUniformBuffer;
-    std::shared_ptr<char[]>                 cpu_buf;
+    //std::shared_ptr<char[]>                 cpu_buf;
     std::vector<vk::raii::Buffer>           gpu_bufs;
     std::vector<vk::raii::DeviceMemory>     memos;
     std::vector<vk::DescriptorBufferInfo>   descriptors;

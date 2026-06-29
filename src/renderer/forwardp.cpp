@@ -35,10 +35,6 @@ void ForwardPRenderer::on_resize(uint32_t width, uint32_t height) {
     this->height = height;
 }
 
-void ForwardPRenderer::update(const RenderView& view) {
-
-}
-
 void ForwardPRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& view) {
     if (!ctx) {
         return;
@@ -72,8 +68,9 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         const auto& pipeline = pipeline_it->second;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
+        sync_uniforms(view.swapchain_image_idx, draw_infos, pipeline);
         if (update_ssbo) {
-            ctx->sync_ssbo(pipeline.ssbos[SSBOType_InstanceAttrs]);
+            sync_ssbos(view.swapchain_image_idx, draw_infos, pipeline);
         }
 
         const vk::DescriptorSet* desc_set = nullptr;

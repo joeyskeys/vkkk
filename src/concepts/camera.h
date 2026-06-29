@@ -9,14 +9,11 @@
 #include <cstring>
 #include <cstdint>
 
+#include "built_in_shader/common.h"
+
 namespace vkkk
 {
 #endif
-
-struct CameraUniform {
-    glm::mat4 view;
-    glm::mat4 proj;
-};
 
 struct Camera {
     // User-friendly camera control state.
@@ -37,7 +34,7 @@ struct Camera {
     glm::quat rotation;
 
     // Final data mirrored to GPU uniform buffers.
-    CameraUniform gpu;
+    CameraUBO ubo_data;
 
 #ifndef GL_core_profile
     inline glm::mat4 get_trans_mat() const {
@@ -58,32 +55,19 @@ struct Camera {
         //return glm::perspective(glm::radians(fov), ratio, near, far);
     }
 
-    inline CameraUniform get_gpu_uniform() const {
-        return CameraUniform{
-            .view = get_view_mat(),
-            .proj = get_proj_mat()
-        };
-    }
-
     inline void look_at(const glm::vec3& pos, const glm::vec3& fr, const glm::vec3& up) {
-        gpu.view = glm::lookAt(pos, pos + fr, up);
+        ubo_data.view = glm::lookAt(pos, pos + fr, up);
     }
     void perspective(const float fov, const float ratio, const float near, const float far) {
-        gpu.proj = glm::perspective(glm::radians(fov), ratio, near, far);
-        gpu.proj[1][1] *= -1;
-    }
-
-    inline void update_uniform(void* data, uint32_t n) {
-        auto uniform = get_gpu_uniform();
-        memcpy(data, &uniform, std::min<uint32_t>(n, sizeof(CameraUniform)));
+        ubo_data.proj = glm::perspective(glm::radians(fov), ratio, near, far);
+        ubo_data.proj[1][1] *= -1;
     }
 
     void update_position(float duration);
     void update_orientation();
+    void update_ubo_data();
 #endif
 };
-
-using CameraDeprecated = Camera;
 
 #ifndef GL_core_profile
 }

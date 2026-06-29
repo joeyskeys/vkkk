@@ -34,7 +34,7 @@ public:
     virtual void set_camera(Camera* c) { camera = c; }
 
     // Called once per frame before command buffer submission.
-    virtual void update(const RenderView& view) = 0;
+    virtual void update();
 
     // Record draw commands into the active swapchain command buffer.
     virtual void record_commands(vk::CommandBuffer cmd, const RenderView& view) {}
@@ -48,12 +48,41 @@ public:
         const char* frag,
         const PipelineOption& option);
 
-    void sync_uniforms(const uint32_t swapchain_idx,
-        const InstanceAttr& instance_attr,
-        const std::string& pipeline_name);
-    void sync_ssbos(const uint32_t swapchain_idx,
-        const InstanceAttr& instance_attr,
-        const Pipeline& pipeline);
+    template <typename T>
+    void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
+        const T& ubo_data,
+        const Pipeline& pipeline)
+    {
+        if (!ctx) {
+            return;
+        }
+
+        auto ubo_it = pipeline.ubos.find(type);
+        if (ubo_it == pipeline.ubos.end()) {
+            return;
+        }
+        auto* ubo = &ubo_it->second;
+        if (swapchain_idx >= ubo->memos.size()) {
+            return;
+        }
+        ctx->sync_uniform(ubo->memos[swapchain_idx], data, static_cast<uint32_t>(ubo_data.size()));
+    }
+
+    template <typename T>
+    void sync_ssbo(const uint32_t swapchain_idx,
+        const T& ssbo_data,
+        const Pipeline& pipeline)
+    {
+        if (!ctx) {
+            return;
+        }
+
+        auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+        if (ssbo_it == pipeline.ssbos.end()) {
+            return;
+        }
+        ctx->sync_ssbo(ssbo_it->second, ssbo_data.get_data());
+    }
 
 public:
     Context* ctx = nullptr;

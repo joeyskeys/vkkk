@@ -13,4 +13,9 @@ void Camera::update_orientation() {
     rotation = glm::quat();
 }
 
+void Camera::update_ubo_data() {
+    ubo_data.view = get_view_mat();
+    ubo_data.proj = get_proj_mat();
+}
+
 }

@@ -51,6 +51,7 @@ const PipelineLightStorage* LightMgr::pipeline_storage(const std::string& pipeli
     return found == pipeline_storages_.end() ? nullptr : &found->second;
 }
 
+/*
 void LightMgr::update_uniform(const std::string& pipeline_name, uint32_t swapchain_idx, Context* ctx) {
     if (!ctx) {
         return;
@@ -87,5 +88,6 @@ void LightMgr::update_uniform(const std::string& pipeline_name, uint32_t swapcha
     sync_ubo(UBOType_SpotLight, storage.spot_lights.data(),
         storage.spot_lights.size() * sizeof(SpotLightUBO));
 }
+*/
 
 }

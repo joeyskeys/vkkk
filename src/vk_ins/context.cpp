@@ -12,6 +12,7 @@
 #include <OpenImageIO/imagebuf.h>
 #include <OpenImageIO/imagebufalgo.h>
 
+#include "asset_mgr/light_mgr.h"
 #include "vk_ins/context.hpp"
 
 namespace vkkk
@@ -948,6 +949,7 @@ bool Context::create_pipeline(const std::string& name,
     }
 
     pipelines.emplace(name, std::move(pipeline));
+    LightMgr::instance().register_pipeline(name, pipelines.at(name).ubos);
     return true;
 }
 

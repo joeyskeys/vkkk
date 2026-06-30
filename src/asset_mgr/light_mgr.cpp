@@ -1,65 +1,91 @@
 
 #include "asset_mgr/light_mgr.h"
-#include "utils/macros.h"
+
+#include <algorithm>
+#include <cstring>
 
 namespace vkkk
 {
 
-void LightMgr::update_uniform(void* data) const {
-    /*
-    // This code doesn't save much typing and have to occupy more stack
-    // space, meaning (a little bit) larger binary...
-    // TODO: Probably the compiler will do the loop unfold, leave the code
-    // here and come back to look into the assembly later...
+namespace
+{
 
-    std::array<void*, 3> datas{pt_lights.data(), dir_lights.data(), spot_lights.data()};
-    std::array<uint32_t, 3> dyn_sizes{pt_lights.size(), dir_lights.size(), spot_lights.size()};
-    std::array<uint32_t, 3> fixed_sizes{MAX_POINT_LIGHTS, MAX_DIRECTIONAL_LIGHTS, MAX_SPOT_LIGHTS};
-    constexpr std::array<uint32_t, 3> obj_sizes{sizeof(PointLight), sizeof(DirectionalLight), sizeof(SpotLight)};
-
-    char* dest = data;
-    for (int i = 0; i < 3; ++i) {
-        uint32_t cnt = dyn_sizes[i] < fixed_sizes[i] ? dyn_sizes[i] : fixed_sizes[i];
-        uint32_t size = cnt * obj_sizes[i];
-        memcpy(dest, datas[i], size);
-        dest += obj_sizes[i] * fixed_sizes[i];
+template <typename T>
+void copy_lights(std::vector<T>& dest, const std::vector<T>& src) {
+    if (dest.empty()) {
+        return;
     }
-    */
-
-    char* dest = reinterpret_cast<char*>(data);
-    uint32_t cnt = pt_lights.size() < MAX_POINT_LIGHTS ? pt_lights.size() : MAX_POINT_LIGHTS;
-    if (cnt > 0) {
-        uint32_t size = cnt * sizeof(PointLight);
-        memcpy(dest, pt_lights.data(), size);
+    const size_t count = std::min(dest.size(), src.size());
+    if (count > 0) {
+        std::memcpy(dest.data(), src.data(), count * sizeof(T));
     }
-
-    dest += MAX_POINT_LIGHTS * sizeof(PointLight);
-    cnt = dir_lights.size() < MAX_DIRECTIONAL_LIGHTS ? dir_lights.size() : MAX_DIRECTIONAL_LIGHTS;
-    if (cnt > 0) {
-        uint32_t size = cnt * sizeof(DirectionalLight);
-        memcpy(dest, dir_lights.data(), size);
-    }
-
-    dest += MAX_DIRECTIONAL_LIGHTS * sizeof(DirectionalLight);
-    cnt = spot_lights.size() < MAX_SPOT_LIGHTS ? spot_lights.size() : MAX_SPOT_LIGHTS;
-    if (cnt > 0) {
-        uint32_t size = cnt * sizeof(SpotLight);
-        memcpy(dest, spot_lights.data(), size);
+    for (size_t i = count; i < dest.size(); ++i) {
+        dest[i] = T{};
     }
 }
 
-void LightMgr::update_uniform(LightInfo& infos) const {
-    uint32_t cnt = pt_lights.size() < MAX_POINT_LIGHTS ? pt_lights.size() : MAX_POINT_LIGHTS;
-    if (cnt > 0)
-        memcpy(&infos.pt_lights, pt_lights.data(), cnt * sizeof(PointLight));
+} // namespace
 
-    cnt = dir_lights.size() < MAX_DIRECTIONAL_LIGHTS ? dir_lights.size() : MAX_DIRECTIONAL_LIGHTS;
-    if (cnt > 0)
-        memcpy(&infos.dir_lights, dir_lights.data(), cnt * sizeof(DirectionalLight));
+void LightMgr::register_pipeline(const std::string& pipeline_name,
+    const std::unordered_map<UBOType, UBO>& ubos)
+{
+    PipelineLightStorage storage;
+    if (const auto found = ubos.find(UBOType_PointLight); found != ubos.end()) {
+        storage.pt_lights.resize(found->second.vecsize);
+    }
+    if (const auto found = ubos.find(UBOType_DirectionalLight); found != ubos.end()) {
+        storage.dir_lights.resize(found->second.vecsize);
+    }
+    if (const auto found = ubos.find(UBOType_SpotLight); found != ubos.end()) {
+        storage.spot_lights.resize(found->second.vecsize);
+    }
+    pipeline_storages_[pipeline_name] = std::move(storage);
+}
 
-    cnt = spot_lights.size() < MAX_SPOT_LIGHTS ? spot_lights.size() : MAX_SPOT_LIGHTS;
-    if (cnt > 0)
-        memcpy(&infos.spot_lights, spot_lights.data(), cnt * sizeof(SpotLight));
+void LightMgr::unregister_pipeline(const std::string& pipeline_name) {
+    pipeline_storages_.erase(pipeline_name);
+}
+
+const PipelineLightStorage* LightMgr::pipeline_storage(const std::string& pipeline_name) const {
+    const auto found = pipeline_storages_.find(pipeline_name);
+    return found == pipeline_storages_.end() ? nullptr : &found->second;
+}
+
+void LightMgr::update_uniform(const std::string& pipeline_name, uint32_t swapchain_idx, Context* ctx) {
+    if (!ctx) {
+        return;
+    }
+
+    const auto storage_it = pipeline_storages_.find(pipeline_name);
+    if (storage_it == pipeline_storages_.end()) {
+        return;
+    }
+
+    const auto pipeline_it = ctx->pipelines.find(pipeline_name);
+    if (pipeline_it == ctx->pipelines.end()) {
+        return;
+    }
+
+    fill_pipeline_storage(storage_it->second);
+    const auto& pipeline = pipeline_it->second;
+    const auto& storage = storage_it->second;
+
+    const auto sync_ubo = [&](UBOType type, const void* data, size_t byte_size) {
+        if (byte_size == 0) {
+            return;
+        }
+        const auto ubo_it = pipeline.ubos.find(type);
+        if (ubo_it == pipeline.ubos.end() || swapchain_idx >= ubo_it->second.memos.size()) {
+            return;
+        }
+        ctx->sync_uniform(ubo_it->second.memos[swapchain_idx], data, static_cast<uint32_t>(byte_size));
+    };
+
+    sync_ubo(UBOType_PointLight, storage.pt_lights.data(), storage.pt_lights.size() * sizeof(PointLightUBO));
+    sync_ubo(UBOType_DirectionalLight, storage.dir_lights.data(),
+        storage.dir_lights.size() * sizeof(DirectionalLightUBO));
+    sync_ubo(UBOType_SpotLight, storage.spot_lights.data(),
+        storage.spot_lights.size() * sizeof(SpotLightUBO));
 }
 
 }

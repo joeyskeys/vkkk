@@ -1,57 +1,42 @@
 #pragma once
 
-#include <array>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
-#include "concepts/lights.h"
+#include "built_in_shader/common.h"
 #include "utils/singleton.h"
+#include "vk_ins/context.hpp"
 
 namespace vkkk
 {
 
-// Add this for easier python binding
-struct LightInfo {
-    std::array<PointLight, MAX_POINT_LIGHTS> pt_lights;
-    std::array<DirectionalLight, MAX_DIRECTIONAL_LIGHTS> dir_lights;
-    std::array<SpotLight, MAX_SPOT_LIGHTS> spot_lights;
+struct PipelineLightStorage {
+    std::vector<PointLightUBO> pt_lights;
+    std::vector<DirectionalLightUBO> dir_lights;
+    std::vector<SpotLightUBO> spot_lights;
 };
 
 class LightMgr : public Singleton<LightMgr> {
 private:
     LightMgr() {}
-    friend class Singleton<LightMgr>;
     LightMgr(const LightMgr&) = delete;
     LightMgr& operator= (const LightMgr&) = delete;
-    friend class Singleton<LightMgr>;
 
 public:
-    inline void add_pt_light(const glm::vec4& pos, const glm::vec4& color) {
-        pt_lights.emplace_back(pos, color);
-    }
+    void register_pipeline(const std::string& pipeline_name,
+        const std::unordered_map<UBOType, UBO>& ubos);
+    void unregister_pipeline(const std::string& pipeline_name);
 
-    inline void add_dir_light(const glm::vec4& dir, const glm::vec4& color) {
-        dir_lights.emplace_back(dir, color);
-    }
+    void update_uniform(const std::string& pipeline_name, uint32_t swapchain_idx, Context* ctx);
 
-    inline void add_spot_light(const glm::vec4& pos,
-        const glm::vec4& dir, const glm::vec3& color, const float angle)
-    {
-        spot_lights.emplace_back(pos, dir, color, angle);
-    }
-
-    void update_uniform(void* data) const;
-    void update_uniform(LightInfo& infos) const;
-
-    inline const std::vector<PointLight>& point_lights() const { return pt_lights; }
-    inline const std::vector<DirectionalLight>& directional_lights() const { return dir_lights; }
+    const std::vector<PointLightUBO>& point_lights() const { return pt_lights; }
+    const std::vector<DirectionalLightUBO>& directional_lights() const { return dir_lights; }
+    const std::vector<SpotLightUBO>& spot_lights() const { return spot_lights; }
+    const PipelineLightStorage* pipeline_storage(const std::string& pipeline_name) const;
 
 private:
-    // since the lights.h header is shared for shader code, we cannot
-    // have a traditional OOP design, and hence here in the manager,
-    // we use a kinda dumb way to manage them
-    std::vector<PointLight> pt_lights;
-    std::vector<DirectionalLight> dir_lights;
-    std::vector<SpotLight> spot_lights;
+    std::unordered_map<std::string, PipelineLightStorage> pipeline_storages;
 };
 
 }

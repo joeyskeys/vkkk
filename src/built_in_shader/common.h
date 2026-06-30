@@ -4,6 +4,7 @@
 #include <glm/vec4.hpp>
 
 #include "utils/sizeable.hpp"
+#include "utils/macros.h"
 
 namespace vkkk
 {
@@ -35,8 +36,13 @@ struct LightBaseUBO : public Sizeable<LightBaseUBO> {
 using PointLightUBO = LightBaseUBO;
 using DirectionalLightUBO = LightBaseUBO;
 
+// spot light: vec is position
 struct SpotLightUBO : public Sizeable<SpotLightUBO> {
     glm::vec4 dir{1.f, 0.f, 0.f, 0.f};
+    float angle;
+    float _pad0{0.0f}; // std140 tail padding for stable upload size.
+    float _pad1{0.0f};
+    float _pad2{0.0f};
 };
 
 }

@@ -268,18 +268,21 @@ void bind_types(nb::module_& m) {
         .def("add_sphere", &DrawableMgr::add_sphere)
         .def("upload_gpu", &DrawableMgr::upload_gpu);
 
-    nb::class_<LightInfo> licl(m, "LightInfo");
-
-    licl.def_rw("pt_lights", &LightInfo::pt_lights)
-        .def_rw("dir_lights", &LightInfo::dir_lights)
-        .def_rw("spot_lights", &LightInfo::spot_lights);
+    nb::class_<PipelineLightStorage> plscl(m, "PipelineLightStorage");
+    plscl.def_rw("pt_lights", &PipelineLightStorage::pt_lights)
+        .def_rw("dir_lights", &PipelineLightStorage::dir_lights)
+        .def_rw("spot_lights", &PipelineLightStorage::spot_lights);
 
     nb::class_<LightMgr> lmcl(m, "LightMgr");
 
     lmcl.def_static("Instance", nb::overload_cast<>(&LightMgr::instance_ptr<>))
         .def("add_pt_light", &LightMgr::add_pt_light)
         .def("add_dir_light", &LightMgr::add_dir_light)
-        .def("add_spot_light", &LightMgr::add_spot_light);
+        .def("add_spot_light", &LightMgr::add_spot_light)
+        .def("clear_lights", &LightMgr::clear_lights)
+        .def("register_pipeline", &LightMgr::register_pipeline)
+        .def("unregister_pipeline", &LightMgr::unregister_pipeline)
+        .def("update_uniform", &LightMgr::update_uniform);
 
     nb::class_<Camera> cmcl(m, "Camera");
     cmcl.def(nb::init<>())

@@ -243,7 +243,7 @@ void ForwardRenderer::update_lights_from_scene() {
     if (scene && scene->light_mgr) {
         const auto& pt_lights = scene->light_mgr->point_lights();
         if (!pt_lights.empty()) {
-            light_ubo_.lightPos = pt_lights[0].pos;
+            light_ubo_.lightPos = pt_lights[0].vec;
             light_ubo_.lightColor = pt_lights[0].color;
         }
     }

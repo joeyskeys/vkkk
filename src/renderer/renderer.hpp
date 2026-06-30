@@ -9,7 +9,6 @@ namespace vkkk
 {
 
 class Scene;
-class Camera;
 class Context;
 
 struct RenderView {
@@ -19,6 +18,7 @@ struct RenderView {
 
 class Renderer {
 public:
+    Renderer(Context* context, Scene* scene) : ctx(context), scene(scene) {}
     virtual ~Renderer() = default;
 
     virtual const char* type_name() const = 0;
@@ -29,9 +29,6 @@ public:
 
     // Scene data to be consumed by concrete renderer implementation.
     virtual void set_scene(Scene* s) { scene = s; }
-
-    // Camera data to be consumed by concrete renderer implementation.
-    virtual void set_camera(Camera* c) { camera = c; }
 
     // Called once per frame before command buffer submission.
     virtual void update();
@@ -87,7 +84,6 @@ public:
 public:
     Context* ctx = nullptr;
     Scene* scene = nullptr;
-    Camera* camera = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
     bool update_ssbo = false;

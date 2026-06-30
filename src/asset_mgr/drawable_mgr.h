@@ -38,9 +38,8 @@ public:
     void add_line(const std::string&, const std::vector<VERT_COMP>&,
         const glm::vec3&, const glm::vec3&);
 
-    // Legacy path (old VkWrappedInstance wrapper). Temporarily disabled while testing Context.
-    // void upload_gpu(VkWrappedInstance*, const std::string&) const;
     const Mesh* find_mesh(const std::string& name) const;
+    void sync_to_gpu(Context* ctx);
 
 private:
     std::unordered_map<std::string, Mesh>   meshes;

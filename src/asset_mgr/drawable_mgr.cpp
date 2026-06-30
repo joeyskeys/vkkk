@@ -270,15 +270,10 @@ const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
     return found != meshes.end() ? &found->second : nullptr;
 }
 
-void DrawableMgr::add_drawble(const std::string& name, const std::string& mesh_name,
-    const std::string& pipeline_name, const InstanceAttr& instance_attr)
-{
-    batches[std::make_pair(mesh_name, pipeline_name)].push_back(instance_attr);
-}
-
-void DrawableMgr::add_drawable(const std::string& mesh_name, const std::string& pipeline_name, InstanceAttr&& instance_attr)
-{
-    batches[std::make_pair(mesh_name, pipeline_name)].emplace_back(std::move(instance_attr));
+void DrawableMgr::sync_to_gpu(Context* ctx) {
+    for (auto& [name, mesh] : meshes) {
+        ctx->load_mesh(name, mesh);
+    }
 }
 
 } // namespace vkkk

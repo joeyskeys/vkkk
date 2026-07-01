@@ -25,7 +25,7 @@ private:
 
 public:
     void register_pipeline(const std::string& pipeline_name,
-        const std::unordered_map<UBOType, UBO>& ubos);
+        PipelineLightStorage&& storage);
     void unregister_pipeline(const std::string& pipeline_name);
 
     //void update_uniform(const std::string& pipeline_name, uint32_t swapchain_idx, Context* ctx);

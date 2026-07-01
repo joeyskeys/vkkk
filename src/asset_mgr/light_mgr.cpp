@@ -27,18 +27,8 @@ void copy_lights(std::vector<T>& dest, const std::vector<T>& src) {
 } // namespace
 
 void LightMgr::register_pipeline(const std::string& pipeline_name,
-    const std::unordered_map<UBOType, UBO>& ubos)
+    PipelineLightStorage&& storage)
 {
-    PipelineLightStorage storage;
-    if (const auto found = ubos.find(UBOType_PointLight); found != ubos.end()) {
-        storage.pt_lights.resize(found->second.vecsize);
-    }
-    if (const auto found = ubos.find(UBOType_DirectionalLight); found != ubos.end()) {
-        storage.dir_lights.resize(found->second.vecsize);
-    }
-    if (const auto found = ubos.find(UBOType_SpotLight); found != ubos.end()) {
-        storage.spot_lights.resize(found->second.vecsize);
-    }
     pipeline_storages_[pipeline_name] = std::move(storage);
 }
 

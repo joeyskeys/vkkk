@@ -225,7 +225,7 @@ public:
     void wait_idle() const { device.waitIdle(); }
     void recreate_swapchain();
     void record_cmds(uint32_t image_index,
-        const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func);
+        const std::function<void(vk::CommandBuffer&, uint32_t)>& emit_func);
 
     bool add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
         uint32_t size, uint32_t vecsize = 1,

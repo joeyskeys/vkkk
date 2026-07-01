@@ -143,6 +143,14 @@ int main() {
         }
     });
 
+    vkkk::PipelineLightStorage light_storage;
+    scene.light_mgr->register_pipeline("phong_mat", {
+        .pt_lights = {
+            {glm::vec4(0.0f, 0.85f, 0.0f, 1.0f), glm::vec4(1.0f)}
+        }
+    });
+    scene.light_mgr->register_pipeline("phong_mat", std::move(light_storage));
+
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_btn_callback);
     glfwSetCursorPosCallback(window, mouse_pos_callback);
@@ -162,15 +170,6 @@ int main() {
         raw_frame_dt = duration;
         scene.camera->update_ubo_data();
 
-        vkkk::built_in_shader::PhongLightUBO light_ubo{};
-        light_ubo.lightPos = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);
-        light_ubo.lightColor = glm::vec4(1.0f);
-        light_ubo.viewPos = glm::vec4(cam.pos, 1.0f);
-
-        for (const auto& batch : batches) {
-            sync_batch_uniforms(ctx, batch, idx, light_ubo);
-        }
-
         hud.begin_frame();
         ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
         ImGui::SetNextWindowBgAlpha(0.35f);
@@ -189,25 +188,9 @@ int main() {
         ImGui::Text("Box instances: %d", 2);
         ImGui::End();
 
-        ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
-            for (const auto& batch : batches) {
-                const auto pipeline_it = ctx.pipelines.find(batch.pipeline_name);
-                if (pipeline_it == ctx.pipelines.end()) continue;
-                const auto& pipeline = pipeline_it->second;
-                cmd_buf.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
-
-                const vk::DescriptorSet* desc_set = nullptr;
-                if (image_index < pipeline.descriptor_sets.size()) {
-                    desc_set = &*pipeline.descriptor_sets[image_index];
-                }
-                ctx.draw_mesh_instanced(
-                    static_cast<vk::CommandBuffer>(*cmd_buf),
-                    batch.mesh_name,
-                    *pipeline.vk_pipeline_layout,
-                    static_cast<uint32_t>(batch.instances.size()),
-                    desc_set);
-            }
-            hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
+        ctx.record_cmds(idx, [&](vk::CommandBuffer& cmd_buf, uint32_t image_index) {
+            renderer.record_commands(cmd_buf, image_index);
+            hud.render(cmd_buf);
         });
     });
 

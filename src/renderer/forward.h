@@ -71,9 +71,9 @@ private:
     //void sync_draw_item_uniforms(uint32_t swapchain_idx, const ForwardDrawItem& item,
         //const std::string& pipeline_name);
 
-    void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
-    void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
-    void pass_post_process(vk::CommandBuffer cmd, const RenderView& view);
+    //void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
+    //void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
+    //void pass_post_process(vk::CommandBuffer cmd, const RenderView& view);
 
     //void draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         //const std::vector<const ForwardDrawItem*>& items, const char* fallback_pipeline);

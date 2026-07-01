@@ -2,8 +2,12 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 
-#include <vulkan/vulkan.h>
+#include <vulkan/vulkan.hpp>
+
+#include "built_in_shader/common.h"
+#include "vk_ins/context.hpp"
 
 namespace vkkk
 {
@@ -34,13 +38,13 @@ public:
     virtual void update();
 
     // Record draw commands into the active swapchain command buffer.
-    virtual void record_commands(vk::CommandBuffer cmd, const RenderView& view) {}
+    virtual void record_commands(vk::CommandBuffer cmd, const RenderView& view) = 0;
 
     // Called when swapchain extent or render targets change.
     virtual void on_resize(uint32_t width, uint32_t height) = 0;
 
     // utils
-    bool create_pipeline_from_shader_src(const string& ppl_name,
+    bool create_pipeline_from_shader_src(const std::string& ppl_name,
         const char* vert_or_mesh,
         const char* frag,
         const PipelineOption& option);
@@ -62,12 +66,11 @@ public:
         if (swapchain_idx >= ubo->memos.size()) {
             return;
         }
-        ctx->sync_uniform(ubo->memos[swapchain_idx], data, static_cast<uint32_t>(ubo_data.size()));
+        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data.data(), static_cast<uint32_t>(ubo_data.size()));
     }
 
     template <typename T>
-    void sync_ssbo(const uint32_t swapchain_idx,
-        const T& ssbo_data,
+    void sync_ssbo(const T& ssbo_data,
         const Pipeline& pipeline)
     {
         if (!ctx) {
@@ -89,7 +92,7 @@ public:
     bool update_ssbo = false;
 
     // draw info: mesh name & instance attributes
-    using DrawInfos = std::unordered_map<std::string, std::vector<InstanceAttr>>;
+    using DrawInfos = std::unordered_map<std::string, std::vector<void*>>;
     // batch: value: pipeline name, key: draw infos
     using Batch = std::unordered_map<std::string, DrawInfos>;
 };

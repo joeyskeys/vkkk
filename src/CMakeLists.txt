@@ -1,5 +1,4 @@
 set(HEADERS
-    built_in_shader/built_in_shader_mgr.h
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
     built_in_shader/pbr.h
@@ -13,10 +12,7 @@ set(HEADERS
     concepts/mesh.h
     gui/gui.h
     renderer/renderer.hpp
-    renderer/forward.h
-    renderer/forward_plus.h
     renderer/forwardp.hpp
-    renderer/deferred.h
     utils/common.h
     utils/io.h
     utils/singleton.h
@@ -36,7 +32,6 @@ set(SRCS
     ../thirdparty/imgui/imgui_widgets.cpp
     ../thirdparty/imgui/backends/imgui_impl_glfw.cpp
     ../thirdparty/imgui/backends/imgui_impl_vulkan.cpp
-    built_in_shader/built_in_shader_mgr.cpp
     asset_mgr/scene.cpp
     asset_mgr/light_mgr.cpp
     asset_mgr/drawable_mgr.cpp
@@ -44,8 +39,6 @@ set(SRCS
     concepts/line.cpp
     concepts/mesh.cpp
     gui/gui.cpp
-    renderer/forward.cpp
-    renderer/forward_plus.cpp
     renderer/forwardp.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
@@ -81,36 +74,6 @@ endif()
     #PRIVATE
         #vkkk
         #OpenImageIO::OpenImageIO)
-
-#add_executable(vkcornell cornell_main.cpp)
-#target_link_libraries(vkcornell
-    #PRIVATE
-        #vkkk
-        #OpenImageIO::OpenImageIO)
-
-add_executable(vkcornellpp cornal_mainpp.cpp)
-target_link_libraries(vkcornellpp
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkrendererpp renderer_mainpp.cpp)
-target_link_libraries(vkrendererpp
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkcornellpluspp cornell_main_plus.cpp)
-target_link_libraries(vkcornellpluspp
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkrendererforwardplus renderer_main_forwardplus.cpp)
-target_link_libraries(vkrendererforwardplus
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
 
 add_executable(vkrendererfp renderer_main_fp.cpp)
 target_link_libraries(vkrendererfp

@@ -27,7 +27,6 @@ void ForwardPRenderer::shutdown() {
     transparent_batch.clear();
     ctx = nullptr;
     scene = nullptr;
-    camera = nullptr;
 }
 
 void ForwardPRenderer::on_resize(uint32_t width, uint32_t height) {
@@ -70,7 +69,7 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
 
         sync_uniforms(view.swapchain_image_idx, draw_infos, pipeline);
         if (update_ssbo) {
-            sync_ssbos(view.swapchain_image_idx, draw_infos, pipeline);
+            sync_ssbos(draw_infos, pipeline);
         }
 
         const vk::DescriptorSet* desc_set = nullptr;

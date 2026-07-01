@@ -122,13 +122,14 @@ bool ForwardRenderer::initialize(Context* context) {
 
 void ForwardRenderer::shutdown() {
     destroy_pass_pipelines();
-    draw_items_.clear();
+    //draw_items_.clear();
     ctx = nullptr;
     scene = nullptr;
-    camera = nullptr;
+    //camera = nullptr;
     post_pipeline_ready_ = false;
 }
 
+/*
 void ForwardRenderer::add_draw_item(const ForwardDrawItem& item) {
     if (!item.pipeline_name.empty()) {
         ensure_draw_item_pipeline(item);
@@ -155,9 +156,10 @@ bool ForwardRenderer::ensure_draw_item_pipeline(const ForwardDrawItem& item) {
     return create_shader_pipeline(item.pipeline_name.c_str(),
         kShaderOpaqueVert, kShaderOpaqueFrag, components, option);
 }
+*/
 
 void ForwardRenderer::clear_draw_items() {
-    draw_items_.clear();
+    //draw_items_.clear();
 }
 
 void ForwardRenderer::on_resize(uint32_t width, uint32_t height) {
@@ -230,12 +232,13 @@ bool ForwardRenderer::create_pass_pipelines() {
 }
 
 void ForwardRenderer::update_camera_aspect() {
-    if (!camera || height == 0) {
+    if (/*!camera ||*/ height == 0) {
         return;
     }
-    camera->ratio = width / static_cast<float>(height);
+    //camera->ratio = width / static_cast<float>(height);
 }
 
+/*
 void ForwardRenderer::update_lights_from_scene() {
     light_ubo_.lightPos = glm::vec4(0.0f, 5.0f, 5.0f, 1.0f);
     light_ubo_.lightColor = glm::vec4(1.0f);
@@ -253,20 +256,17 @@ void ForwardRenderer::update_lights_from_scene() {
         : glm::vec4(0.0f, 0.0f, 5.0f, 1.0f);
     // shadow_params_ubo_.lightSpace = glm::mat4(1.0f);
 }
+*/
 
 void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     if (!ctx) {
         return;
     }
 
-    if (!camera) {
-        return;
-    }
-
     PhongTransformUBO camera_transform{};
-    camera_transform.model = glm::mat4(1.0f);
-    camera_transform.view = camera->get_view_mat();
-    camera_transform.proj = camera->get_proj_mat();
+    //camera_transform.model = glm::mat4(1.0f);
+    //camera_transform.view = camera->get_view_mat();
+    //camera_transform.proj = camera->get_proj_mat();
 
     auto sync_global_ubo = [&](const char* pipeline_name, const char* suffix,
                                const void* data, size_t size) {
@@ -294,6 +294,7 @@ void ForwardRenderer::update_global_uniforms(uint32_t swapchain_idx) {
     // }
 }
 
+/*
 void ForwardRenderer::sync_draw_item_uniforms(uint32_t swapchain_idx,
     const ForwardDrawItem& item, const std::string& pipeline_name)
 {
@@ -410,6 +411,7 @@ void ForwardRenderer::pass_transparent(vk::CommandBuffer cmd, const RenderView& 
 
     draw_batch(cmd, view, transparent_items, kTransparentPipeline);
 }
+*/
 
 void ForwardRenderer::pass_post_process(vk::CommandBuffer cmd, const RenderView& view) {
     (void)view;

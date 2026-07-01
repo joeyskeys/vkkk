@@ -9,7 +9,7 @@
 namespace vkkk
 {
 
-struct FixedColorInstanceAttrs: public Sizeable<FixedColorUBO> {
+struct FixedColorInstanceAttrs: public Sizeable<FixedColorInstanceAttrs> {
     glm::mat4 model{1.0f};
     glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };

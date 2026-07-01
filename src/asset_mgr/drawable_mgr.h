@@ -8,6 +8,7 @@
 #include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "utils/singleton.h"
+#include "vk_ins/context.hpp"
 
 namespace fs = std::filesystem;
 

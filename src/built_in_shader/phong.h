@@ -109,10 +109,7 @@ void main() {
 
 namespace built_in_shader
 {
-using PhongTransformUBO = ::vkkk::PhongTransformUBO;
-using PhongLightUBO = ::vkkk::PhongLightUBO;
 using PhongInstanceAttrs = ::vkkk::PhongInstanceAttrs;
-using PhongDrawModeUBO = ::vkkk::PhongDrawModeUBO;
 inline constexpr auto& phong_vert = ::vkkk::phong_vert;
 inline constexpr auto& phong_frag = ::vkkk::phong_frag;
 } // namespace built_in_shader

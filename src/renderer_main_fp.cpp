@@ -12,6 +12,7 @@
 
 #include "renderer/forwardp.hpp"
 #include "asset_mgr/drawable_mgr.h"
+#include "asset_mgr/light_mgr.h"
 #include "asset_mgr/scene.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
@@ -25,7 +26,7 @@ namespace
 constexpr unsigned int WIDTH = 800;
 constexpr unsigned int HEIGHT = 600;
 
-Scene scene;
+vkkk::Scene scene;
 
 void key_callback(GLFWwindow* /*win*/, int key, int /*code*/, int action, int /*mods*/) {
     const bool key_down = action == GLFW_PRESS || action == GLFW_REPEAT;
@@ -51,8 +52,8 @@ void mouse_btn_callback(GLFWwindow* win, int btn, int action, int /*mods*/) {
 
 void mouse_pos_callback(GLFWwindow* /*win*/, double x, double y) {
     if (!scene.camera->rotating) return;
-    const float delta_x = static_cast<float>((x - cam.prev_x) / 100.0);
-    const float delta_y = static_cast<float>((y - cam.prev_y) / 100.0);
+    const float delta_x = static_cast<float>((x - scene.camera->prev_x) / 100.0);
+    const float delta_y = static_cast<float>((y - scene.camera->prev_y) / 100.0);
     scene.camera->prev_x = x;
     scene.camera->prev_y = y;
     scene.camera->rotation = glm::angleAxis(delta_x, glm::vec3(0.0f, 1.0f, 0.0f));
@@ -86,12 +87,12 @@ int main() {
     vkkk::ForwardPRenderer renderer(&ctx, &scene);
     renderer.initialize(&ctx);
 
-    renderer.create_pipeline_from_shader_src("phong_mat", phong_vert, phong_frag, make_pipeline_option());
+    renderer.create_pipeline_from_shader_src("phong_mat", vkkk::phong_vert, vkkk::phong_frag, make_pipeline_option());
 
     renderer.add_opaque_drawable({
         "cornell_plane",
         "phong_mat",
-        vkkk::built_in_shader::PhongMaterialUBO{
+        vkkk::built_in_shader::PhongInstanceAttrs{
             .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
@@ -105,7 +106,7 @@ int main() {
     renderer.add_opaque_drawable({
         "cornell_plane",
         "phong_mat",
-        vkkk::built_in_shader::PhongMaterialUBO{
+        vkkk::built_in_shader::PhongInstanceAttrs{
             .ambient = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
             .diffuse = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
             .specular = glm::vec4(0.12f, 0.04f, 0.04f, 1.0f),
@@ -117,7 +118,7 @@ int main() {
     renderer.add_opaque_drawable({
         "cornell_plane",
         "phong_mat",
-        vkkk::built_in_shader::PhongMaterialUBO{
+        vkkk::built_in_shader::PhongInstanceAttrs{
             .ambient = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .diffuse = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .specular = glm::vec4(0.06f, 0.25f, 0.07f, 1.0f),
@@ -127,7 +128,7 @@ int main() {
     renderer.add_opaque_drawable({
         "cornell_cube",
         "phong_mat",
-        vkkk::built_in_shader::PhongMaterialUBO{
+        vkkk::built_in_shader::PhongInstanceAttrs{
             .ambient = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .diffuse = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),

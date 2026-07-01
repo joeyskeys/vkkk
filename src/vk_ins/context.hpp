@@ -25,6 +25,7 @@
 #include "vk_ins/compute_shader.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 #include "vk_ins/types.h"
+#include "built_in_shader/common.h"
 
 namespace fs = std::filesystem;
 

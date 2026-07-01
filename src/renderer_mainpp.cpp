@@ -14,7 +14,6 @@
 #include "concepts/camera.h"
 #include "gui/gui.h"
 #include "renderer/forward.h"
-#include "renderer/renderer.h"
 #include "vk_ins/context.hpp"
 
 namespace

@@ -27,7 +27,7 @@ public:
     void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
 
     template <bool transparent>
-    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const InstanceAttr& instance_attr) {
+    void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const void* instance_attr) {
         if constexpr (transparent) {
             transparent_batch[pipeline_name][mesh_name].push_back(instance_attr);
         } else {
@@ -35,8 +35,12 @@ public:
         }
     }
 
-    using add_opaque_drawable = add_drawable<false>;
-    using add_transparent_drawable = add_drawable<true>;
+    inline void add_opaque_drawable(const std::string& mesh_name, const std::string& pipeline_name, const void* instance_attr) {
+        add_drawable<false>(mesh_name, pipeline_name, instance_attr);
+	}
+    inline void add_transparent_drawable(const std::string& mesh_name, const std::string& pipeline_name, const void* instance_attr) {
+        add_drawable<true>(mesh_name, pipeline_name, instance_attr);
+    }
 
 private:
     void prepare_light_clusters(const RenderView& view);

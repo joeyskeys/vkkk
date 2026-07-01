@@ -9,7 +9,6 @@
 #include <glm/mat4x4.hpp>
 #include <vulkan/vulkan_raii.hpp>
 
-#include "built_in_shader/built_in_shader_mgr.h"
 #include "built_in_shader/phong.h"
 #include "renderer/renderer.hpp"
 #include "vk_ins/context.hpp"
@@ -22,36 +21,6 @@ namespace vkkk
 
 class Camera;
 class Scene;
-
-// Shadow UBOs are temporarily disabled while forward shadow pass is under migration.
-// struct ShadowTransformUBO {
-//     glm::mat4 model{1.0f};
-//     glm::mat4 lightView{1.0f};
-//     glm::mat4 lightProj{1.0f};
-// };
-//
-// struct ShadowParamsUBO {
-//     glm::mat4 lightSpace{1.0f};
-//     glm::vec4 params{0.0025f, 1.0f, 0.0f, 0.0f};
-// };
-
-struct PostParamsUBO {
-    float exposure{1.0f};
-    float gamma{2.2f};
-    float _pad0{0.0f};
-    float _pad1{0.0f};
-};
-
-struct ForwardDrawItem {
-    std::string mesh_name;
-    std::string pipeline_name;
-    vkkk::BuiltInShaderType shader_type{
-        vkkk::BuiltInShaderType::Phong
-    };
-    glm::mat4 model{1.0f};
-    bool transparent = false;
-    built_in_shader::PhongMaterialUBO material{};
-};
 
 class ForwardRenderer final : public Renderer {
 public:
@@ -76,10 +45,10 @@ public:
         overlay_draw_ = std::move(draw);
     }
 
-    void add_draw_item(const ForwardDrawItem& item);
+    //void add_draw_item(const ForwardDrawItem& item);
     void clear_draw_items();
 
-    void update(const RenderView& view) override;
+    //void update(const RenderView& view) override;
     void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
 
     void on_resize(uint32_t width, uint32_t height) override;
@@ -97,31 +66,31 @@ private:
         const std::vector<VERT_COMP>& components, PipelineOption& option);
 
     void update_camera_aspect();
-    void update_lights_from_scene();
+    //void update_lights_from_scene();
     void update_global_uniforms(uint32_t swapchain_idx);
-    void sync_draw_item_uniforms(uint32_t swapchain_idx, const ForwardDrawItem& item,
-        const std::string& pipeline_name);
+    //void sync_draw_item_uniforms(uint32_t swapchain_idx, const ForwardDrawItem& item,
+        //const std::string& pipeline_name);
 
     void pass_opaque(vk::CommandBuffer cmd, const RenderView& view);
     void pass_transparent(vk::CommandBuffer cmd, const RenderView& view);
     void pass_post_process(vk::CommandBuffer cmd, const RenderView& view);
 
-    void draw_batch(vk::CommandBuffer cmd, const RenderView& view,
-        const std::vector<const ForwardDrawItem*>& items, const char* fallback_pipeline);
+    //void draw_batch(vk::CommandBuffer cmd, const RenderView& view,
+        //const std::vector<const ForwardDrawItem*>& items, const char* fallback_pipeline);
 
-    bool ensure_draw_item_pipeline(const ForwardDrawItem& item);
+    //bool ensure_draw_item_pipeline(const ForwardDrawItem& item);
 
     PipelineOption make_base_pipeline_option() const;
     PipelineOption make_transparent_pipeline_option() const;
     PipelineOption make_post_pipeline_option() const;
 
 private:
-    std::vector<ForwardDrawItem> draw_items_;
+    //std::vector<ForwardDrawItem> draw_items_;
     std::vector<std::string> missing_shaders_;
 
     built_in_shader::PhongLightUBO light_ubo_{};
     // ShadowParamsUBO shadow_params_ubo_{};
-    PostParamsUBO post_params_ubo_{};
+    //PostParamsUBO post_params_ubo_{};
 
     bool post_pipeline_ready_ = false;
 

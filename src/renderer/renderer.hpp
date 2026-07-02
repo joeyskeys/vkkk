@@ -92,7 +92,7 @@ public:
     uint32_t height = 0;
 
     // draw info: mesh name & instance attributes
-    using DrawInfos = std::unordered_map<std::string, void*>;
+    using DrawInfos = std::unordered_map<std::string, std::unique_ptr<char[]>>;
     // batch: value: pipeline name, key: draw infos
     using Batch = std::unordered_map<std::string, DrawInfos>;
 };

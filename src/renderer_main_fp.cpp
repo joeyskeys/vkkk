@@ -189,7 +189,7 @@ int main() {
         ImGui::Text("Box instances: %d", 2);
         ImGui::End();
 
-        ctx.record_cmds(idx, [&](vk::CommandBuffer& cmd_buf, uint32_t image_index) {
+        ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
             renderer.record_commands(cmd_buf, image_index);
             hud.render(cmd_buf);
         });

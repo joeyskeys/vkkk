@@ -67,10 +67,7 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         const auto& pipeline = pipeline_it->second;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
-        sync_uniforms(view.swapchain_image_idx, draw_infos, pipeline);
-        if (update_ssbo) {
-            sync_ssbos(draw_infos, pipeline);
-        }
+        sync_uniforms(view.swapchain_image_idx, scene, pipeline);
 
         const vk::DescriptorSet* desc_set = nullptr;
         if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
@@ -78,6 +75,8 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         }
 
         for (const auto& [mesh_name, instance_attrs] : draw_infos) {
+            sync_ssbo(instance_attrs, pipeline);
+
             const auto instance_count = static_cast<uint32_t>(instance_attrs.size());
             if (instance_count == 0u) {
                 continue;

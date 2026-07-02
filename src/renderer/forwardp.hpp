@@ -18,6 +18,8 @@ class Scene;
 
 class ForwardPRenderer final : public Renderer {
 public:
+    ForwardPRenderer(Context* context, Scene* scene) : Renderer(context, scene) {}
+    
     const char* type_name() const override { return "ForwardP"; }
 
     bool initialize(Context* context) override;
@@ -29,9 +31,9 @@ public:
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const void* instance_attr) {
         if constexpr (transparent) {
-            transparent_batch[pipeline_name][mesh_name].push_back(instance_attr);
+            transparent_batch[pipeline_name][mesh_name].push_back(reinterpret_cast<void*>(instance_attr));
         } else {
-            opaque_batch[pipeline_name][mesh_name].push_back(instance_attr);
+            opaque_batch[pipeline_name][mesh_name].push_back(reinterpret_cast<void*>(instance_attr));
         }
     }
 

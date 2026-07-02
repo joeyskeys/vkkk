@@ -949,7 +949,6 @@ bool Context::create_pipeline(const std::string& name,
     }
 
     pipelines.emplace(name, std::move(pipeline));
-    LightMgr::instance().register_pipeline(name, pipelines.at(name).ubos);
     return true;
 }
 
@@ -1178,7 +1177,7 @@ void Context::dispatch_compute(const std::string& pipeline_name, uint32_t group_
 }
 
 void Context::record_cmds(uint32_t image_index,
-    const std::function<void(vk::CommandBuffer&, uint32_t)>& emit_func)
+    const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func)
 {
     auto& cmd_buf = command_buffers[image_index];
     cmd_buf.reset({});

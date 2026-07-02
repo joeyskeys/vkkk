@@ -39,6 +39,7 @@ set(SRCS
     concepts/line.cpp
     concepts/mesh.cpp
     gui/gui.cpp
+    renderer/renderer.cpp
     renderer/forwardp.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp

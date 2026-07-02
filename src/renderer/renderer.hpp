@@ -51,7 +51,7 @@ public:
 
     template <typename T>
     void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
-        const T& ubo_data,
+        const T* ubo_data,
         const Pipeline& pipeline)
     {
         if (!ctx) {
@@ -66,11 +66,10 @@ public:
         if (swapchain_idx >= ubo->memos.size()) {
             return;
         }
-        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data.data(), static_cast<uint32_t>(ubo_data.size()));
+        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data, static_cast<uint32_t>(ubo_data.size()));
     }
 
-    template <typename T>
-    void sync_ssbo(const T& ssbo_data,
+    void sync_ssbo(const void* ssbo_data,
         const Pipeline& pipeline)
     {
         if (!ctx) {
@@ -81,15 +80,16 @@ public:
         if (ssbo_it == pipeline.ssbos.end()) {
             return;
         }
-        ctx->sync_ssbo(ssbo_it->second, ssbo_data.get_data());
+        ctx->sync_ssbo(ssbo_it->second, ssbo_data);
     }
+
+    void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const Pipeline& pipeline);
 
 public:
     Context* ctx = nullptr;
     Scene* scene = nullptr;
     uint32_t width = 0;
     uint32_t height = 0;
-    bool update_ssbo = false;
 
     // draw info: mesh name & instance attributes
     using DrawInfos = std::unordered_map<std::string, std::vector<void*>>;

@@ -43,6 +43,28 @@ void ForwardPRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& 
     pass_transparent(cmd, view);
 }
 
+void ForwardPRenderer::allocate_ssbo() {
+    size_t total_opaque_size = 0;
+    size_t total_transparent_size = 0;
+
+    auto allocate_ssbo_for_batch = [](const IntermediateSSBOData& intermediate_ssbo_data, Batch& batch) {
+        size_t total_size = 0;
+        for (const auto& [pipeline_name, buf_pair] : intermediate_ssbo_data) {
+            batch[pipeline_name].first = std::make_unique<char[]>(buf_pair.first);
+            std::vector<size_t> offsets(buf_pair.second.size());
+            for (int i = 0; const auto& [mesh_name, buf] : buf_pair.second) {
+                memcpy(batch[pipeline_name].first.get() + total_size, buf.data(), buf.size());
+                offsets[i] = total_size;
+                total_size += buf.size();
+                i++;
+            }
+            batch[pipeline_name].second = offsets;
+        }
+    };
+    allocate_ssbo_for_batch(opaque_intermediate_ssbo_data, opaque_batch);
+    allocate_ssbo_for_batch(transparent_intermediate_ssbo_data, transparent_batch);
+}
+
 // private funcs
 void ForwardPRenderer::prepare_light_clusters(const RenderView& view) {
     (void)view;

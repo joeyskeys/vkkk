@@ -91,10 +91,10 @@ public:
     uint32_t width = 0;
     uint32_t height = 0;
 
-    // draw info: mesh name & instance attributes
-    using DrawInfos = std::unordered_map<std::string, std::unique_ptr<char[]>>;
-    // batch: value: pipeline name, key: draw infos
-    using Batch = std::unordered_map<std::string, DrawInfos>;
+    // intermediate ssbo data: pipeline name, mesh name, ssbo buffer
+    using IntermediateSSBOData = std::unordered_map<std::string, std::pair<size_t, std::unordered_map<std::string, std::vector<char[]>>>>;
+    // batch: value: pipeline name, key: ssbo buffer, offset vector
+    using Batch = std::unordered_map<std::string, std::pair<std::unique_ptr<char[]>, std::vector<size_t>>>;
 };
 
 } // namespace vkkk

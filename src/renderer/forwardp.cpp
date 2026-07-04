@@ -51,14 +51,14 @@ void ForwardPRenderer::allocate_ssbo() {
         size_t total_size = 0;
         for (const auto& [pipeline_name, buf_pair] : intermediate_ssbo_data) {
             batch[pipeline_name].first = std::make_unique<char[]>(buf_pair.first);
-            std::vector<size_t> offsets(buf_pair.second.size());
-            for (int i = 0; const auto& [mesh_name, buf] : buf_pair.second) {
-                memcpy(batch[pipeline_name].first.get() + total_size, buf.data(), buf.size());
-                offsets[i] = total_size;
-                total_size += buf.size();
+            std::vector<std::tuple<std::string, size_t, size_t>> draw_infos(buf_pair.second.size());
+            for (int i = 0; const auto& [mesh_name, buf_info] : buf_pair.second) {
+                memcpy(batch[pipeline_name].first.get() + total_size, buf_info.second.data(), buf_info.second.size());
+                draw_infos[i] = std::make_tuple(mesh_name, buf_info.first, total_size);
+                total_size += buf_info.second.size();
                 i++;
             }
-            batch[pipeline_name].second = offsets;
+            batch[pipeline_name].second = draw_infos;
         }
     };
     allocate_ssbo_for_batch(opaque_intermediate_ssbo_data, opaque_batch);
@@ -89,27 +89,23 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         const auto& pipeline = pipeline_it->second;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
-        sync_uniforms(view.swapchain_image_idx, scene, pipeline);
+        sync_uniforms(view.swapchain_image_idx, scene, pipeline_name, pipeline);
 
         const vk::DescriptorSet* desc_set = nullptr;
         if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
             desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
         }
 
-        for (const auto& [mesh_name, instance_attrs] : draw_infos) {
-            sync_ssbo(instance_attrs, pipeline);
-
-            const auto instance_count = static_cast<uint32_t>(instance_attrs.size());
-            if (instance_count == 0u) {
-                continue;
-            }
-
+		sync_ssbo(draw_infos.first.get(), pipeline);
+        for (const auto& [mesh_name, instance_count, offset] : draw_infos.second) {
             ctx->draw_mesh_instanced(
                 cmd,
                 mesh_name,
                 *pipeline.vk_pipeline_layout,
                 instance_count,
-                desc_set);
+                offset,
+                desc_set
+            );
         }
     }
 }

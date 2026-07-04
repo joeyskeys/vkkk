@@ -30,22 +30,21 @@ public:
 
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const size_t instance_attr_size, const char* data) {
+        auto add_drawable_to_batch = [&](IntermediateSSBOData& intermediate_ssbo_data) {
+            if (intermediate_ssbo_data.find(pipeline_name) == intermediate_ssbo_data.end()) {
+                intermediate_ssbo_data[pipeline_name].first = 0;
+                intermediate_ssbo_data[pipeline_name].second[mesh_name].first = 0;
+                intermediate_ssbo_data[pipeline_name].second[mesh_name].second.clear();
+            }
+            auto& [instance_cnt, buffer] = intermediate_ssbo_data[pipeline_name].second[mesh_name];
+            instance_cnt += 1;
+            buffer.insert(buffer.end(), data, data + instance_attr_size);
+            intermediate_ssbo_data[pipeline_name].first += instance_attr_size;
+        };
         if constexpr (transparent) {
-            if (transparent_intermediate_ssbo_data.find(pipeline_name) == transparent_intermediate_ssbo_data.end()) {
-                transparent_intermediate_ssbo_data[pipeline_name].first = 0;
-                transparent_intermediate_ssbo_data[pipeline_name].second.clear();
-            }
-            auto& buffer = transparent_intermediate_ssbo_data[pipeline_name].second[mesh_name];
-            buffer.insert(buffer.end(), data, data + instance_attr_size);
-            transparent_intermediate_ssbo_data[pipeline_name].first += instance_attr_size;
+            add_drawable_to_batch(transparent_intermediate_ssbo_data);
         } else {
-            if (opaque_intermediate_ssbo_data.find(pipeline_name) == opaque_intermediate_ssbo_data.end()) {
-                opaque_intermediate_ssbo_data[pipeline_name].first = 0;
-                opaque_intermediate_ssbo_data[pipeline_name].second.clear();
-            }
-            auto& buffer = opaque_intermediate_ssbo_data[pipeline_name].second[mesh_name];
-            buffer.insert(buffer.end(), data, data + instance_attr_size);
-            opaque_intermediate_ssbo_data[pipeline_name].first += instance_attr_size;
+            add_drawable_to_batch(opaque_intermediate_ssbo_data);
         }
     }
 

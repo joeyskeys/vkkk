@@ -47,7 +47,8 @@ public:
     bool create_pipeline_from_shader_src(const std::string& ppl_name,
         const char* vert_or_mesh,
         const char* frag,
-        const PipelineOption& option);
+        const PipelineOption& option,
+        const std::vector<VERT_COMP>& components = {VERTEX});
 
     template <typename T>
     void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
@@ -66,7 +67,7 @@ public:
         if (swapchain_idx >= ubo->memos.size()) {
             return;
         }
-        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data, static_cast<uint32_t>(ubo_data.size()));
+        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data, ubo->size * ubo->vecsize);
     }
 
     void sync_ssbo(const void* ssbo_data,
@@ -83,7 +84,7 @@ public:
         ctx->sync_ssbo(ssbo_it->second, ssbo_data);
     }
 
-    void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const Pipeline& pipeline);
+    void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string pipeline_name, const Pipeline& pipeline);
 
 public:
     Context* ctx = nullptr;
@@ -92,9 +93,9 @@ public:
     uint32_t height = 0;
 
     // intermediate ssbo data: pipeline name, mesh name, ssbo buffer
-    using IntermediateSSBOData = std::unordered_map<std::string, std::pair<size_t, std::unordered_map<std::string, std::vector<char[]>>>>;
+    using IntermediateSSBOData = std::unordered_map<std::string, std::pair<size_t, std::unordered_map<std::string, std::pair<size_t, std::vector<char>>>>>;
     // batch: value: pipeline name, key: ssbo buffer, offset vector
-    using Batch = std::unordered_map<std::string, std::pair<std::unique_ptr<char[]>, std::vector<size_t>>>;
+    using Batch = std::unordered_map<std::string, std::pair<std::unique_ptr<char[]>, std::vector<std::tuple<std::string, size_t, size_t>>>>;
 };
 
 } // namespace vkkk

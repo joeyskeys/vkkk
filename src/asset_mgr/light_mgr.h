@@ -26,7 +26,7 @@ private:
 
 public:
     void register_pipeline(const std::string& pipeline_name,
-        PipelineLightStorage&& storage);
+        const PipelineLightStorage& storage);
     void unregister_pipeline(const std::string& pipeline_name);
 
     const PipelineLightStorage* pipeline_storage(const std::string& pipeline_name) const;

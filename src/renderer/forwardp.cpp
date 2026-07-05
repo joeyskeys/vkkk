@@ -34,13 +34,13 @@ void ForwardPRenderer::on_resize(uint32_t width, uint32_t height) {
     this->height = height;
 }
 
-void ForwardPRenderer::record_commands(vk::CommandBuffer cmd, const RenderView& view) {
+void ForwardPRenderer::record_commands(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
     if (!ctx) {
         return;
     }
 
-    pass_opaque(cmd, view);
-    pass_transparent(cmd, view);
+    pass_opaque(cmd, swapchain_image_idx);
+    pass_transparent(cmd, swapchain_image_idx);
 }
 
 void ForwardPRenderer::allocate_ssbo() {
@@ -66,16 +66,16 @@ void ForwardPRenderer::allocate_ssbo() {
 }
 
 // private funcs
-void ForwardPRenderer::prepare_light_clusters(const RenderView& view) {
-    (void)view;
+void ForwardPRenderer::prepare_light_clusters(const uint32_t swapchain_image_idx) {
+    (void)swapchain_image_idx;
 }
 
-void ForwardPRenderer::pass_shadow(vk::CommandBuffer cmd, const RenderView& view) {
+void ForwardPRenderer::pass_shadow(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
     (void)cmd;
-    (void)view;
+    (void)swapchain_image_idx;
 }
 
-void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view, const Batch& batch) {
+void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batch& batch) {
     if (!ctx) {
         return;
     }
@@ -89,11 +89,11 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& view,
         const auto& pipeline = pipeline_it->second;
         cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
 
-        sync_uniforms(view.swapchain_image_idx, scene, pipeline_name, pipeline);
+        sync_uniforms(swapchain_image_idx, scene, pipeline_name, pipeline);
 
         const vk::DescriptorSet* desc_set = nullptr;
-        if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
-            desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
+        if (swapchain_image_idx < pipeline.descriptor_sets.size()) {
+            desc_set = &*pipeline.descriptor_sets[swapchain_image_idx];
         }
 
 		sync_ssbo(draw_infos.first.get(), pipeline);

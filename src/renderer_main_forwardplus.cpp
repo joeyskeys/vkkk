@@ -153,8 +153,14 @@ int main() {
     upload_mesh(ctx, scene, "cornell_plane");
     upload_mesh(ctx, scene, "cornell_cube");
 
-    std::vector<InstancedPhongBatch> batches;
-    batches.push_back({
+    vkkk::ForwardPRenderer renderer(&ctx, &scene);
+    renderer.add_opaque_drawable("cornell_plane", "cornell_plane_gray", sizeof(PhongInstanceAttr), nullptr);
+    renderer.add_opaque_drawable("cornell_plane", "cornell_plane_red", sizeof(PhongInstanceAttr), nullptr);
+    renderer.add_opaque_drawable("cornell_plane", "cornell_plane_green", sizeof(PhongInstanceAttr), nullptr);
+    renderer.add_opaque_drawable("cornell_cube", "cornell_boxes", sizeof(PhongInstanceAttr), nullptr);
+
+    renderer.create_pass_pipelines();
+    renderer.add_draw_item({
         "cornell_plane",
         "cornell_plane_gray",
         make_material(glm::vec3(0.78f, 0.78f, 0.78f), 8.0f),

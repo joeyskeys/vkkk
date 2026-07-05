@@ -26,7 +26,7 @@ public:
     void shutdown() override;
     void on_resize(uint32_t width, uint32_t height) override;
 
-    void record_commands(vk::CommandBuffer cmd, const RenderView& view) override;
+    void record_commands(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) override;
 
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const size_t instance_attr_size, const char* data) {
@@ -58,18 +58,18 @@ public:
     void allocate_ssbo();
 
 private:
-    void prepare_light_clusters(const RenderView& view);
+    void prepare_light_clusters(const uint32_t swapchain_image_idx);
 
-    inline void pass_opaque(vk::CommandBuffer cmd, const RenderView& view) {
-        draw_batch(cmd, view, opaque_batch);
+    inline void pass_opaque(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
+        draw_batch(cmd, swapchain_image_idx, opaque_batch);
     }
 
-    inline void pass_transparent(vk::CommandBuffer cmd, const RenderView& view) {
-        draw_batch(cmd, view, transparent_batch);
+    inline void pass_transparent(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
+        draw_batch(cmd, swapchain_image_idx, transparent_batch);
     }
 
-    void pass_shadow(vk::CommandBuffer cmd, const RenderView& view);
-    void draw_batch(vk::CommandBuffer cmd, const RenderView& view, const Batch& batch);
+    void pass_shadow(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx);
+    void draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batch& batch);
 
     IntermediateSSBOData opaque_intermediate_ssbo_data;
     IntermediateSSBOData transparent_intermediate_ssbo_data;

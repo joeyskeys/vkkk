@@ -27,9 +27,9 @@ void copy_lights(std::vector<T>& dest, const std::vector<T>& src) {
 } // namespace
 
 void LightMgr::register_pipeline(const std::string& pipeline_name,
-    PipelineLightStorage&& storage)
+    const PipelineLightStorage& storage)
 {
-    pipeline_storages[pipeline_name] = std::move(storage);
+    pipeline_storages[pipeline_name] = storage;
 }
 
 void LightMgr::unregister_pipeline(const std::string& pipeline_name) {

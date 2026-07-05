@@ -89,68 +89,96 @@ int main() {
 
     renderer.create_pipeline_from_shader_src("phong_mat", vkkk::phong_vert, vkkk::phong_frag, make_pipeline_option());
 
-    renderer.add_opaque_drawable({
-        "cornell_plane",
-        "phong_mat",
-        vkkk::built_in_shader::PhongInstanceAttrs{
+    constexpr auto phong_attr_size = sizeof(vkkk::built_in_shader::PhongInstanceAttrs);
+    vkkk::built_in_shader::PhongInstanceAttrs phong_attrs[7] = {
+        {
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
             .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
         },
         {
-            {glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f))},
-            {glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f))},
-            {glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f))}}
-    });
-    renderer.add_opaque_drawable({
-        "cornell_plane",
-        "phong_mat",
-        vkkk::built_in_shader::PhongInstanceAttrs{
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
             .ambient = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
             .diffuse = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
             .specular = glm::vec4(0.12f, 0.04f, 0.04f, 1.0f),
             .shininess = 8.0f
         },
         {
-            {glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f))}}
-    });
-    renderer.add_opaque_drawable({
-        "cornell_plane",
-        "phong_mat",
-        vkkk::built_in_shader::PhongInstanceAttrs{
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+            .ambient = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
+            .diffuse = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
+            .specular = glm::vec4(0.12f, 0.04f, 0.04f, 1.0f),
+            .shininess = 8.0f
+        },
+        {
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
             .ambient = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .diffuse = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .specular = glm::vec4(0.06f, 0.25f, 0.07f, 1.0f),
             .shininess = 8.0f
         },
-    });
-    renderer.add_opaque_drawable({
-        "cornell_cube",
-        "phong_mat",
-        vkkk::built_in_shader::PhongInstanceAttrs{
+        {
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.45f, -0.6f, -0.15f)) *
+                glm::rotate(glm::mat4(1.0f), glm::radians(-18.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
+                glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, 0.8f, 0.6f)),
             .ambient = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .diffuse = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 24.0f
         },
         {
-            {glm::translate(glm::mat4(1.0f), glm::vec3(-0.45f, -0.6f, -0.15f)) *
-                glm::rotate(glm::mat4(1.0f), glm::radians(-18.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
-                glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, 0.8f, 0.6f))},
-            {glm::translate(glm::mat4(1.0f), glm::vec3(0.38f, -0.35f, 0.32f)) *
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.38f, -0.35f, 0.32f)) *
                 glm::rotate(glm::mat4(1.0f), glm::radians(14.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
-                glm::scale(glm::mat4(1.0f), glm::vec3(0.55f, 1.3f, 0.55f))}
+                glm::scale(glm::mat4(1.0f), glm::vec3(0.55f, 1.3f, 0.55f)),
+            .ambient = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
+            .diffuse = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
+            .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
+            .shininess = 24.0f
         }
-    });
-
+    };
+    renderer.add_opaque_drawable(
+        "cornell_plane",
+        "phong_mat",
+		phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[0]));
+    renderer.add_opaque_drawable(
+        "cornell_plane",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[1]));
+    renderer.add_opaque_drawable(
+        "cornell_plane",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[2]));
+    renderer.add_opaque_drawable(
+        "cornell_plane",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[3]));
+    renderer.add_opaque_drawable(
+        "cornell_plane",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[4]));
+    renderer.add_opaque_drawable(
+        "cornell_cube",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[5]));
+    renderer.add_opaque_drawable(
+        "cornell_cube",
+        "phong_mat",
+        phong_attr_size,
+        reinterpret_cast<char*>(&phong_attrs[6]));
     vkkk::PipelineLightStorage light_storage;
-    scene.light_mgr->register_pipeline("phong_mat", {
-        .pt_lights = {
-            {glm::vec4(0.0f, 0.85f, 0.0f, 1.0f), glm::vec4(1.0f)}
-        }
-    });
-    scene.light_mgr->register_pipeline("phong_mat", std::move(light_storage));
+    vkkk::PointLightUBO point_light{};
+    point_light.vec = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);
+    point_light.color = glm::vec4(1.0f);
+    light_storage.pt_lights.push_back(point_light);
+    scene.light_mgr->register_pipeline("phong_mat", light_storage);
 
     glfwSetKeyCallback(window, key_callback);
     glfwSetMouseButtonCallback(window, mouse_btn_callback);
@@ -191,7 +219,7 @@ int main() {
 
         ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
             renderer.record_commands(cmd_buf, image_index);
-            hud.render(cmd_buf);
+            hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
         });
     });
 

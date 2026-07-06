@@ -36,17 +36,19 @@ layout(binding = 0) uniform CameraUBO {
     mat4 proj;
 } ubo;
 
+struct PhongInstanceAttr {
+    mat4 model;
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    float shininess;
+    float _pad0;
+    float _pad1;
+    float _pad2;
+};
+
 layout(std430, binding = 3) readonly buffer PhongInstanceAttrs {
-    struct PhongInstanceAttr {
-        mat4 model;
-        vec4 ambient;
-        vec4 diffuse;
-        vec4 specular;
-        float shininess;
-        float _pad0;
-        float _pad1;
-        float _pad2;
-    } attrs[];
+    PhongInstanceAttr attrs[];
 } instance_attrs;
 
 layout(location = 0) in vec3 inPosition;

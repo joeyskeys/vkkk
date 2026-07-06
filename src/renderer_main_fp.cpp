@@ -18,7 +18,6 @@
 #include "concepts/camera.h"
 #include "gui/gui.h"
 #include "vk_ins/context.hpp"
-#include "built_in_shader/phong.h"
 
 namespace
 {
@@ -26,38 +25,46 @@ namespace
 constexpr unsigned int WIDTH = 800;
 constexpr unsigned int HEIGHT = 600;
 
-vkkk::Scene scene;
+vkkk::Camera cam{
+    glm::vec3{0.0f, 0.0f, 3.8f},
+    glm::vec3{0.0f, 0.0f, -1.0f},
+    glm::vec3{0.0f, 1.0f, 0.0f},
+    35.0f,
+    WIDTH / static_cast<float>(HEIGHT),
+    0.1f,
+    100.0f
+};
 
 void key_callback(GLFWwindow* /*win*/, int key, int /*code*/, int action, int /*mods*/) {
     const bool key_down = action == GLFW_PRESS || action == GLFW_REPEAT;
     const bool key_up = action == GLFW_RELEASE;
-    if (key == GLFW_KEY_E) scene.camera->y = key_down ? 0.01f : (key_up ? 0.0f : scene.camera->y);
-    else if (key == GLFW_KEY_Q) scene.camera->y = key_down ? -0.01f : (key_up ? 0.0f : scene.camera->y);
-    else if (key == GLFW_KEY_W) scene.camera->z = key_down ? 0.01f : (key_up ? 0.0f : scene.camera->z);
-    else if (key == GLFW_KEY_S) scene.camera->z = key_down ? -0.01f : (key_up ? 0.0f : scene.camera->z);
-    else if (key == GLFW_KEY_A) scene.camera->x = key_down ? -0.01f : (key_up ? 0.0f : scene.camera->x);
-    else if (key == GLFW_KEY_D) scene.camera->x = key_down ? 0.01f : (key_up ? 0.0f : scene.camera->x);
+    if (key == GLFW_KEY_E) cam.y = key_down ? 0.01f : (key_up ? 0.0f : cam.y);
+    else if (key == GLFW_KEY_Q) cam.y = key_down ? -0.01f : (key_up ? 0.0f : cam.y);
+    else if (key == GLFW_KEY_W) cam.z = key_down ? 0.01f : (key_up ? 0.0f : cam.z);
+    else if (key == GLFW_KEY_S) cam.z = key_down ? -0.01f : (key_up ? 0.0f : cam.z);
+    else if (key == GLFW_KEY_A) cam.x = key_down ? -0.01f : (key_up ? 0.0f : cam.x);
+    else if (key == GLFW_KEY_D) cam.x = key_down ? 0.01f : (key_up ? 0.0f : cam.x);
 }
 
 void mouse_btn_callback(GLFWwindow* win, int btn, int action, int /*mods*/) {
     if (btn == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) {
-            scene.camera->rotating = true;
-            glfwGetCursorPos(win, &scene.camera->prev_x, &scene.camera->prev_y);
+            cam.rotating = true;
+            glfwGetCursorPos(win, &cam.prev_x, &cam.prev_y);
         } else {
-            scene.camera->rotating = false;
+            cam.rotating = false;
         }
     }
 }
 
 void mouse_pos_callback(GLFWwindow* /*win*/, double x, double y) {
-    if (!scene.camera->rotating) return;
-    const float delta_x = static_cast<float>((x - scene.camera->prev_x) / 100.0);
-    const float delta_y = static_cast<float>((y - scene.camera->prev_y) / 100.0);
-    scene.camera->prev_x = x;
-    scene.camera->prev_y = y;
-    scene.camera->rotation = glm::angleAxis(delta_x, glm::vec3(0.0f, 1.0f, 0.0f));
-    scene.camera->rotation = glm::angleAxis(-delta_y, glm::vec3(1.0f, 0.0f, 0.0f)) * scene.camera->rotation;
+    if (!cam.rotating) return;
+    const float delta_x = static_cast<float>((x - cam.prev_x) / 100.0);
+    const float delta_y = static_cast<float>((y - cam.prev_y) / 100.0);
+    cam.prev_x = x;
+    cam.prev_y = y;
+    cam.rotation = glm::angleAxis(delta_x, glm::vec3(0.0f, 1.0f, 0.0f));
+    cam.rotation = glm::angleAxis(-delta_y, glm::vec3(1.0f, 0.0f, 0.0f)) * cam.rotation;
 }
 
 vkkk::PipelineOption make_pipeline_option() {
@@ -80,6 +87,7 @@ int main() {
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
 
     vkkk::Scene scene;
+    scene.camera = &cam;
     scene.drawable_mgr->add_plane("cornell_plane", {vkkk::VERTEX, vkkk::NORMAL}, 2.0f);
     scene.drawable_mgr->add_cube("cornell_cube", {vkkk::VERTEX, vkkk::NORMAL}, 1.0f);
     scene.drawable_mgr->sync_to_gpu(&ctx);
@@ -197,7 +205,10 @@ int main() {
 
     ctx.set_update_cbk([&](uint32_t idx, float duration) {
         raw_frame_dt = duration;
-        scene.camera->update_ubo_data();
+        cam.ratio = WIDTH / static_cast<float>(HEIGHT);
+        cam.update_position(frame_dt);
+        cam.update_orientation();
+        cam.update_ubo_data();
 
         hud.begin_frame();
         ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);

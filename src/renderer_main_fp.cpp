@@ -95,7 +95,14 @@ int main() {
     vkkk::ForwardPRenderer renderer(&ctx, &scene);
     renderer.initialize(&ctx);
 
-    renderer.create_pipeline_from_shader_src("phong_mat", vkkk::phong_vert, vkkk::phong_frag, make_pipeline_option());
+    if (!renderer.create_pipeline_from_shader_src(
+            "phong_mat",
+            vkkk::phong_vert,
+            vkkk::phong_frag,
+            make_pipeline_option(),
+            {vkkk::VERTEX, vkkk::NORMAL})) {
+        throw std::runtime_error("failed to create phong_mat pipeline");
+    }
 
     constexpr auto phong_attr_size = sizeof(vkkk::built_in_shader::PhongInstanceAttrs);
     vkkk::built_in_shader::PhongInstanceAttrs phong_attrs[7] = {
@@ -181,6 +188,7 @@ int main() {
         "phong_mat",
         phong_attr_size,
         reinterpret_cast<char*>(&phong_attrs[6]));
+    renderer.allocate_ssbo();
     vkkk::PipelineLightStorage light_storage;
     vkkk::PointLightUBO point_light{};
     point_light.vec = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);

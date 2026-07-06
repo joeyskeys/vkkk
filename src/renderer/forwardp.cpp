@@ -48,14 +48,14 @@ void ForwardPRenderer::allocate_ssbo() {
     size_t total_transparent_size = 0;
 
     auto allocate_ssbo_for_batch = [](const IntermediateSSBOData& intermediate_ssbo_data, Batch& batch) {
-        size_t total_size = 0;
         for (const auto& [pipeline_name, buf_pair] : intermediate_ssbo_data) {
+            size_t offset = 0;
             batch[pipeline_name].first = std::make_unique<char[]>(buf_pair.first);
             std::vector<std::tuple<std::string, size_t, size_t>> draw_infos(buf_pair.second.size());
             for (int i = 0; const auto& [mesh_name, buf_info] : buf_pair.second) {
-                memcpy(batch[pipeline_name].first.get() + total_size, buf_info.second.data(), buf_info.second.size());
-                draw_infos[i] = std::make_tuple(mesh_name, buf_info.first, total_size);
-                total_size += buf_info.second.size();
+                memcpy(batch[pipeline_name].first.get() + offset, buf_info.second.data(), buf_info.second.size());
+                draw_infos[i] = std::make_tuple(mesh_name, buf_info.first, offset);
+                offset += buf_info.second.size();
                 i++;
             }
             batch[pipeline_name].second = draw_infos;

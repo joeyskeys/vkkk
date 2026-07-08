@@ -70,8 +70,8 @@ public:
         ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data, ubo->size * ubo->vecsize);
     }
 
-    void sync_ssbo(const void* ssbo_data,
-        const Pipeline& pipeline)
+    void sync_ssbo(const void* ssbo_data, const Pipeline& pipeline,
+        uint32_t swapchain_idx, uint32_t byte_size = 0)
     {
         if (!ctx) {
             return;
@@ -81,7 +81,7 @@ public:
         if (ssbo_it == pipeline.ssbos.end()) {
             return;
         }
-        ctx->sync_ssbo(ssbo_it->second, ssbo_data);
+        ctx->sync_ssbo(ssbo_it->second, ssbo_data, swapchain_idx, byte_size);
     }
 
     void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string pipeline_name, const Pipeline& pipeline);
@@ -92,10 +92,31 @@ public:
     uint32_t width = 0;
     uint32_t height = 0;
 
-    // intermediate ssbo data: pipeline name, mesh name, ssbo buffer
-    using IntermediateSSBOData = std::unordered_map<std::string, std::pair<size_t, std::unordered_map<std::string, std::pair<size_t, std::vector<char>>>>>;
-    // batch: value: pipeline name, key: ssbo buffer, offset vector
-    using Batch = std::unordered_map<std::string, std::pair<std::unique_ptr<char[]>, std::vector<std::tuple<std::string, size_t, size_t>>>>;
+    using IntermediateSSBOBuffer = struct {
+        size_t instance_count;
+        std::vector<char> data;
+    };
+
+    using IntermediateSSBOData = struct {
+        size_t total_size;
+        std::unordered_map<std::string, IntermediateSSBOBuffer> data_map;
+    };
+
+    using IntermediateSSBODataMap = std::unordered_map<std::string, IntermediateSSBOData>;
+
+    using BatchInfo = struct {
+        std::string mesh_name;
+        size_t batch_total_size;
+        size_t instance_count;
+        size_t instance_offset;
+    };
+
+    using Batch = struct {
+        std::unique_ptr<char[]> buffer;
+        std::vector<BatchInfo> batch_infos;
+    };
+
+    using Batches = std::unordered_map<std::string, Batch>;
 };
 
 } // namespace vkkk

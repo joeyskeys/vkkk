@@ -23,8 +23,8 @@ bool ForwardPRenderer::initialize(Context* context) {
 }
 
 void ForwardPRenderer::shutdown() {
-    opaque_batch.clear();
-    transparent_batch.clear();
+    opaque_batches.clear();
+    transparent_batches.clear();
     ctx = nullptr;
     scene = nullptr;
 }
@@ -47,22 +47,29 @@ void ForwardPRenderer::allocate_ssbo() {
     size_t total_opaque_size = 0;
     size_t total_transparent_size = 0;
 
-    auto allocate_ssbo_for_batch = [](const IntermediateSSBOData& intermediate_ssbo_data, Batch& batch) {
-        for (const auto& [pipeline_name, buf_pair] : intermediate_ssbo_data) {
-            size_t offset = 0;
-            batch[pipeline_name].first = std::make_unique<char[]>(buf_pair.first);
-            std::vector<std::tuple<std::string, size_t, size_t>> draw_infos(buf_pair.second.size());
-            for (int i = 0; const auto& [mesh_name, buf_info] : buf_pair.second) {
-                memcpy(batch[pipeline_name].first.get() + offset, buf_info.second.data(), buf_info.second.size());
-                draw_infos[i] = std::make_tuple(mesh_name, buf_info.first, offset);
-                offset += buf_info.second.size();
+    auto allocate_ssbo_for_batch = [](const IntermediateSSBODataMap& intermediate_ssbo_data_map, Batches& batches) {
+        for (const auto& [pipeline_name, intermediate_ssbo_data] : intermediate_ssbo_data_map) {
+            size_t instance_offset = 0;
+            size_t byte_offset = 0;
+            batches[pipeline_name].buffer = std::make_unique<char[]>(intermediate_ssbo_data.total_size);
+            std::vector<BatchInfo> batch_infos(intermediate_ssbo_data.data_map.size());
+            for (int i = 0; const auto& [mesh_name, intermediate_ssbo_buffer] : intermediate_ssbo_data.data_map) {
+                memcpy(batches[pipeline_name].buffer.get() + byte_offset, intermediate_ssbo_buffer.data.data(), intermediate_ssbo_buffer.data.size());
+                batch_infos[i] = BatchInfo{
+                    .mesh_name = mesh_name,
+                    .batch_total_size = intermediate_ssbo_buffer.data.size(),
+                    .instance_count = intermediate_ssbo_buffer.instance_count,
+                    .instance_offset = instance_offset,
+                };
+                instance_offset += intermediate_ssbo_buffer.instance_count;
+                byte_offset += intermediate_ssbo_buffer.data.size();
                 i++;
             }
-            batch[pipeline_name].second = draw_infos;
+            batches[pipeline_name].batch_infos = std::move(batch_infos);
         }
     };
-    allocate_ssbo_for_batch(opaque_intermediate_ssbo_data, opaque_batch);
-    allocate_ssbo_for_batch(transparent_intermediate_ssbo_data, transparent_batch);
+    allocate_ssbo_for_batch(opaque_intermediate_ssbo_data_map, opaque_batches);
+    allocate_ssbo_for_batch(transparent_intermediate_ssbo_data_map, transparent_batches);
 }
 
 // private funcs
@@ -75,12 +82,12 @@ void ForwardPRenderer::pass_shadow(vk::CommandBuffer cmd, const uint32_t swapcha
     (void)swapchain_image_idx;
 }
 
-void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batch& batch) {
+void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batches& batches) {
     if (!ctx) {
         return;
     }
 
-    for (const auto& [pipeline_name, draw_infos] : batch) {
+    for (const auto& [pipeline_name, batch] : batches) {
         const auto pipeline_it = ctx->pipelines.find(pipeline_name);
         if (pipeline_it == ctx->pipelines.end()) {
             continue;
@@ -96,14 +103,21 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchai
             desc_set = &*pipeline.descriptor_sets[swapchain_image_idx];
         }
 
-		sync_ssbo(draw_infos.first.get(), pipeline);
-        for (const auto& [mesh_name, instance_count, offset] : draw_infos.second) {
+        const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+        const size_t elem_size = ssbo_it != pipeline.ssbos.end() ? ssbo_it->second.size : 0;
+        size_t upload_bytes = 0;
+        for (const auto& batch_info : batch.batch_infos) {
+            upload_bytes = std::max(upload_bytes,
+                (batch_info.instance_offset + batch_info.instance_count) * elem_size);
+        }
+        sync_ssbo(batch.buffer.get(), pipeline, swapchain_image_idx, static_cast<uint32_t>(upload_bytes));
+        for (const auto& batch_info : batch.batch_infos) {
             ctx->draw_mesh_instanced(
                 cmd,
-                mesh_name,
+                batch_info.mesh_name,
                 *pipeline.vk_pipeline_layout,
-                instance_count,
-                offset,
+                batch_info.instance_count,
+                batch_info.instance_offset,
                 desc_set
             );
         }

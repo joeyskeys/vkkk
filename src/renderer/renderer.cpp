@@ -39,7 +39,7 @@ void Renderer::sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, c
         return;
     }
 
-    auto light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
+    const auto* light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
     
     for (const auto& [ubo_type, ubo] : pipeline.ubos) {
         if (swapchain_idx >= ubo.memos.size()) {

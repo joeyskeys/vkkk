@@ -64,6 +64,18 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
         auto binding_idx = comp.get_decoration(ssbo.id, spv::DecorationBinding);
         auto struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
         auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
+
+        // Runtime-sized SSBO blocks (e.g. attrs[]) report block size 0; use member element size.
+        if (struct_size == 0 && !base_type_info.member_types.empty()) {
+            const auto member_type = comp.get_type(base_type_info.member_types[0]);
+            struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+            if (!member_type.array.empty()) {
+                array_size = member_type.array[0] == 0 ? 64u : member_type.array[0];
+            }
+        }
+        if (array_size == 0) {
+            array_size = 64;
+        }
         mod.storage_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
     }
 

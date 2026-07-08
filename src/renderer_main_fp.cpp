@@ -115,9 +115,9 @@ int main() {
         },
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-            .ambient = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
-            .diffuse = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
-            .specular = glm::vec4(0.12f, 0.04f, 0.04f, 1.0f),
+            .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
         },
         {
@@ -132,6 +132,13 @@ int main() {
             .ambient = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .diffuse = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .specular = glm::vec4(0.06f, 0.25f, 0.07f, 1.0f),
+            .shininess = 8.0f
+        },
+        {
+            .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+            .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
         },
         {
@@ -189,6 +196,12 @@ int main() {
         phong_attr_size,
         reinterpret_cast<char*>(&phong_attrs[6]));
     renderer.allocate_ssbo();
+    if (!ctx.resize_pipeline_ssbo("phong_mat", 7)) {
+        throw std::runtime_error("failed to set phong_mat ssbo capacity");
+    }
+    if (!ctx.alloc_pipeline_ssbo("phong_mat")) {
+        throw std::runtime_error("failed to allocate phong_mat ssbo gpu buffers");
+    }
     vkkk::PipelineLightStorage light_storage;
     vkkk::PointLightUBO point_light{};
     point_light.vec = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);

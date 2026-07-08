@@ -30,21 +30,21 @@ public:
 
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const size_t instance_attr_size, const char* data) {
-        auto add_drawable_to_batch = [&](IntermediateSSBOData& intermediate_ssbo_data) {
-            if (intermediate_ssbo_data.find(pipeline_name) == intermediate_ssbo_data.end()) {
-                intermediate_ssbo_data[pipeline_name].first = 0;
-                intermediate_ssbo_data[pipeline_name].second[mesh_name].first = 0;
-                intermediate_ssbo_data[pipeline_name].second[mesh_name].second.clear();
+        auto add_drawable_to_batch = [&](IntermediateSSBODataMap& intermediate_ssbo_data_map) {
+            if (intermediate_ssbo_data_map.find(pipeline_name) == intermediate_ssbo_data_map.end()) {
+                intermediate_ssbo_data_map[pipeline_name].total_size = 0;
+                intermediate_ssbo_data_map[pipeline_name].data_map[mesh_name].instance_count = 0;
+                intermediate_ssbo_data_map[pipeline_name].data_map[mesh_name].data.clear();
             }
-            auto& [instance_cnt, buffer] = intermediate_ssbo_data[pipeline_name].second[mesh_name];
+            auto& [instance_cnt, buffer] = intermediate_ssbo_data_map[pipeline_name].data_map[mesh_name];
             instance_cnt += 1;
             buffer.insert(buffer.end(), data, data + instance_attr_size);
-            intermediate_ssbo_data[pipeline_name].first += instance_attr_size;
+            intermediate_ssbo_data_map[pipeline_name].total_size += instance_attr_size;
         };
         if constexpr (transparent) {
-            add_drawable_to_batch(transparent_intermediate_ssbo_data);
+            add_drawable_to_batch(transparent_intermediate_ssbo_data_map);
         } else {
-            add_drawable_to_batch(opaque_intermediate_ssbo_data);
+            add_drawable_to_batch(opaque_intermediate_ssbo_data_map);
         }
     }
 
@@ -61,20 +61,20 @@ private:
     void prepare_light_clusters(const uint32_t swapchain_image_idx);
 
     inline void pass_opaque(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
-        draw_batch(cmd, swapchain_image_idx, opaque_batch);
+        draw_batch(cmd, swapchain_image_idx, opaque_batches);
     }
 
     inline void pass_transparent(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
-        draw_batch(cmd, swapchain_image_idx, transparent_batch);
+        draw_batch(cmd, swapchain_image_idx, transparent_batches);
     }
 
     void pass_shadow(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx);
-    void draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batch& batch);
+    void draw_batch(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx, const Batches& batches);
 
-    IntermediateSSBOData opaque_intermediate_ssbo_data;
-    IntermediateSSBOData transparent_intermediate_ssbo_data;
-    Batch opaque_batch;
-    Batch transparent_batch;
+    IntermediateSSBODataMap opaque_intermediate_ssbo_data_map;
+    IntermediateSSBODataMap transparent_intermediate_ssbo_data_map;
+    Batches opaque_batches;
+    Batches transparent_batches;
 };
 
 }

@@ -263,7 +263,9 @@ public:
     }
 
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
-    void sync_ssbo(const SSBO& ssbo, const void* data) const;
+    void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
+    bool alloc_pipeline_ssbo(const std::string& pipeline_name);
+    bool resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize);
     UBO& require_ubo(const std::string& full_name);
     GLFWwindow* get_window() const { return window; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
@@ -349,6 +351,9 @@ private:
     uint32_t find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags properties) const;
 
     void create_depth_resources();
+
+    bool create_pipeline_ssbo_gpu(Pipeline& pipeline, SSBO& ssbo);
+    void update_pipeline_ssbo_descriptors(Pipeline& pipeline, const SSBO& ssbo);
 
     void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t layer_count = 1) const;
     void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;

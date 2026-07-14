@@ -78,6 +78,10 @@ vkkk::PipelineOption make_pipeline_option() {
     return option;
 }
 
+glm::vec4 phong_ambient(const glm::vec3& color) {
+    return glm::vec4(color * 0.08f, 1.0f);
+}
+
 } // namespace
 
 int main() {
@@ -108,35 +112,35 @@ int main() {
     vkkk::built_in_shader::PhongInstanceAttrs phong_attrs[7] = {
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 1.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(180.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-            .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.78f)),
             .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
         },
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -1.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(1.0f, 0.0f, 0.0f)),
-            .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.78f)),
             .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
         },
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(-1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-            .ambient = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.72f, 0.12f, 0.12f)),
             .diffuse = glm::vec4(0.72f, 0.12f, 0.12f, 1.0f),
             .specular = glm::vec4(0.12f, 0.04f, 0.04f, 1.0f),
             .shininess = 8.0f
         },
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(1.0f, 0.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
-            .ambient = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.14f, 0.62f, 0.18f)),
             .diffuse = glm::vec4(0.14f, 0.62f, 0.18f, 1.0f),
             .specular = glm::vec4(0.06f, 0.25f, 0.07f, 1.0f),
             .shininess = 8.0f
         },
         {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
-            .ambient = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.78f)),
             .diffuse = glm::vec4(0.78f, 0.78f, 0.78f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 8.0f
@@ -145,7 +149,7 @@ int main() {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(-0.45f, -0.6f, -0.15f)) *
                 glm::rotate(glm::mat4(1.0f), glm::radians(-18.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
                 glm::scale(glm::mat4(1.0f), glm::vec3(0.6f, 0.8f, 0.6f)),
-            .ambient = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.82f)),
             .diffuse = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 24.0f
@@ -154,7 +158,7 @@ int main() {
             .model = glm::translate(glm::mat4(1.0f), glm::vec3(0.38f, -0.35f, 0.32f)) *
                 glm::rotate(glm::mat4(1.0f), glm::radians(14.0f), glm::vec3(0.0f, 1.0f, 0.0f)) *
                 glm::scale(glm::mat4(1.0f), glm::vec3(0.55f, 1.3f, 0.55f)),
-            .ambient = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
+            .ambient = phong_ambient(glm::vec3(0.82f)),
             .diffuse = glm::vec4(0.82f, 0.82f, 0.82f, 1.0f),
             .specular = glm::vec4(0.18f, 0.18f, 0.18f, 1.0f),
             .shininess = 24.0f

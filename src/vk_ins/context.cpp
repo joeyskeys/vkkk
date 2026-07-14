@@ -593,7 +593,7 @@ bool Context::create_pipeline(const std::string& name,
 
     std::vector<vk::VertexInputBindingDescription> input_binding_descs;
     std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
-    std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
+    std::map<uint32_t, vk::DescriptorSetLayoutBinding> descriptor_bindings;
     std::map<uint32_t, UBOType> ubo_binding_to_type;
     std::map<uint32_t, SSBOType> storage_binding_to_type;
     std::map<uint32_t, std::string> tex_binding_to_name;
@@ -614,6 +614,15 @@ bool Context::create_pipeline(const std::string& name,
     std::vector<vk::PipelineShaderStageCreateInfo> shader_stage_infos;
     shader_modules.reserve(shader_module_pack.modules.size());
     shader_stage_infos.reserve(shader_module_pack.modules.size());
+
+    const auto merge_descriptor_binding = [&descriptor_bindings](const vk::DescriptorSetLayoutBinding& binding) {
+        const auto found = descriptor_bindings.find(binding.binding);
+        if (found == descriptor_bindings.end()) {
+            descriptor_bindings.emplace(binding.binding, binding);
+            return;
+        }
+        found->second.stageFlags |= binding.stageFlags;
+    };
 
     for (const auto& [stage, module] : shader_module_pack.modules) {
         vk::ShaderModuleCreateInfo shader_module_create_info{};
@@ -675,7 +684,7 @@ bool Context::create_pipeline(const std::string& name,
             layout_binding.descriptorType = vk::DescriptorType::eUniformBuffer;
             layout_binding.descriptorCount = array_size;
             layout_binding.stageFlags = stage;
-            descriptor_layouts.push_back(layout_binding);
+            merge_descriptor_binding(layout_binding);
         }
 
         if (!module.storage_buf_infos.empty()) {
@@ -701,7 +710,7 @@ bool Context::create_pipeline(const std::string& name,
             layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
             layout_binding.descriptorCount = 1;
             layout_binding.stageFlags = stage;
-            descriptor_layouts.push_back(layout_binding);
+            merge_descriptor_binding(layout_binding);
         }
 
         for (const auto& [tex_name, tex_binding] : module.img_infos) {
@@ -735,8 +744,14 @@ bool Context::create_pipeline(const std::string& name,
             tex_layout_binding.descriptorType = vk::DescriptorType::eCombinedImageSampler;
             tex_layout_binding.descriptorCount = descriptor_count;
             tex_layout_binding.stageFlags = stage;
-            descriptor_layouts.push_back(tex_layout_binding);
+            merge_descriptor_binding(tex_layout_binding);
         }
+    }
+
+    std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
+    descriptor_layouts.reserve(descriptor_bindings.size());
+    for (const auto& [_, binding] : descriptor_bindings) {
+        descriptor_layouts.push_back(binding);
     }
 
     if (!pipeline_uses_mesh_shader && !has_vertex_stage) {

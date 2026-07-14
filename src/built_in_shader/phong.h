@@ -78,6 +78,11 @@ void main() {
 inline constexpr const char phong_frag[] = R"(
 #version 450
 
+layout(binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 proj;
+} camera;
+
 layout(binding = 2) uniform PointLightUBO {
     vec4 vec;
     vec4 color;
@@ -95,7 +100,8 @@ layout(location = 0) out vec4 outColor;
 void main() {
     vec3 normal = normalize(fragNormal);
     vec3 light_dir = normalize(light.vec.xyz - fragPos);
-    vec3 view_dir = normalize(light.vec.xyz - fragPos);
+    vec3 camera_pos = (inverse(camera.view) * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+    vec3 view_dir = normalize(camera_pos - fragPos);
     vec3 reflect_dir = reflect(-light_dir, normal);
 
     float diff = max(dot(normal, light_dir), 0.0);

@@ -1486,7 +1486,7 @@ bool Context::create_pipeline_ssbo_gpu(Pipeline& pipeline, SSBO& ssbo) {
         vk::raii::DeviceMemory memo{nullptr};
         std::tie(gpu_buf, memo) = create_buffer(
             buffer_size,
-            vk::BufferUsageFlagBits::eStorageBuffer,
+            vk::BufferUsageFlagBits::eStorageBuffer | vk::BufferUsageFlagBits::eTransferDst,
             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         ssbo.descriptors.push_back(vk::DescriptorBufferInfo{*gpu_buf, 0, buffer_size});
         ssbo.gpu_bufs.push_back(std::move(gpu_buf));

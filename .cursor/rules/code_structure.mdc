@@ -1,0 +1,43 @@
+---
+description: Project architecture and preferred extension points
+alwaysApply: true
+---
+
+# Code Structure
+
+- `src/vk_ins/`: Vulkan backend. `Context` owns GPU resources, pipelines, meshes, swapchain, command recording, and presentation.
+- `src/renderer/`: rendering strategies derived from `Renderer`. `ForwardPRenderer` and `renderer_main_fp.cpp` are the current reference path.
+- `src/asset_mgr/`: `Scene`, CPU-side mesh management (`DrawableMgr`), and per-pipeline light storage (`LightMgr`).
+- `src/concepts/`: domain types such as `Mesh`, `Camera`, and `Line`.
+- `src/built_in_shader/`: paired CPU buffer structs and inline GLSL. Keep struct layout, GLSL block names, and bindings aligned.
+- `resource/shaders/`: file-based GLSL used by legacy/alternate renderer paths.
+- `src/gui/`: ImGui integration. `src/binding/` is the optional Python/nanobind layer.
+
+## Dependency direction
+
+- Applications own and configure `Context`, `Scene`, and a `Renderer`; lower layers must not depend on an application.
+- Renderers use `Context` for GPU work and read scene camera/light data.
+- `DrawableMgr` owns CPU meshes; `sync_to_gpu(Context*)` uploads them into `Context`.
+- Keep Vulkan resource creation and descriptor updates in `Context`; use or add a Context API before changing renderer internals.
+
+## Rendering flow
+
+1. Initialize `Context`, then populate `Scene` meshes and upload them.
+2. Initialize a renderer and create pipelines from `ShaderModulePack` or inline built-in shaders.
+3. Register drawables, prepare SSBO CPU data, set SSBO capacity, then allocate its GPU buffers.
+4. Register pipeline light storage in `LightMgr`.
+5. Per frame: update camera state, call `Context::record_cmds`, let the renderer emit draws, then `Context::draw_frame` submits and presents.
+
+## Buffer and shader conventions
+
+- Camera and light data are UBOs, replicated per swapchain image; instance attributes use the `SSBOType_InstanceAttrs` SSBO.
+- `ShaderModule` compiles GLSL with shaderc and reflects resources using spirv-cross; recognized UBO names and binding consistency matter.
+- Pipeline vertex components must match both mesh packing (`VERT_COMP`) and GLSL input locations.
+- For a new material, add matching C++ buffer data and GLSL in `built_in_shader/`, then create a pipeline through `Context`.
+
+## Extension points
+
+- New render technique: implement a `Renderer` subclass under `src/renderer/`.
+- New procedural/imported geometry: extend `DrawableMgr` or `Mesh`, then upload through `DrawableMgr::sync_to_gpu`.
+- New low-level GPU feature: add a focused `Context` API.
+- Prefer `renderer_main_fp.cpp` over older `*_main*.cpp` demos; several legacy paths reference removed wrapper APIs.

@@ -102,6 +102,7 @@ struct ComputePipeline {
     vk::raii::DescriptorPool descriptor_pool{nullptr};
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
     std::unordered_map<std::string, UBO> ubos;
+    std::unordered_map<std::string, SSBO> ssbos;
 };
 
 struct PipelineOption {
@@ -217,6 +218,9 @@ public:
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
     void dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1, uint32_t descriptor_set_index = 0);
+    bool record_compute(vk::CommandBuffer cmd, const std::string& pipeline_name,
+        uint32_t group_x, uint32_t group_y = 1, uint32_t group_z = 1,
+        uint32_t descriptor_set_index = 0) const;
     bool draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1) const;
     bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
@@ -226,7 +230,8 @@ public:
     void wait_idle() const { device.waitIdle(); }
     void recreate_swapchain();
     void record_cmds(uint32_t image_index,
-        const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func);
+        const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
+        const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func = {});
 
     bool add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
         uint32_t size, uint32_t vecsize = 1,
@@ -266,7 +271,12 @@ public:
     void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     bool alloc_pipeline_ssbo(const std::string& pipeline_name);
     bool resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize);
+    bool alloc_compute_ssbo(const std::string& full_name);
+    bool resize_compute_ssbo(const std::string& full_name, size_t new_vecsize);
+    bool sync_compute_ssbo(const std::string& full_name, const void* data,
+        uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     UBO& require_ubo(const std::string& full_name);
+    const SSBO& require_compute_ssbo(const std::string& full_name) const;
     GLFWwindow* get_window() const { return window; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
     VkPhysicalDevice get_vk_physical_device() const { return static_cast<VkPhysicalDevice>(*physical_device); }
@@ -354,6 +364,8 @@ private:
 
     bool create_pipeline_ssbo_gpu(Pipeline& pipeline, SSBO& ssbo);
     void update_pipeline_ssbo_descriptors(Pipeline& pipeline, const SSBO& ssbo);
+    bool create_compute_ssbo_gpu(ComputePipeline& pipeline, SSBO& ssbo);
+    void update_compute_ssbo_descriptors(ComputePipeline& pipeline, const SSBO& ssbo);
 
     void transit_image_layout(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Image& img, vk::ImageLayout old_layout, vk::ImageLayout new_layout, uint32_t layer_count = 1) const;
     void copy_buffer_to_image(vk::raii::CommandBuffer& cmd_buf, const vk::raii::Buffer& buf, const vk::raii::Image& img, uint32_t width, uint32_t height) const;

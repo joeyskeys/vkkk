@@ -130,4 +130,118 @@ void main() {
 
 )";
 
+// Draw one task workgroup for every 21 input triangles:
+// vkCmdDrawMeshTasksEXT(ceil(index_count / 3.0 / 21.0), 1, 1).
+// Binding 3 is one packed SSBO containing:
+//   uint vertex_count;
+//   uint index_count;
+//   uint position_words[vertex_count * 3]; // IEEE-754 x, y, z bits
+//   uint indices[index_count];             // indexed triangle-list indices
+inline constexpr char gen_line_task[] = R"(
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 1) in;
+
+struct LineTaskPayload {
+    uint first_triangle;
+    uint triangle_count;
+};
+
+taskPayloadSharedEXT LineTaskPayload payload;
+
+layout(std430, binding = 3) readonly buffer IndexedTriangleListBuffer {
+    uint vertex_count;
+    uint index_count;
+    uint data[];
+} mesh;
+
+const uint triangles_per_mesh_workgroup = 21u;
+
+void main() {
+    const uint triangle_count = mesh.index_count / 3u;
+    const uint first_triangle = gl_WorkGroupID.x * triangles_per_mesh_workgroup;
+
+    if (first_triangle >= triangle_count) {
+        EmitMeshTasksEXT(0u, 1u, 1u);
+        return;
+    }
+
+    payload.first_triangle = first_triangle;
+    payload.triangle_count = min(triangles_per_mesh_workgroup, triangle_count - first_triangle);
+    EmitMeshTasksEXT(1u, 1u, 1u);
+}
+)";
+
+// Emits three line primitives per input triangle. Shared triangle edges are emitted
+// twice; this preserves the input triangle list exactly and needs no adjacency data.
+inline constexpr char gen_line_mesh[] = R"(
+#version 460
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 32) in;
+layout(lines) out;
+layout(max_vertices = 63, max_primitives = 63) out;
+
+struct LineTaskPayload {
+    uint first_triangle;
+    uint triangle_count;
+};
+
+taskPayloadSharedEXT in LineTaskPayload payload;
+
+layout(binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 proj;
+} camera;
+
+layout(std430, binding = 3) readonly buffer IndexedTriangleListBuffer {
+    uint vertex_count;
+    uint index_count;
+    uint data[];
+} mesh;
+
+vec3 load_position(uint vertex_index) {
+    const uint position_offset = vertex_index * 3u;
+    return vec3(
+        uintBitsToFloat(mesh.data[position_offset + 0u]),
+        uintBitsToFloat(mesh.data[position_offset + 1u]),
+        uintBitsToFloat(mesh.data[position_offset + 2u])
+    );
+}
+
+uint load_index(uint index_index) {
+    const uint index_offset = mesh.vertex_count * 3u;
+    return mesh.data[index_offset + index_index];
+}
+
+void main() {
+    const uint invocation = gl_LocalInvocationIndex;
+    const uint vertex_count = payload.triangle_count * 3u;
+    const uint line_count = payload.triangle_count * 3u;
+    SetMeshOutputsEXT(vertex_count, line_count);
+
+    for (uint triangle = invocation; triangle < payload.triangle_count; triangle += gl_WorkGroupSize.x) {
+        const uint input_index = (payload.first_triangle + triangle) * 3u;
+        const uint output_vertex = triangle * 3u;
+        const uint output_line = triangle * 3u;
+
+        const uint i0 = load_index(input_index + 0u);
+        const uint i1 = load_index(input_index + 1u);
+        const uint i2 = load_index(input_index + 2u);
+
+        gl_MeshVerticesEXT[output_vertex + 0u].gl_Position =
+            camera.proj * camera.view * vec4(load_position(i0), 1.0);
+        gl_MeshVerticesEXT[output_vertex + 1u].gl_Position =
+            camera.proj * camera.view * vec4(load_position(i1), 1.0);
+        gl_MeshVerticesEXT[output_vertex + 2u].gl_Position =
+            camera.proj * camera.view * vec4(load_position(i2), 1.0);
+
+        gl_PrimitiveLineIndicesEXT[output_line + 0u] = uvec2(output_vertex + 0u, output_vertex + 1u);
+        gl_PrimitiveLineIndicesEXT[output_line + 1u] = uvec2(output_vertex + 1u, output_vertex + 2u);
+        gl_PrimitiveLineIndicesEXT[output_line + 2u] = uvec2(output_vertex + 2u, output_vertex + 0u);
+    }
+}
+)";
+
 }

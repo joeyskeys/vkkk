@@ -30,10 +30,16 @@ struct LightBaseUBO : public Sizeable<LightBaseUBO> {
     glm::vec4 color{1.f, 1.f, 1.f, 1.f};
 };
 
-// here vec member is reused for point light and directional light
-// point light: vec is position
-// directional light: vec is direction
-using PointLightUBO = LightBaseUBO;
+// Point-light position is stored in vec.xyz. Radius is separate from vec.w so
+// the base light layout remains suitable for directional lights.
+struct PointLightUBO : public LightBaseUBO {
+    float radius{1.0f};
+    float _pad0{0.0f}; // std140 tail padding for stable upload size.
+    float _pad1{0.0f};
+    float _pad2{0.0f};
+};
+
+// Directional-light vec is its direction.
 using DirectionalLightUBO = LightBaseUBO;
 
 // spot light: vec is position

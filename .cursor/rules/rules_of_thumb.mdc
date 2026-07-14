@@ -6,4 +6,4 @@ alwaysApply: true
 2. when implementing a feature of detailed rendering out of Context class, use APIs provided by Context;
 3. if there's no proper API in Context to do the job, make a summary to remind me and stop there;
 4. don't add class members with "_" postfix.
-5. don't do build validation if explicitly required.
+5. don't do compile/build validation unless explicitly required.

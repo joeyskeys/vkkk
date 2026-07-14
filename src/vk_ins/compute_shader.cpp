@@ -31,7 +31,16 @@ bool reflect_compute_shader(ComputeShader& shader) {
         const auto binding = comp.get_decoration(resource.id, spv::DecorationBinding);
         const auto type_info = comp.get_type(resource.type_id);
         const auto base_type_info = comp.get_type(resource.base_type_id);
-        const uint32_t struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
+        uint32_t struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
+        if (kind == ComputeDescriptorKind::StorageBuffer && struct_size == 0
+            && !base_type_info.member_types.empty())
+        {
+            struct_size = static_cast<uint32_t>(comp.type_struct_member_array_stride(base_type_info, 0));
+            if (struct_size == 0) {
+                const auto member_type = comp.get_type(base_type_info.member_types[0]);
+                struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+            }
+        }
         shader.bindings.push_back(ComputeDescriptorBinding{
             .name = resource.name,
             .binding = binding,

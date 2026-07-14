@@ -2,8 +2,22 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "asset_mgr/light_mgr.h"
+#include "asset_mgr/scene.h"
+#include "built_in_shader/light_clusterize.h"
+#include "concepts/camera.h"
+
 namespace vkkk
 {
+
+namespace
+{
+
+constexpr char light_cluster_pipeline_name[] = "forwardp_light_cluster";
+constexpr uint32_t cluster_tile_size = 16;
+constexpr uint32_t cluster_depth_slices = 24;
+
+} // namespace
 
 // public funcs
 bool ForwardPRenderer::initialize(Context* context) {
@@ -17,9 +31,14 @@ bool ForwardPRenderer::initialize(Context* context) {
         int h = 0;
         glfwGetFramebufferSize(ctx->get_window(), &w, &h);
         width = static_cast<uint32_t>(std::max(w, 1));
+        height = static_cast<uint32_t>(std::max(h, 1));
     }
 
-    return true;
+    ComputeShader cluster_shader;
+    if (!cluster_shader.load(light_clusterize_comp, light_cluster_pipeline_name)) {
+        return false;
+    }
+    return ctx->create_compute_pipeline(light_cluster_pipeline_name, cluster_shader);
 }
 
 void ForwardPRenderer::shutdown() {
@@ -73,8 +92,88 @@ void ForwardPRenderer::allocate_ssbo() {
 }
 
 // private funcs
-void ForwardPRenderer::prepare_light_clusters(const uint32_t swapchain_image_idx) {
-    (void)swapchain_image_idx;
+void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
+    if (!ctx || !scene || !scene->camera || !scene->light_mgr) {
+        return;
+    }
+
+    const PipelineLightStorage* light_storage = nullptr;
+    for (const auto& [pipeline_name, _] : opaque_batches) {
+        light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
+        if (light_storage != nullptr) {
+            break;
+        }
+    }
+    if (light_storage == nullptr) {
+        for (const auto& [pipeline_name, _] : transparent_batches) {
+            light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
+            if (light_storage != nullptr) {
+                break;
+            }
+        }
+    }
+    if (light_storage == nullptr) {
+        return;
+    }
+
+    const uint32_t cluster_x = std::max((width + cluster_tile_size - 1) / cluster_tile_size, 1u);
+    const uint32_t cluster_y = std::max((height + cluster_tile_size - 1) / cluster_tile_size, 1u);
+    const uint32_t cluster_count = cluster_x * cluster_y * cluster_depth_slices;
+    const uint32_t light_index_capacity = cluster_count * max_lights_per_cluster;
+
+    const std::string params_name = std::string(light_cluster_pipeline_name) + ":LightClusterParams";
+    const std::string point_lights_name = std::string(light_cluster_pipeline_name) + ":PointLights";
+    const std::string cluster_grid_name = std::string(light_cluster_pipeline_name) + ":ClusterGrid";
+    const std::string light_indices_name = std::string(light_cluster_pipeline_name) + ":ClusterLightIndices";
+
+    const size_t point_light_capacity = std::max(light_storage->pt_lights.size(), size_t{1});
+    if (!ctx->resize_compute_ssbo(point_lights_name, point_light_capacity)
+        || !ctx->resize_compute_ssbo(cluster_grid_name, cluster_count)
+        || !ctx->resize_compute_ssbo(light_indices_name, light_index_capacity)
+        || !ctx->alloc_compute_ssbo(point_lights_name)
+        || !ctx->alloc_compute_ssbo(cluster_grid_name)
+        || !ctx->alloc_compute_ssbo(light_indices_name))
+    {
+        return;
+    }
+
+    const PointLightUBO empty_light{};
+    const void* light_data = light_storage->pt_lights.empty()
+        ? static_cast<const void*>(&empty_light)
+        : static_cast<const void*>(light_storage->pt_lights.data());
+    const uint32_t light_bytes = static_cast<uint32_t>(
+        light_storage->pt_lights.size() * sizeof(PointLightUBO));
+    if (!ctx->sync_compute_ssbo(point_lights_name, light_data, swapchain_image_idx, light_bytes)) {
+        return;
+    }
+
+    LightClusterParamsUBO params{};
+    params.view = scene->camera->ubo_data.view;
+    params.proj = scene->camera->ubo_data.proj;
+    params.cluster_dims_and_light_count = glm::uvec4(
+        cluster_x, cluster_y, cluster_depth_slices,
+        static_cast<uint32_t>(light_storage->pt_lights.size()));
+    params.config = glm::uvec4(max_lights_per_cluster, width, height, 0u);
+    params.depth_range = glm::vec4(scene->camera->near, scene->camera->far, 0.0f, 0.0f);
+
+    try {
+        auto& params_ubo = ctx->require_ubo(params_name);
+        if (swapchain_image_idx >= params_ubo.memos.size()) {
+            return;
+        }
+        ctx->sync_uniform(params_ubo.memos[swapchain_image_idx], &params, sizeof(params));
+    }
+    catch (const std::runtime_error&) {
+        return;
+    }
+
+    ctx->record_compute(
+        cmd,
+        light_cluster_pipeline_name,
+        cluster_x,
+        cluster_y,
+        cluster_depth_slices,
+        swapchain_image_idx);
 }
 
 void ForwardPRenderer::pass_shadow(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {

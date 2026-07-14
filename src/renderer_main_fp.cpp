@@ -256,6 +256,8 @@ int main() {
         ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
             renderer.record_commands(cmd_buf, image_index);
             hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
+        }, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
+            renderer.prepare_light_clusters(cmd_buf, image_index);
         });
     });
 

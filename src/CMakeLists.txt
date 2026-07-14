@@ -70,28 +70,11 @@ else()
     target_link_libraries(vkkk PRIVATE ${SHADERC_RELEASE_LIBRARIES})
 endif()
 
-#add_executable(vkmain main.cpp)
-#target_link_libraries(vkmain
-    #PRIVATE
-        #vkkk
-        #OpenImageIO::OpenImageIO)
-
 add_executable(vkrendererfp renderer_main_fp.cpp)
 target_link_libraries(vkrendererfp
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)
-
-#add_executable(vkrenderer renderer_main.cpp)
-#target_link_libraries(vkrenderer
-    #PRIVATE
-        #vkkk
-        #OpenImageIO::OpenImageIO)
-
-#add_executable(vktest test_main.cpp)
-#target_link_libraries(vktest
-    #PUBLIC
-        #Vulkan::Vulkan)
 
 #if(VKKK_BUILD_PYTHON_BINDINGS)
     #add_subdirectory(binding)

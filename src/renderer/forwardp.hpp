@@ -4,6 +4,7 @@
 #include <tuple>
 
 #include <glm/mat4x4.hpp>
+#include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
 
 #include "renderer/renderer.hpp"
@@ -27,6 +28,10 @@ public:
     void on_resize(uint32_t width, uint32_t height) override;
 
     void record_commands(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) override;
+    void prepare_light_clusters(vk::CommandBuffer cmd, uint32_t swapchain_image_idx);
+    void set_max_lights_per_cluster(uint32_t count) {
+        max_lights_per_cluster = count == 0 ? 1u : count;
+    }
 
     template <bool transparent>
     void add_drawable(const std::string& mesh_name, const std::string& pipeline_name, const size_t instance_attr_size, const char* data) {
@@ -58,8 +63,6 @@ public:
     void allocate_ssbo();
 
 private:
-    void prepare_light_clusters(const uint32_t swapchain_image_idx);
-
     inline void pass_opaque(vk::CommandBuffer cmd, const uint32_t swapchain_image_idx) {
         draw_batch(cmd, swapchain_image_idx, opaque_batches);
     }
@@ -75,6 +78,7 @@ private:
     IntermediateSSBODataMap transparent_intermediate_ssbo_data_map;
     Batches opaque_batches;
     Batches transparent_batches;
+    uint32_t max_lights_per_cluster = 64;
 };
 
 }

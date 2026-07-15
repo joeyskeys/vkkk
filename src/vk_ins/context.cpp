@@ -50,8 +50,7 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
 }
 
 bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
-    if (reflected_name == "PhongInstanceAttrs"
-        || reflected_name == "PhongPlusInstanceAttrs")
+    if (reflected_name == "InstanceAttrs" || reflected_name == "instance_attrs")
     {
         out_type = SSBOType_InstanceAttrs;
         return true;

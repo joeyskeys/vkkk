@@ -42,7 +42,48 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_SpotLight;
         return true;
     }
+    if (reflected_name == "LightClusterParams") {
+        out_type = UBOType_LightClusterParams;
+        return true;
+    }
     return false;
+}
+
+bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
+    if (reflected_name == "PhongInstanceAttrs"
+        || reflected_name == "PhongPlusInstanceAttrs")
+    {
+        out_type = SSBOType_InstanceAttrs;
+        return true;
+    }
+    if (reflected_name == "PointLights") {
+        out_type = SSBOType_PointLights;
+        return true;
+    }
+    if (reflected_name == "ClusterGrid") {
+        out_type = SSBOType_ClusterGrid;
+        return true;
+    }
+    if (reflected_name == "ClusterLightIndices") {
+        out_type = SSBOType_ClusterLightIndices;
+        return true;
+    }
+    return false;
+}
+
+const char* compute_ssbo_block_name(SSBOType type) {
+    for (const char* block_name : {"PointLights", "ClusterGrid", "ClusterLightIndices"}) {
+        SSBOType resolved_type{};
+        if (resolve_ssbo_type(block_name, resolved_type) && resolved_type == type) {
+            return block_name;
+        }
+    }
+    return nullptr;
+}
+
+std::string compute_ssbo_full_name(const std::string& pipeline_name, SSBOType type) {
+    const char* block_name = compute_ssbo_block_name(type);
+    return block_name == nullptr ? std::string{} : pipeline_name + ":" + block_name;
 }
 
 } // namespace
@@ -688,29 +729,38 @@ bool Context::create_pipeline(const std::string& name,
         }
 
         if (!module.storage_buf_infos.empty()) {
-            assert(module.storage_buf_infos.size() == 1 && "Only one SSBO per shader module is supported.");
-            assert(pipeline_ssbos.empty() && "Only one SSBO per shader pipeline is supported.");
+            for (const auto& [ssbo_name, ssbo_info] : module.storage_buf_infos) {
+                SSBOType ssbo_type{};
+                if (!resolve_ssbo_type(ssbo_name, ssbo_type)) {
+                    std::cout << "Unsupported SSBO type " << ssbo_name
+                        << " in pipeline " << name << std::endl;
+                    return false;
+                }
 
-            const auto& [ssbo_name, ssbo_info] = *module.storage_buf_infos.begin();
-            (void)ssbo_name;
-            const auto& [struct_size, array_size, binding] = ssbo_info;
-            const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
+                const auto& [struct_size, array_size, binding] = ssbo_info;
+                const auto existing = pipeline_ssbos.find(ssbo_type);
+                if (existing == pipeline_ssbos.end()) {
+                    SSBO ssbo{};
+                    ssbo.size = struct_size == 0 ? 16u : struct_size;
+                    ssbo.vecsize = array_size;
+                    ssbo.binding = binding;
+                    ssbo.descriptor_type = vk::DescriptorType::eStorageBuffer;
+                    pipeline_ssbos.emplace(ssbo_type, std::move(ssbo));
+                }
+                else if (existing->second.binding != binding) {
+                    std::cout << "SSBO " << ssbo_name << " uses inconsistent bindings in pipeline "
+                        << name << std::endl;
+                    return false;
+                }
 
-            SSBO ssbo{};
-            ssbo.size = alloc_size;
-            ssbo.vecsize = array_size;
-            ssbo.binding = binding;
-            ssbo.descriptor_type = vk::DescriptorType::eStorageBuffer;
-            // GPU buffers are allocated later via alloc_pipeline_ssbo() once instance count is known.
-
-            pipeline_ssbos.emplace(SSBOType_InstanceAttrs, std::move(ssbo));
-            storage_binding_to_type[binding] = SSBOType_InstanceAttrs;
-            vk::DescriptorSetLayoutBinding layout_binding{};
-            layout_binding.binding = binding;
-            layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
-            layout_binding.descriptorCount = 1;
-            layout_binding.stageFlags = stage;
-            merge_descriptor_binding(layout_binding);
+                storage_binding_to_type[binding] = ssbo_type;
+                vk::DescriptorSetLayoutBinding layout_binding{};
+                layout_binding.binding = binding;
+                layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
+                layout_binding.descriptorCount = 1;
+                layout_binding.stageFlags = stage;
+                merge_descriptor_binding(layout_binding);
+            }
         }
 
         for (const auto& [tex_name, tex_binding] : module.img_infos) {
@@ -912,14 +962,22 @@ bool Context::create_pipeline(const std::string& name,
                 const auto ssbo_found = pipeline.ssbos.find(ssbo_type);
                 assert(ssbo_found != pipeline.ssbos.end());
                 const auto& ssbo = ssbo_found->second;
-                if (ssbo.gpu_bufs.empty()) {
+                if (ssbo.uses_borrowed_descriptors) {
+                    if (i >= ssbo.borrowed_descriptors.size()) {
+                        continue;
+                    }
+                    buffer_infos.push_back(ssbo.borrowed_descriptors[i]);
+                }
+                else if (i < ssbo.gpu_bufs.size()) {
+                    vk::DescriptorBufferInfo buffer_info{};
+                    buffer_info.buffer = *ssbo.gpu_bufs[i];
+                    buffer_info.offset = 0;
+                    buffer_info.range = ssbo.size * ssbo.vecsize;
+                    buffer_infos.push_back(buffer_info);
+                }
+                else {
                     continue;
                 }
-                vk::DescriptorBufferInfo buffer_info{};
-                buffer_info.buffer = *ssbo.gpu_bufs[i];
-                buffer_info.offset = 0;
-                buffer_info.range = ssbo.size * ssbo.vecsize;
-                buffer_infos.push_back(buffer_info);
                 vk::WriteDescriptorSet write{};
                 write.dstSet = *pipeline.descriptor_sets[i];
                 write.dstBinding = binding;
@@ -1516,7 +1574,7 @@ void Context::sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_i
 }
 
 bool Context::create_pipeline_ssbo_gpu(Pipeline& pipeline, SSBO& ssbo) {
-    if (ssbo.size == 0 || ssbo.vecsize == 0) {
+    if (ssbo.uses_borrowed_descriptors || ssbo.size == 0 || ssbo.vecsize == 0) {
         return false;
     }
 
@@ -1545,7 +1603,10 @@ bool Context::create_pipeline_ssbo_gpu(Pipeline& pipeline, SSBO& ssbo) {
 }
 
 void Context::update_pipeline_ssbo_descriptors(Pipeline& pipeline, const SSBO& ssbo) {
-    if (ssbo.gpu_bufs.empty() || pipeline.descriptor_sets.size() != ssbo.gpu_bufs.size()) {
+    const auto& descriptors = ssbo.uses_borrowed_descriptors
+        ? ssbo.borrowed_descriptors
+        : ssbo.descriptors;
+    if (descriptors.empty() || pipeline.descriptor_sets.size() != descriptors.size()) {
         return;
     }
 
@@ -1554,7 +1615,7 @@ void Context::update_pipeline_ssbo_descriptors(Pipeline& pipeline, const SSBO& s
     writes.reserve(pipeline.descriptor_sets.size());
     buffer_infos.reserve(pipeline.descriptor_sets.size());
     for (size_t i = 0; i < pipeline.descriptor_sets.size(); ++i) {
-        buffer_infos.push_back(ssbo.descriptors[i]);
+        buffer_infos.push_back(descriptors[i]);
         vk::WriteDescriptorSet write{};
         write.dstSet = *pipeline.descriptor_sets[i];
         write.dstBinding = ssbo.binding;
@@ -1622,18 +1683,25 @@ void Context::update_compute_ssbo_descriptors(ComputePipeline& pipeline, const S
 }
 
 bool Context::alloc_pipeline_ssbo(const std::string& pipeline_name) {
+    return alloc_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs);
+}
+
+bool Context::alloc_pipeline_ssbo(const std::string& pipeline_name, SSBOType type) {
     const auto pipeline_it = pipelines.find(pipeline_name);
     if (pipeline_it == pipelines.end()) {
         return false;
     }
 
     auto& pipeline = pipeline_it->second;
-    const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+    const auto ssbo_it = pipeline.ssbos.find(type);
     if (ssbo_it == pipeline.ssbos.end()) {
         return false;
     }
 
     auto& ssbo = ssbo_it->second;
+    if (ssbo.uses_borrowed_descriptors) {
+        return false;
+    }
     if (!ssbo.gpu_bufs.empty()) {
         return true;
     }
@@ -1642,6 +1710,10 @@ bool Context::alloc_pipeline_ssbo(const std::string& pipeline_name) {
 }
 
 bool Context::resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize) {
+    return resize_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs, new_vecsize);
+}
+
+bool Context::resize_pipeline_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize) {
     if (new_vecsize == 0) {
         return false;
     }
@@ -1652,12 +1724,15 @@ bool Context::resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_
     }
 
     auto& pipeline = pipeline_it->second;
-    const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+    const auto ssbo_it = pipeline.ssbos.find(type);
     if (ssbo_it == pipeline.ssbos.end()) {
         return false;
     }
 
     auto& ssbo = ssbo_it->second;
+    if (ssbo.uses_borrowed_descriptors) {
+        return false;
+    }
     if (ssbo.vecsize == new_vecsize && !ssbo.gpu_bufs.empty()) {
         return true;
     }
@@ -1668,6 +1743,49 @@ bool Context::resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_
     }
 
     return create_pipeline_ssbo_gpu(pipeline, ssbo);
+}
+
+bool Context::bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name,
+    SSBOType graphics_type, const std::string& compute_pipeline_name, SSBOType compute_type)
+{
+    const auto graphics_pipeline_it = pipelines.find(graphics_pipeline_name);
+    if (graphics_pipeline_it == pipelines.end()) {
+        return false;
+    }
+
+    auto& graphics_pipeline = graphics_pipeline_it->second;
+    const auto graphics_ssbo_it = graphics_pipeline.ssbos.find(graphics_type);
+    if (graphics_ssbo_it == graphics_pipeline.ssbos.end()) {
+        return false;
+    }
+
+    const auto compute_ssbo_name = compute_ssbo_full_name(compute_pipeline_name, compute_type);
+    if (compute_ssbo_name.empty()) {
+        return false;
+    }
+
+    try {
+        const auto& compute_ssbo = require_compute_ssbo(compute_ssbo_name);
+        if (compute_ssbo.descriptors.empty()
+            || compute_ssbo.descriptors.size() != graphics_pipeline.descriptor_sets.size())
+        {
+            return false;
+        }
+
+        auto& graphics_ssbo = graphics_ssbo_it->second;
+        graphics_ssbo.gpu_bufs.clear();
+        graphics_ssbo.memos.clear();
+        graphics_ssbo.descriptors.clear();
+        graphics_ssbo.size = compute_ssbo.size;
+        graphics_ssbo.vecsize = compute_ssbo.vecsize;
+        graphics_ssbo.borrowed_descriptors = compute_ssbo.descriptors;
+        graphics_ssbo.uses_borrowed_descriptors = true;
+        update_pipeline_ssbo_descriptors(graphics_pipeline, graphics_ssbo);
+        return true;
+    }
+    catch (const std::runtime_error&) {
+        return false;
+    }
 }
 
 bool Context::alloc_compute_ssbo(const std::string& full_name) {
@@ -1731,6 +1849,23 @@ bool Context::sync_compute_ssbo(const std::string& full_name, const void* data,
     catch (const std::runtime_error&) {
         return false;
     }
+}
+
+bool Context::alloc_compute_ssbo(const std::string& pipeline_name, SSBOType type) {
+    const auto full_name = compute_ssbo_full_name(pipeline_name, type);
+    return !full_name.empty() && alloc_compute_ssbo(full_name);
+}
+
+bool Context::resize_compute_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize) {
+    const auto full_name = compute_ssbo_full_name(pipeline_name, type);
+    return !full_name.empty() && resize_compute_ssbo(full_name, new_vecsize);
+}
+
+bool Context::sync_compute_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
+    uint32_t swapchain_idx, uint32_t byte_size) const
+{
+    const auto full_name = compute_ssbo_full_name(pipeline_name, type);
+    return !full_name.empty() && sync_compute_ssbo(full_name, data, swapchain_idx, byte_size);
 }
 
 UBO& Context::require_ubo(const std::string& full_name) {

@@ -1,6 +1,8 @@
 set(HEADERS
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
+    built_in_shader/phong_plus.h
+    built_in_shader/light_clusterize.h
     built_in_shader/pbr.h
     built_in_shader/shadow.h
     built_in_shader/shadow.h
@@ -72,6 +74,12 @@ endif()
 
 add_executable(vkrendererfp renderer_main_fp.cpp)
 target_link_libraries(vkrendererfp
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
+add_executable(vkrendererforwardplus renderer_main_forwardplus.cpp)
+target_link_libraries(vkrendererforwardplus
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

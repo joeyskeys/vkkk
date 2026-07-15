@@ -122,20 +122,44 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
     const uint32_t light_index_capacity = cluster_count * max_lights_per_cluster;
 
     const std::string params_name = std::string(light_cluster_pipeline_name) + ":LightClusterParams";
-    const std::string point_lights_name = std::string(light_cluster_pipeline_name) + ":PointLights";
-    const std::string cluster_grid_name = std::string(light_cluster_pipeline_name) + ":ClusterGrid";
-    const std::string light_indices_name = std::string(light_cluster_pipeline_name) + ":ClusterLightIndices";
 
     const size_t point_light_capacity = std::max(light_storage->pt_lights.size(), size_t{1});
-    if (!ctx->resize_compute_ssbo(point_lights_name, point_light_capacity)
-        || !ctx->resize_compute_ssbo(cluster_grid_name, cluster_count)
-        || !ctx->resize_compute_ssbo(light_indices_name, light_index_capacity)
-        || !ctx->alloc_compute_ssbo(point_lights_name)
-        || !ctx->alloc_compute_ssbo(cluster_grid_name)
-        || !ctx->alloc_compute_ssbo(light_indices_name))
+    if (!ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_PointLights, point_light_capacity)
+        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterGrid, cluster_count)
+        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterLightIndices, light_index_capacity)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_PointLights)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterGrid)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterLightIndices))
     {
         return;
     }
+
+    const auto bind_cluster_buffers = [&](const Batches& batches) {
+        for (const auto& [pipeline_name, _] : batches) {
+            const auto pipeline_it = ctx->pipelines.find(pipeline_name);
+            if (pipeline_it == ctx->pipelines.end()) {
+                continue;
+            }
+            const auto& ssbos = pipeline_it->second.ssbos;
+            if (ssbos.contains(SSBOType_PointLights)) {
+                ctx->bind_pipeline_ssbo_from_compute(
+                    pipeline_name, SSBOType_PointLights,
+                    light_cluster_pipeline_name, SSBOType_PointLights);
+            }
+            if (ssbos.contains(SSBOType_ClusterGrid)) {
+                ctx->bind_pipeline_ssbo_from_compute(
+                    pipeline_name, SSBOType_ClusterGrid,
+                    light_cluster_pipeline_name, SSBOType_ClusterGrid);
+            }
+            if (ssbos.contains(SSBOType_ClusterLightIndices)) {
+                ctx->bind_pipeline_ssbo_from_compute(
+                    pipeline_name, SSBOType_ClusterLightIndices,
+                    light_cluster_pipeline_name, SSBOType_ClusterLightIndices);
+            }
+        }
+    };
+    bind_cluster_buffers(opaque_batches);
+    bind_cluster_buffers(transparent_batches);
 
     const PointLightUBO empty_light{};
     const void* light_data = light_storage->pt_lights.empty()
@@ -143,7 +167,13 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
         : static_cast<const void*>(light_storage->pt_lights.data());
     const uint32_t light_bytes = static_cast<uint32_t>(
         light_storage->pt_lights.size() * sizeof(PointLightUBO));
-    if (!ctx->sync_compute_ssbo(point_lights_name, light_data, swapchain_image_idx, light_bytes)) {
+    if (!ctx->sync_compute_ssbo(
+            light_cluster_pipeline_name,
+            SSBOType_PointLights,
+            light_data,
+            swapchain_image_idx,
+            light_bytes))
+    {
         return;
     }
 
@@ -166,6 +196,26 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
     catch (const std::runtime_error&) {
         return;
     }
+
+    const auto sync_graphics_cluster_params = [&](const Batches& batches) {
+        for (const auto& [pipeline_name, _] : batches) {
+            const auto pipeline_it = ctx->pipelines.find(pipeline_name);
+            if (pipeline_it == ctx->pipelines.end()) {
+                continue;
+            }
+            const auto ubo_it = pipeline_it->second.ubos.find(UBOType_LightClusterParams);
+            if (ubo_it != pipeline_it->second.ubos.end()
+                && swapchain_image_idx < ubo_it->second.memos.size())
+            {
+                ctx->sync_uniform(
+                    ubo_it->second.memos[swapchain_image_idx],
+                    &params,
+                    static_cast<uint32_t>(sizeof(params)));
+            }
+        }
+    };
+    sync_graphics_cluster_params(opaque_batches);
+    sync_graphics_cluster_params(transparent_batches);
 
     ctx->record_compute(
         cmd,

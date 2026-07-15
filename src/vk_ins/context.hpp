@@ -68,7 +68,10 @@ struct UBO {
     std::vector<vk::DescriptorBufferInfo>   descriptors;
 };
 
-using SSBO = UBO;
+struct SSBO : public UBO {
+    std::vector<vk::DescriptorBufferInfo> borrowed_descriptors;
+    bool uses_borrowed_descriptors = false;
+};
 
 struct Texture {
     uint32_t                                binding;
@@ -271,9 +274,17 @@ public:
     void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     bool alloc_pipeline_ssbo(const std::string& pipeline_name);
     bool resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize);
+    bool alloc_pipeline_ssbo(const std::string& pipeline_name, SSBOType type);
+    bool resize_pipeline_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
+    bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name, SSBOType graphics_type,
+        const std::string& compute_pipeline_name, SSBOType compute_type);
     bool alloc_compute_ssbo(const std::string& full_name);
     bool resize_compute_ssbo(const std::string& full_name, size_t new_vecsize);
     bool sync_compute_ssbo(const std::string& full_name, const void* data,
+        uint32_t swapchain_idx, uint32_t byte_size = 0) const;
+    bool alloc_compute_ssbo(const std::string& pipeline_name, SSBOType type);
+    bool resize_compute_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
+    bool sync_compute_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
         uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     UBO& require_ubo(const std::string& full_name);
     const SSBO& require_compute_ssbo(const std::string& full_name) const;

@@ -21,16 +21,15 @@ namespace vkkk
 namespace {
 
 bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
-    if (reflected_name == "CameraUBO" || reflected_name == "UniformBufferObject"
-        || reflected_name == "ubo" || reflected_name == "camera"
+    // Match GLSL block/type names from reflection (get_name(base_type_id)).
+    if (reflected_name == "CameraUBO"
+        || reflected_name == "UniformBufferObject"
         || reflected_name == "Camera")
     {
         out_type = UBOType_Camera;
         return true;
     }
-    if (reflected_name == "PointLightUBO" || reflected_name == "PhongLight"
-        || reflected_name == "light")
-    {
+    if (reflected_name == "PointLightUBO" || reflected_name == "PhongLight") {
         out_type = UBOType_PointLight;
         return true;
     }
@@ -50,7 +49,10 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
 }
 
 bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
-    if (reflected_name == "InstanceAttrs" || reflected_name == "instance_attrs")
+    // Match GLSL block/type names from reflection (get_name(base_type_id)).
+    if (reflected_name == "PhongInstanceAttrs"
+        || reflected_name == "PhongPlusInstanceAttrs"
+        || reflected_name == "InstanceAttrs")
     {
         out_type = SSBOType_InstanceAttrs;
         return true;

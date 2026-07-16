@@ -30,11 +30,11 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
     spirv_cross::CompilerGLSL comp(mod.spirv_code);
     auto res = comp.get_shader_resources();
 
-    // UBOs
+    // UBOs — key by block/type name so instance names (camera, ubo, …) do not matter.
     for (auto& ubo : res.uniform_buffers) {
-        auto name = comp.get_name(ubo.id);
+        auto name = comp.get_name(ubo.base_type_id);
         if (name.empty())
-            name = comp.get_name(ubo.base_type_id);
+            name = ubo.name;
         if (name.empty())
             name = fmt::format("ubo_{}", comp.get_decoration(ubo.id, spv::DecorationBinding));
         auto type_info = comp.get_type(ubo.type_id);
@@ -52,11 +52,11 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
         mod.img_infos.emplace(img.name, binding_idx);
     }
 
-    // Storage buffers
+    // Storage buffers — key by block/type name (not instance name).
     for (auto& ssbo : res.storage_buffers) {
-        auto name = comp.get_name(ssbo.id);
+        auto name = comp.get_name(ssbo.base_type_id);
         if (name.empty())
-            name = comp.get_name(ssbo.base_type_id);
+            name = ssbo.name;
         if (name.empty())
             name = fmt::format("ssbo_{}", comp.get_decoration(ssbo.id, spv::DecorationBinding));
         auto type_info = comp.get_type(ssbo.type_id);

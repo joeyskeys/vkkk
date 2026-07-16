@@ -38,11 +38,17 @@ bool reflect_compute_shader(ComputeShader& shader) {
             struct_size = static_cast<uint32_t>(comp.type_struct_member_array_stride(base_type_info, 0));
             if (struct_size == 0) {
                 const auto member_type = comp.get_type(base_type_info.member_types[0]);
-                struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+                if (!member_type.member_types.empty()) {
+                    struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+                }
             }
         }
+        std::string type_name = comp.get_name(resource.base_type_id);
+        if (type_name.empty()) {
+            type_name = resource.name;
+        }
         shader.bindings.push_back(ComputeDescriptorBinding{
-            .name = resource.name,
+            .name = std::move(type_name),
             .binding = binding,
             .descriptor_count = reflect_array_size(type_info),
             .struct_size = struct_size,

@@ -108,7 +108,7 @@ int main() {
     if (!renderer.initialize(&ctx)) {
         throw std::runtime_error("failed to initialize Forward+ renderer");
     }
-    renderer.set_max_lights_per_cluster(64);
+    renderer.set_max_lights_per_cluster(16);
 
     if (!renderer.create_pipeline_from_shader_src(
             pipeline_name,
@@ -191,7 +191,8 @@ int main() {
             intensity * (0.55f + 0.45f * std::cos(hue + 2.094f)),
             intensity * (0.55f + 0.45f * std::cos(hue + 4.189f)),
             1.0f);
-        light.radius = 0.35f + 1.4f * (0.5f + 0.5f * std::sin(hue * 2.3f + 0.4f));
+        // Keep radii small vs 0.5 spacing so typical tile overlap stays under the 16-light cap.
+        light.radius = 0.18f + 0.14f * (0.5f + 0.5f * std::sin(hue * 2.3f + 0.4f));
         lights.pt_lights.push_back(light);
     }
     scene.light_mgr->register_pipeline(pipeline_name, lights);

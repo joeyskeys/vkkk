@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cmath>
 #include <iterator>
 #include <stdexcept>
 #include <thread>
@@ -167,12 +168,32 @@ int main() {
         throw std::runtime_error("failed to allocate instance attributes");
     }
 
+    constexpr uint32_t point_light_count = 64;
     vkkk::PipelineLightStorage lights;
-    vkkk::PointLightUBO point_light{};
-    point_light.vec = glm::vec4(0.0f, 0.85f, 0.0f, 1.0f);
-    point_light.color = glm::vec4(1.0f);
-    point_light.radius = 5.0f;
-    lights.pt_lights.push_back(point_light);
+    lights.pt_lights.reserve(point_light_count);
+    for (uint32_t i = 0; i < point_light_count; ++i) {
+        const uint32_t ix = i % 4;
+        const uint32_t iy = (i / 4) % 4;
+        const uint32_t iz = i / 16;
+        const float t = static_cast<float>(i) / static_cast<float>(point_light_count);
+
+        vkkk::PointLightUBO light{};
+        light.vec = glm::vec4(
+            -0.75f + static_cast<float>(ix) * 0.5f,
+            -0.75f + static_cast<float>(iy) * 0.5f,
+            -0.75f + static_cast<float>(iz) * 0.5f,
+            1.0f);
+        // Dim colored lights so clustering differences stay visible.
+        const float hue = t * 6.2831853f;
+        const float intensity = 0.08f + 0.12f * (0.5f + 0.5f * std::sin(hue * 1.7f));
+        light.color = glm::vec4(
+            intensity * (0.55f + 0.45f * std::cos(hue)),
+            intensity * (0.55f + 0.45f * std::cos(hue + 2.094f)),
+            intensity * (0.55f + 0.45f * std::cos(hue + 4.189f)),
+            1.0f);
+        light.radius = 0.35f + 1.4f * (0.5f + 0.5f * std::sin(hue * 2.3f + 0.4f));
+        lights.pt_lights.push_back(light);
+    }
     scene.light_mgr->register_pipeline(pipeline_name, lights);
 
     glfwSetKeyCallback(window, key_callback);
@@ -213,6 +234,7 @@ int main() {
         ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
         ImGui::Text("Plane instances: %d", 5);
         ImGui::Text("Box instances: %d", 2);
+        ImGui::Text("Point lights: %u", point_light_count);
         ImGui::End();
 
         ctx.record_cmds(image_index,

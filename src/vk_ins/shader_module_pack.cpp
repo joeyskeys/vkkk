@@ -65,16 +65,19 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
         auto struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
         auto array_size = type_info.array.size() > 0 ? type_info.array[0] : 1;
 
-        // Runtime-sized SSBO blocks (e.g. attrs[]) report block size 0; use member element size.
+        // Runtime-sized SSBO blocks report block size 0. Prefer array stride so scalar/vector
+        // members (e.g. uint[], uvec4[]) work; get_declared_struct_size only accepts structs.
         if (struct_size == 0 && !base_type_info.member_types.empty()) {
+            struct_size = static_cast<uint32_t>(
+                comp.type_struct_member_array_stride(base_type_info, 0));
             const auto member_type = comp.get_type(base_type_info.member_types[0]);
-            struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
-            if (!member_type.array.empty()) {
-                array_size = member_type.array[0] == 0 ? 64u : member_type.array[0];
+            if (struct_size == 0 && !member_type.member_types.empty()) {
+                struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
             }
-        }
-        if (array_size == 0) {
-            array_size = 64;
+            if (!member_type.array.empty()) {
+                // Runtime arrays report 0; capacity is set later by the user.
+                array_size = member_type.array[0];
+            }
         }
         mod.storage_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
     }

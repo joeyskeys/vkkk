@@ -3,6 +3,7 @@ set(HEADERS
     built_in_shader/phong.h
     built_in_shader/phong_plus.h
     built_in_shader/light_clusterize.h
+    built_in_shader/line_gen.h
     built_in_shader/pbr.h
     built_in_shader/shadow.h
     built_in_shader/shadow.h

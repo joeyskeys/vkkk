@@ -1,14 +1,18 @@
-#include <stdexcept>
+#include <chrono>
 #include <iterator>
+#include <stdexcept>
+#include <thread>
 
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui.h>
 
 #include "asset_mgr/drawable_mgr.h"
 #include "asset_mgr/light_mgr.h"
 #include "asset_mgr/scene.h"
 #include "built_in_shader/phong_plus.h"
 #include "concepts/camera.h"
+#include "gui/gui.h"
 #include "renderer/forwardp.hpp"
 #include "vk_ins/context.hpp"
 
@@ -28,6 +32,38 @@ vkkk::Camera camera{
     0.1f,
     100.0f
 };
+
+void key_callback(GLFWwindow* /*win*/, int key, int /*code*/, int action, int /*mods*/) {
+    const bool key_down = action == GLFW_PRESS || action == GLFW_REPEAT;
+    const bool key_up = action == GLFW_RELEASE;
+    if (key == GLFW_KEY_E) camera.y = key_down ? 0.01f : (key_up ? 0.0f : camera.y);
+    else if (key == GLFW_KEY_Q) camera.y = key_down ? -0.01f : (key_up ? 0.0f : camera.y);
+    else if (key == GLFW_KEY_W) camera.z = key_down ? 0.01f : (key_up ? 0.0f : camera.z);
+    else if (key == GLFW_KEY_S) camera.z = key_down ? -0.01f : (key_up ? 0.0f : camera.z);
+    else if (key == GLFW_KEY_A) camera.x = key_down ? -0.01f : (key_up ? 0.0f : camera.x);
+    else if (key == GLFW_KEY_D) camera.x = key_down ? 0.01f : (key_up ? 0.0f : camera.x);
+}
+
+void mouse_btn_callback(GLFWwindow* win, int btn, int action, int /*mods*/) {
+    if (btn == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == GLFW_PRESS) {
+            camera.rotating = true;
+            glfwGetCursorPos(win, &camera.prev_x, &camera.prev_y);
+        } else {
+            camera.rotating = false;
+        }
+    }
+}
+
+void mouse_pos_callback(GLFWwindow* /*win*/, double x, double y) {
+    if (!camera.rotating) return;
+    const float delta_x = static_cast<float>((x - camera.prev_x) / 100.0);
+    const float delta_y = static_cast<float>((y - camera.prev_y) / 100.0);
+    camera.prev_x = x;
+    camera.prev_y = y;
+    camera.rotation = glm::angleAxis(delta_x, glm::vec3(0.0f, 1.0f, 0.0f));
+    camera.rotation = glm::angleAxis(-delta_y, glm::vec3(1.0f, 0.0f, 0.0f)) * camera.rotation;
+}
 
 vkkk::PipelineOption make_pipeline_option() {
     vkkk::PipelineOption option;
@@ -139,22 +175,82 @@ int main() {
     lights.pt_lights.push_back(point_light);
     scene.light_mgr->register_pipeline(pipeline_name, lights);
 
-    ctx.set_update_cbk([&](uint32_t image_index, float /*dt*/) {
+    glfwSetKeyCallback(window, key_callback);
+    glfwSetMouseButtonCallback(window, mouse_btn_callback);
+    glfwSetCursorPosCallback(window, mouse_pos_callback);
+
+    vkkk::ImGuiHud hud;
+    if (!hud.init(&ctx)) {
+        throw std::runtime_error("failed to initialize imgui hud");
+    }
+
+    bool limit_fps_enabled = true;
+    float target_fps = 60.0f;
+    float current_fps = 0.0f;
+    float frame_dt = 0.0f;
+    float raw_frame_dt = 0.0f;
+
+    ctx.set_update_cbk([&](uint32_t image_index, float duration) {
+        raw_frame_dt = duration;
+        camera.ratio = width / static_cast<float>(height);
+        camera.update_position(frame_dt);
+        camera.update_orientation();
         camera.update_ubo_data();
+
+        hud.begin_frame();
+        ImGui::SetNextWindowPos(ImVec2(8.0f, 8.0f), ImGuiCond_Always);
+        ImGui::SetNextWindowBgAlpha(0.35f);
+        constexpr ImGuiWindowFlags hud_flags =
+            ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize
+            | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing
+            | ImGuiWindowFlags_NoNav;
+        ImGui::Begin("FPS HUD", nullptr, hud_flags);
+        ImGui::Text("Renderer: Forward+ Clustered");
+        ImGui::Checkbox("Limit FPS", &limit_fps_enabled);
+        ImGui::SliderFloat("Target FPS", &target_fps, 15.0f, 240.0f, "%.0f");
+        ImGui::Text("FPS: %.1f", current_fps);
+        ImGui::Text("Frame: %.2f ms", frame_dt * 1000.0f);
+        ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
+        ImGui::Text("Plane instances: %d", 5);
+        ImGui::Text("Box instances: %d", 2);
+        ImGui::End();
+
         ctx.record_cmds(image_index,
             [&](vk::raii::CommandBuffer& cmd, uint32_t swapchain_index) {
                 renderer.record_commands(cmd, swapchain_index);
+                hud.render(static_cast<VkCommandBuffer>(*cmd));
             },
             [&](vk::raii::CommandBuffer& cmd, uint32_t swapchain_index) {
                 renderer.prepare_light_clusters(cmd, swapchain_index);
             });
     });
 
+    using Clock = std::chrono::steady_clock;
+    auto next_frame_tick = Clock::now();
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
+        const auto frame_begin = Clock::now();
         ctx.draw_frame();
+        auto frame_end = Clock::now();
+
+        if (limit_fps_enabled && target_fps > 1.0f) {
+            const auto frame_period = std::chrono::duration<float>(1.0f / target_fps);
+            next_frame_tick += std::chrono::duration_cast<Clock::duration>(frame_period);
+            if (frame_end < next_frame_tick) {
+                std::this_thread::sleep_until(next_frame_tick);
+                frame_end = Clock::now();
+            } else {
+                next_frame_tick = frame_end;
+            }
+        } else {
+            next_frame_tick = frame_end;
+        }
+
+        frame_dt = std::chrono::duration<float>(frame_end - frame_begin).count();
+        current_fps = frame_dt > 0.0f ? 1.0f / frame_dt : 0.0f;
     }
 
+    hud.shutdown();
     ctx.wait_idle();
     glfwDestroyWindow(window);
     glfwTerminate();

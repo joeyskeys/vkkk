@@ -85,6 +85,12 @@ target_link_libraries(vkrendererforwardplus
         vkkk
         OpenImageIO::OpenImageIO)
 
+add_executable(vkrendererwireframe renderer_main_wireframe.cpp)
+target_link_libraries(vkrendererwireframe
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
 #if(VKKK_BUILD_PYTHON_BINDINGS)
     #add_subdirectory(binding)
 #endif()

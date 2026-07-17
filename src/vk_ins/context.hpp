@@ -176,7 +176,10 @@ struct MeshGPU {
     vk::raii::DeviceMemory                  vbuf_memo{nullptr};
     vk::raii::Buffer                        ibuf{nullptr};
     vk::raii::DeviceMemory                  ibuf_memo{nullptr};
+    uint32_t                                vcnt = 0;
     uint32_t                                icnt = 0;
+    vk::DeviceSize                          vert_bytes = 0;
+    vk::DeviceSize                          index_bytes = 0;
     
     void sync(const Mesh& mesh, class Context* ctx);
     void emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
@@ -226,6 +229,10 @@ public:
         uint32_t descriptor_set_index = 0) const;
     bool draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1) const;
+    // Bind a mesh-shader graphics pipeline + descriptors, then draw mesh tasks.
+    bool record_mesh_tasks(vk::CommandBuffer cmd, const std::string& pipeline_name,
+        uint32_t group_x, uint32_t group_y = 1, uint32_t group_z = 1,
+        uint32_t descriptor_set_index = 0) const;
     bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
         vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
         const vk::DescriptorSet* desc_set = nullptr) const;
@@ -259,15 +266,17 @@ public:
     void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
         size_t comp_size, size_t vcnt) const
     {
-        create_input_attr_buffer<vk::BufferUsageFlagBits::eVertexBuffer>(
-            src, buf, memo, comp_size * sizeof(float), vcnt);
+        create_input_attr_buffer(
+            src, buf, memo, comp_size * sizeof(float), vcnt,
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
     }
 
     void create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
         size_t idx_cnt) const
     {
-        create_input_attr_buffer<vk::BufferUsageFlagBits::eIndexBuffer>(
-            reinterpret_cast<const float*>(src), buf, memo, sizeof(uint32_t), idx_cnt);
+        create_input_attr_buffer(
+            reinterpret_cast<const float*>(src), buf, memo, sizeof(uint32_t), idx_cnt,
+            vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
     }
 
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
@@ -278,6 +287,8 @@ public:
     bool resize_pipeline_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
     bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name, SSBOType graphics_type,
         const std::string& compute_pipeline_name, SSBOType compute_type);
+    // Bind MeshGPU vertex/index buffers as pipeline Vertices/Indices SSBOs for mesh shaders.
+    bool bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, const std::string& mesh_name);
     bool alloc_compute_ssbo(const std::string& full_name);
     bool resize_compute_ssbo(const std::string& full_name, size_t new_vecsize);
     bool sync_compute_ssbo(const std::string& full_name, const void* data,
@@ -354,17 +365,16 @@ private:
     vk::raii::CommandBuffer begin_single_commands(const vk::raii::CommandPool& pool) const;
     void end_single_commands(vk::raii::CommandBuffer&& cmd_buf, const vk::raii::Queue& submit_queue) const;
 
-    template <vk::BufferUsageFlagBits buf_type>
     void create_input_attr_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-        size_t comp_size, size_t elem_cnt) const
+        size_t elem_stride_bytes, size_t elem_cnt, vk::BufferUsageFlags usage) const
     {
-        vk::DeviceSize buf_size = comp_size * elem_cnt;
+        vk::DeviceSize buf_size = elem_stride_bytes * elem_cnt;
         auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
             vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
         void* data = staging_memo.mapMemory(0, buf_size);
         std::memcpy(data, src, static_cast<size_t>(buf_size));
         staging_memo.unmapMemory();
-        std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | buf_type,
+        std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | usage,
             vk::MemoryPropertyFlagBits::eDeviceLocal);
         copy_buffer(staging_buf, buf, buf_size);
     }
@@ -433,6 +443,7 @@ private:
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
+    bool task_shader_available = false;
     bool depth_image_initialized = false;
     int32_t active_render_target_index_ = -1;
 

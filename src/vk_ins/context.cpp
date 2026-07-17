@@ -45,6 +45,10 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_LightClusterParams;
         return true;
     }
+    if (reflected_name == "LineGenParams") {
+        out_type = UBOType_LineGenParams;
+        return true;
+    }
     return false;
 }
 
@@ -67,6 +71,14 @@ bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
     }
     if (reflected_name == "ClusterLightIndices") {
         out_type = SSBOType_ClusterLightIndices;
+        return true;
+    }
+    if (reflected_name == "Vertices") {
+        out_type = SSBOType_Vertices;
+        return true;
+    }
+    if (reflected_name == "Indices") {
+        out_type = SSBOType_Indices;
         return true;
     }
     return false;
@@ -147,7 +159,10 @@ void MeshGPU::sync(const Mesh& mesh, Context* ctx) {
         throw std::runtime_error("cannot sync unloaded mesh");
     ctx->create_vertex_buffer(mesh.vbuf, vbuf, vbuf_memo, mesh.comp_size, mesh.vcnt);
     ctx->create_index_buffer(reinterpret_cast<const uint32_t*>(mesh.ibuf), ibuf, ibuf_memo, mesh.icnt * 3);
+    vcnt = mesh.vcnt;
     icnt = mesh.icnt;
+    vert_bytes = static_cast<vk::DeviceSize>(mesh.comp_size) * mesh.vcnt * sizeof(float);
+    index_bytes = static_cast<vk::DeviceSize>(mesh.icnt) * 3u * sizeof(uint32_t);
 }
 
 void MeshGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
@@ -517,6 +532,8 @@ void Context::init(GLFWwindow* win,
         supported_feature_chain.get<vk::PhysicalDeviceVulkan13Features>().shaderDemoteToHelperInvocation == vk::True;
     const bool supports_mesh_shader =
         supported_feature_chain.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader == vk::True;
+    const bool supports_task_shader =
+        supported_feature_chain.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().taskShader == vk::True;
     if (use_mesh_shader && !supports_mesh_shader) {
         throw std::runtime_error("mesh shader requested but device does not support meshShader feature");
     }
@@ -535,8 +552,10 @@ void Context::init(GLFWwindow* win,
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;
     device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().meshShader =
         (use_mesh_shader && supports_mesh_shader) ? vk::True : vk::False;
-    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().taskShader = vk::False;
+    device_features.get<vk::PhysicalDeviceMeshShaderFeaturesEXT>().taskShader =
+        (use_mesh_shader && supports_task_shader) ? vk::True : vk::False;
     mesh_shader_available = use_mesh_shader && supports_mesh_shader;
+    task_shader_available = use_mesh_shader && supports_task_shader;
 
     float queue_priority = 0.5f;
     std::vector<vk::DeviceQueueCreateInfo> queue_create_infos;
@@ -645,6 +664,7 @@ bool Context::create_pipeline(const std::string& name,
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eTaskEXT);
     bool has_vertex_stage = false;
+    bool has_mesh_stage = false;
     bool has_task_stage = false;
 
     if (pipeline_uses_mesh_shader && (!use_mesh_shader || !mesh_shader_available)) {
@@ -680,6 +700,9 @@ bool Context::create_pipeline(const std::string& name,
 
         if (stage == vk::ShaderStageFlagBits::eTaskEXT) {
             has_task_stage = true;
+        }
+        if (stage == vk::ShaderStageFlagBits::eMeshEXT) {
+            has_mesh_stage = true;
         }
         if (stage == vk::ShaderStageFlagBits::eVertex) {
             has_vertex_stage = true;
@@ -813,8 +836,16 @@ bool Context::create_pipeline(const std::string& name,
         std::cout << "Pipeline " << name << " mixes mesh/task and vertex shader stages." << std::endl;
         return false;
     }
-    if (has_task_stage) {
-        std::cout << "Pipeline " << name << " uses task shader, which is not enabled in Context yet." << std::endl;
+    if (has_task_stage && !task_shader_available) {
+        std::cout << "Pipeline " << name << " uses task shader, but task shader support is disabled." << std::endl;
+        return false;
+    }
+    if (has_task_stage && !has_mesh_stage) {
+        std::cout << "Pipeline " << name << " has a task stage without a mesh stage." << std::endl;
+        return false;
+    }
+    if (pipeline_uses_mesh_shader && !has_mesh_stage) {
+        std::cout << "Pipeline " << name << " requested mesh shader path without a mesh stage." << std::endl;
         return false;
     }
 
@@ -1207,14 +1238,38 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
 bool Context::draw_mesh_tasks(vk::CommandBuffer cmd, uint32_t group_x, uint32_t group_y,
     uint32_t group_z) const
 {
-    const auto draw_mesh_tasks = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(
+    const auto draw_mesh_tasks_fn = reinterpret_cast<PFN_vkCmdDrawMeshTasksEXT>(
         device.getProcAddr("vkCmdDrawMeshTasksEXT"));
-    if (draw_mesh_tasks == nullptr) {
+    if (draw_mesh_tasks_fn == nullptr) {
         std::cout << "vkCmdDrawMeshTasksEXT is not available on this device" << std::endl;
         return false;
     }
-    draw_mesh_tasks(static_cast<VkCommandBuffer>(cmd), group_x, group_y, group_z);
+    draw_mesh_tasks_fn(static_cast<VkCommandBuffer>(cmd), group_x, group_y, group_z);
     return true;
+}
+
+bool Context::record_mesh_tasks(vk::CommandBuffer cmd, const std::string& pipeline_name,
+    uint32_t group_x, uint32_t group_y, uint32_t group_z, uint32_t descriptor_set_index) const
+{
+    const auto found = pipelines.find(pipeline_name);
+    if (found == pipelines.end()) {
+        return false;
+    }
+
+    const auto& pipeline = found->second;
+    if (!pipeline.uses_mesh_shader) {
+        return false;
+    }
+
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+    if (!pipeline.descriptor_sets.empty()) {
+        const auto idx = std::min<uint32_t>(descriptor_set_index,
+            static_cast<uint32_t>(pipeline.descriptor_sets.size() - 1));
+        const vk::DescriptorSet desc_set = *pipeline.descriptor_sets[idx];
+        cmd.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline_layout, 0, {desc_set}, {});
+    }
+    return draw_mesh_tasks(cmd, group_x, group_y, group_z);
 }
 
 bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
@@ -1787,6 +1842,49 @@ bool Context::bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeli
     catch (const std::runtime_error&) {
         return false;
     }
+}
+
+bool Context::bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, const std::string& mesh_name) {
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end()) {
+        return false;
+    }
+
+    const auto mesh_it = meshes.find(mesh_name);
+    if (mesh_it == meshes.end()) {
+        return false;
+    }
+
+    auto& pipeline = pipeline_it->second;
+    const auto& mesh = mesh_it->second;
+    if (!*mesh.vbuf || !*mesh.ibuf || mesh.vert_bytes == 0 || mesh.index_bytes == 0
+        || pipeline.descriptor_sets.empty())
+    {
+        return false;
+    }
+
+    const auto bind_mesh_buffer = [&](SSBOType type, const vk::raii::Buffer& buf, vk::DeviceSize bytes) {
+        const auto ssbo_it = pipeline.ssbos.find(type);
+        if (ssbo_it == pipeline.ssbos.end()) {
+            return false;
+        }
+
+        auto& ssbo = ssbo_it->second;
+        ssbo.gpu_bufs.clear();
+        ssbo.memos.clear();
+        ssbo.descriptors.clear();
+        ssbo.size = static_cast<uint32_t>(bytes);
+        ssbo.vecsize = 1;
+        ssbo.uses_borrowed_descriptors = true;
+        ssbo.borrowed_descriptors.assign(
+            pipeline.descriptor_sets.size(),
+            vk::DescriptorBufferInfo{*buf, 0, bytes});
+        update_pipeline_ssbo_descriptors(pipeline, ssbo);
+        return true;
+    };
+
+    return bind_mesh_buffer(SSBOType_Vertices, mesh.vbuf, mesh.vert_bytes)
+        && bind_mesh_buffer(SSBOType_Indices, mesh.ibuf, mesh.index_bytes);
 }
 
 bool Context::alloc_compute_ssbo(const std::string& full_name) {

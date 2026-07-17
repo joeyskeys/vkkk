@@ -11,12 +11,16 @@ namespace vkkk
 // Draw info for gen_line_* shaders. `vertex_stride_floats` is the interleaved
 // vertex pitch in floats (6 for VERTEX+NORMAL as in renderer_main_fp).
 struct LineGenParamsUBO : public Sizeable<LineGenParamsUBO> {
+    glm::mat4 model{1.0f};
+    glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
     uint32_t vertex_stride_floats{6};
     uint32_t index_count{0};
     uint32_t _pad0{0};
     uint32_t _pad1{0};
-    glm::vec4 color{1.0f, 1.0f, 1.0f, 1.0f};
 };
+
+// Must match gen_line_task's triangles_per_mesh_workgroup.
+inline constexpr uint32_t line_gen_triangles_per_task = 21;
 
 // Draw one task workgroup for every 21 input triangles:
 //   vkCmdDrawMeshTasksEXT(ceil(index_count / 3.0 / 21.0), 1, 1)
@@ -43,11 +47,12 @@ struct LineTaskPayload {
 taskPayloadSharedEXT LineTaskPayload payload;
 
 layout(std140, binding = 1) uniform LineGenParams {
+    mat4 model;
+    vec4 color;
     uint vertex_stride_floats;
     uint index_count;
     uint _pad0;
     uint _pad1;
-    vec4 color;
 } params;
 
 const uint triangles_per_mesh_workgroup = 21u;
@@ -90,11 +95,12 @@ layout(binding = 0) uniform CameraUBO {
 } camera;
 
 layout(std140, binding = 1) uniform LineGenParams {
+    mat4 model;
+    vec4 color;
     uint vertex_stride_floats;
     uint index_count;
     uint _pad0;
     uint _pad1;
-    vec4 color;
 } params;
 
 layout(std430, binding = 2) readonly buffer Vertices {
@@ -126,11 +132,11 @@ void main() {
         const uint i2 = indices[input_index + 2u];
 
         gl_MeshVerticesEXT[output_vertex + 0u].gl_Position =
-            camera.proj * camera.view * vec4(load_position(i0), 1.0);
+            camera.proj * camera.view * params.model * vec4(load_position(i0), 1.0);
         gl_MeshVerticesEXT[output_vertex + 1u].gl_Position =
-            camera.proj * camera.view * vec4(load_position(i1), 1.0);
+            camera.proj * camera.view * params.model * vec4(load_position(i1), 1.0);
         gl_MeshVerticesEXT[output_vertex + 2u].gl_Position =
-            camera.proj * camera.view * vec4(load_position(i2), 1.0);
+            camera.proj * camera.view * params.model * vec4(load_position(i2), 1.0);
 
         gl_PrimitiveLineIndicesEXT[output_line + 0u] = uvec2(output_vertex + 0u, output_vertex + 1u);
         gl_PrimitiveLineIndicesEXT[output_line + 1u] = uvec2(output_vertex + 1u, output_vertex + 2u);
@@ -144,11 +150,12 @@ inline constexpr char gen_line_frag[] = R"(
 #version 460
 
 layout(std140, binding = 1) uniform LineGenParams {
+    mat4 model;
+    vec4 color;
     uint vertex_stride_floats;
     uint index_count;
     uint _pad0;
     uint _pad1;
-    vec4 color;
 } params;
 
 layout(location = 0) out vec4 outColor;

@@ -34,6 +34,35 @@ bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,
     return ctx->create_pipeline(ppl_name, pack, option, components);
 }
 
+bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,
+    const char* task,
+    const char* mesh,
+    const char* frag,
+    const PipelineOption& option,
+    const std::vector<VERT_COMP>& components)
+{
+    if (!ctx) {
+        return false;
+    }
+
+    ShaderModule task_module, mesh_module, frag_module;
+    if (!task_module.load(task, vk::ShaderStageFlagBits::eTaskEXT, "task_shader")
+        || !mesh_module.load(mesh, vk::ShaderStageFlagBits::eMeshEXT, "mesh_shader")
+        || !frag_module.load(frag, vk::ShaderStageFlagBits::eFragment, "frag_shader"))
+    {
+        return false;
+    }
+
+    ShaderModulePack pack;
+    if (!(pack.add_shader_module(task_module)
+        && pack.add_shader_module(mesh_module)
+        && pack.add_shader_module(frag_module)))
+    {
+        return false;
+    }
+    return ctx->create_pipeline(ppl_name, pack, option, components);
+}
+
 void Renderer::sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string pipeline_name, const Pipeline& pipeline) {
     if (!ctx) {
         return;

@@ -50,6 +50,13 @@ public:
         const PipelineOption& option,
         const std::vector<VERT_COMP>& components = {VERTEX});
 
+    bool create_pipeline_from_shader_src(const std::string& ppl_name,
+        const char* task,
+        const char* mesh,
+        const char* frag,
+        const PipelineOption& option,
+        const std::vector<VERT_COMP>& components = {});
+
     template <typename T>
     void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
         const T* ubo_data,

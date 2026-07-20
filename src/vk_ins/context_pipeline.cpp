@@ -41,6 +41,10 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_LineGenMeshInfo;
         return true;
     }
+    if (reflected_name == "ShadowResolve") {
+        out_type = UBOType_ShadowResolve;
+        return true;
+    }
     return false;
 }
 
@@ -75,6 +79,18 @@ bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
     }
     if (reflected_name == "LineGenParams") {
         out_type = SSBOType_LineGenParams;
+        return true;
+    }
+    if (reflected_name == "MainDirectionalShadow") {
+        out_type = SSBOType_MainDirectionalShadow;
+        return true;
+    }
+    if (reflected_name == "MeshPositions") {
+        out_type = SSBOType_ShadowResolveMeshVertices;
+        return true;
+    }
+    if (reflected_name == "MeshIndices") {
+        out_type = SSBOType_ShadowResolveMeshIndices;
         return true;
     }
     return false;

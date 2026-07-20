@@ -117,6 +117,7 @@ bool Context::create_pipeline(const std::string& name,
     std::map<uint32_t, UBOType> ubo_binding_to_type;
     std::map<uint32_t, SSBOType> storage_binding_to_type;
     std::map<uint32_t, std::string> tex_binding_to_name;
+    std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
     std::unordered_map<UBOType, UBO> pipeline_ubos;
     std::unordered_map<SSBOType, SSBO> pipeline_ssbos;
     const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
@@ -249,28 +250,30 @@ bool Context::create_pipeline(const std::string& name,
         for (const auto& [tex_name, tex_binding] : module.img_infos) {
             const auto ppl_tex_name = name + ":" + tex_name;
             uint32_t descriptor_count = 1;
+            sampler_descriptor_counts[tex_binding] = descriptor_count;
             if (textures.find(ppl_tex_name) == textures.end()) {
                 const auto tex_path_info = module.tex_img_pairs.find(tex_name);
                 if (tex_path_info == module.tex_img_pairs.end()) {
                     std::cout << "No texture assigned for sampler " << tex_name << std::endl;
-                    continue;
                 }
-
-                const auto& [path, is_cubemap] = tex_path_info->second;
-                descriptor_count = is_cubemap ? 6u : 1u;
-                if (!is_cubemap) {
-                    if (!add_texture(ppl_tex_name, tex_binding, path)) {
-                        continue;
+                else {
+                    const auto& [path, is_cubemap] = tex_path_info->second;
+                    descriptor_count = is_cubemap ? 6u : 1u;
+                    if (!is_cubemap) {
+                        if (add_texture(ppl_tex_name, tex_binding, path)) {
+                            tex_binding_to_name[tex_binding] = ppl_tex_name;
+                        }
                     }
-                }
-                else if (!add_cubemap(ppl_tex_name, tex_binding, path)) {
-                    continue;
+                    else if (add_cubemap(ppl_tex_name, tex_binding, path)) {
+                        tex_binding_to_name[tex_binding] = ppl_tex_name;
+                    }
                 }
             }
             else {
                 descriptor_count = static_cast<uint32_t>(textures.at(ppl_tex_name).vecsize);
+                tex_binding_to_name[tex_binding] = ppl_tex_name;
             }
-            tex_binding_to_name[tex_binding] = ppl_tex_name;
+            sampler_descriptor_counts[tex_binding] = descriptor_count;
 
             vk::DescriptorSetLayoutBinding tex_layout_binding{};
             tex_layout_binding.binding = tex_binding;
@@ -363,6 +366,7 @@ bool Context::create_pipeline(const std::string& name,
     pipeline.uses_mesh_shader = pipeline_uses_mesh_shader;
     pipeline.ubos = std::move(pipeline_ubos);
     pipeline.ssbos = std::move(pipeline_ssbos);
+    pipeline.sampler_descriptor_counts = std::move(sampler_descriptor_counts);
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     uint32_t uniform_desc_count = 0;
@@ -380,12 +384,9 @@ bool Context::create_pipeline(const std::string& name,
         storage_desc_count += 1;
     }
     uint32_t image_desc_count = 0;
-    for (const auto& [binding, tex_name] : tex_binding_to_name) {
+    for (const auto& [binding, descriptor_count] : pipeline.sampler_descriptor_counts) {
         (void)binding;
-        const auto tex_found = textures.find(tex_name);
-        if (tex_found != textures.end()) {
-            image_desc_count += static_cast<uint32_t>(tex_found->second.vecsize);
-        }
+        image_desc_count += descriptor_count;
     }
 
     std::vector<vk::DescriptorPoolSize> pool_sizes;
@@ -428,8 +429,9 @@ bool Context::create_pipeline(const std::string& name,
             std::vector<vk::DescriptorImageInfo> image_infos;
             std::vector<vk::WriteDescriptorSet> writes;
             buffer_infos.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size());
-            image_infos.reserve(tex_binding_to_name.size());
-            writes.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size() + tex_binding_to_name.size());
+            image_infos.reserve(pipeline.sampler_descriptor_counts.size());
+            writes.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size()
+                + pipeline.sampler_descriptor_counts.size());
 
             for (const auto& [binding, ubo_type] : ubo_binding_to_type) {
                 const auto ubo_found = pipeline.ubos.find(ubo_type);

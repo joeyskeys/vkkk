@@ -608,6 +608,7 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     }
     target.width = target_width;
     target.height = target_height;
+    target.usage = usage;
 
     std::tie(target.image, target.memo) = create_vk_image(
         target_width, target_height, 1, samples, format, vk::ImageTiling::eOptimal,
@@ -629,6 +630,47 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
 
     targets.emplace_back(std::move(target));
+    return true;
+}
+
+bool Context::bind_pipeline_render_target(const std::string& pipeline_name, uint32_t binding,
+    uint32_t target_index)
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end() || target_index >= targets.size()) {
+        return false;
+    }
+
+    auto& pipeline = pipeline_it->second;
+    const auto sampler_binding = pipeline.sampler_descriptor_counts.find(binding);
+    if (sampler_binding == pipeline.sampler_descriptor_counts.end()
+        || sampler_binding->second != 1
+        || pipeline.descriptor_sets.empty())
+    {
+        return false;
+    }
+
+    const auto& target = targets[target_index];
+    if ((target.usage & vk::ImageUsageFlagBits::eSampled) == vk::ImageUsageFlags{}) {
+        std::cout << "Render target " << target_index << " was not created with sampled usage"
+            << std::endl;
+        return false;
+    }
+
+    std::vector<vk::DescriptorImageInfo> image_infos(
+        pipeline.descriptor_sets.size(), target.descriptor);
+    std::vector<vk::WriteDescriptorSet> writes;
+    writes.reserve(pipeline.descriptor_sets.size());
+    for (size_t i = 0; i < pipeline.descriptor_sets.size(); ++i) {
+        vk::WriteDescriptorSet write{};
+        write.dstSet = *pipeline.descriptor_sets[i];
+        write.dstBinding = binding;
+        write.descriptorCount = 1;
+        write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        write.pImageInfo = &image_infos[i];
+        writes.push_back(write);
+    }
+    device.updateDescriptorSets(writes, {});
     return true;
 }
 

@@ -77,6 +77,7 @@ struct Texture {
     size_t                                  vecsize;
     uint32_t                                width = 0;
     uint32_t                                height = 0;
+    vk::ImageUsageFlags                     usage{};
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
     vk::raii::ImageView                     view{nullptr};
@@ -106,6 +107,7 @@ struct Pipeline {
 
     std::unordered_map<UBOType, UBO> ubos;
     std::unordered_map<SSBOType, SSBO> ssbos;
+    std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
 };
 
 struct ComputePipeline {
@@ -273,6 +275,9 @@ public:
     bool resize_pipeline_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
     bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name, SSBOType graphics_type,
         const std::string& compute_pipeline_name, SSBOType compute_type);
+    // Bind a sampleable render target to a reflected combined-image-sampler binding.
+    bool bind_pipeline_render_target(const std::string& pipeline_name, uint32_t binding,
+        uint32_t target_index);
     // Bind MeshGPU vertex/index buffers as pipeline Vertices/Indices SSBOs for mesh shaders.
     bool bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, const std::string& mesh_name);
     bool alloc_compute_ssbo(const std::string& full_name);

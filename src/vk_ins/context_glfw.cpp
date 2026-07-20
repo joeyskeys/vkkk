@@ -50,6 +50,8 @@ void Context::recreate_swapchain() {
     depth_view = nullptr;
     depth_image = nullptr;
     depth_memo = nullptr;
+    depth_attachments.clear();
+    active_depth_attachment_index_ = -1;
     swapchain = nullptr;
 
     create_swapchain();

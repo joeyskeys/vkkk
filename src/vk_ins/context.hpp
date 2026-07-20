@@ -47,7 +47,6 @@ constexpr uint32_t max_frames_in_flight = 2;
 
 }
 
-
 class Camera;
 
 // We have a design division here. ubo is actually bound to pipeline, the GPU part.
@@ -84,6 +83,17 @@ struct Texture {
     vk::ImageLayout                         layout;
     vk::DescriptorImageInfo                 descriptor;
     vk::raii::Sampler                       sampler{nullptr};
+};
+
+struct DepthAttachment {
+    uint32_t                                width = 0;
+    uint32_t                                height = 0;
+    vk::Format                              format = vk::Format::eUndefined;
+    vk::ImageAspectFlags                    aspect_mask = vk::ImageAspectFlagBits::eDepth;
+    vk::raii::Image                         image{nullptr};
+    vk::raii::DeviceMemory                  memo{nullptr};
+    vk::raii::ImageView                     view{nullptr};
+    bool                                    initialized = false;
 };
 
 struct Pipeline {
@@ -201,11 +211,11 @@ struct CameraGPU {
 // these parts are not frequently changed or used.
 class Context {
 public:
+    // Initialization, window, and swapchain
     Context(bool enable_debug_m = true);
 
     static std::vector<const char*> get_glfw_instance_extensions(bool enable_validation = true);
     GLFWwindow* init_glfw(int width, int height, const char* title = default_app_name, bool resizable = false);
-
     void init(GLFWwindow* win,
         const char* app_name = default_app_name,
         uint32_t app_version = default_app_version,
@@ -214,7 +224,10 @@ public:
         bool enable_validation_layers = true,
         const std::vector<const char*>& extra_validation_layers = {},
         const std::vector<const char*>& extra_extensions = {});
+    void recreate_swapchain();
+    void wait_idle() const { device.waitIdle(); }
 
+    // Pipeline creation
     bool create_pipeline(const std::string& name,
         const ShaderModulePack& shader_module_pack,
         const PipelineOption& option,
@@ -222,6 +235,8 @@ public:
         bool interleaved = true);
     bool create_compute_pipeline(const std::string& name, const ComputeShader& shader);
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
+
+    // Command recording, draw, and dispatch
     void dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y = 1,
         uint32_t group_z = 1, uint32_t descriptor_set_index = 0);
     bool record_compute(vk::CommandBuffer cmd, const std::string& pipeline_name,
@@ -236,13 +251,12 @@ public:
     bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
         vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
         const vk::DescriptorSet* desc_set = nullptr) const;
-    void draw_frame();
-    void wait_idle() const { device.waitIdle(); }
-    void recreate_swapchain();
     void record_cmds(uint32_t image_index,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func = {});
+    void draw_frame();
 
+    // GPU buffers and descriptors
     bool add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
         uint32_t size, uint32_t vecsize = 1,
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
@@ -251,34 +265,6 @@ public:
         uint32_t size, uint32_t vecsize = 1,
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
         vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
-    bool add_texture(const std::string& name, uint32_t binding,
-        const fs::path& path);
-    bool add_cubemap(const std::string& name, uint32_t binding,
-        const fs::path& path);
-    bool add_render_target(vk::ImageUsageFlags usage, vk::Format format,
-        uint32_t width = 0, uint32_t height = 0,
-        vk::ImageLayout layout = vk::ImageLayout::eGeneral,
-        vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
-    bool set_render_target(uint32_t target_index);
-    void set_render_to_framebuffer();
-    bool load_mesh(const std::string& name, const Mesh& mesh);
-
-    void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-        size_t comp_size, size_t vcnt) const
-    {
-        create_input_attr_buffer(
-            src, buf, memo, comp_size * sizeof(float), vcnt,
-            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
-    }
-
-    void create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-        size_t idx_cnt) const
-    {
-        create_input_attr_buffer(
-            reinterpret_cast<const float*>(src), buf, memo, sizeof(uint32_t), idx_cnt,
-            vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
-    }
-
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
     void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     bool alloc_pipeline_ssbo(const std::string& pipeline_name);
@@ -299,6 +285,44 @@ public:
         uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     UBO& require_ubo(const std::string& full_name);
     const SSBO& require_compute_ssbo(const std::string& full_name) const;
+
+    // Textures, render targets, and depth attachments
+    bool add_texture(const std::string& name, uint32_t binding,
+        const fs::path& path);
+    bool add_cubemap(const std::string& name, uint32_t binding,
+        const fs::path& path);
+    bool add_render_target(vk::ImageUsageFlags usage, vk::Format format,
+        uint32_t width = 0, uint32_t height = 0,
+        vk::ImageLayout layout = vk::ImageLayout::eGeneral,
+        vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    bool set_render_target(uint32_t target_index);
+    void set_render_to_framebuffer();
+    // Custom depth attachments are sampleable so they can later serve shadow-map passes.
+    bool add_depth_attachment(uint32_t width = 0, uint32_t height = 0,
+        vk::Format format = vk::Format::eUndefined,
+        vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    bool set_depth_attachment(uint32_t attachment_index);
+    void set_default_depth_attachment();
+
+    // Mesh resources
+    bool load_mesh(const std::string& name, const Mesh& mesh);
+    void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
+        size_t comp_size, size_t vcnt) const
+    {
+        create_input_attr_buffer(
+            src, buf, memo, comp_size * sizeof(float), vcnt,
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
+    }
+
+    void create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
+        size_t idx_cnt) const
+    {
+        create_input_attr_buffer(
+            reinterpret_cast<const float*>(src), buf, memo, sizeof(uint32_t), idx_cnt,
+            vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
+    }
+
+    // Accessors and configuration
     GLFWwindow* get_window() const { return window; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
     VkPhysicalDevice get_vk_physical_device() const { return static_cast<VkPhysicalDevice>(*physical_device); }
@@ -322,6 +346,7 @@ public:
     vk::SampleCountFlagBits nsample = vk::SampleCountFlagBits::e1;
 
 private:
+    // Internal device and resource helpers
     void setup_debug_messenger();
     static bool is_device_suitable(
         const vk::raii::PhysicalDevice& device,
@@ -446,6 +471,7 @@ private:
     bool task_shader_available = false;
     bool depth_image_initialized = false;
     int32_t active_render_target_index_ = -1;
+    int32_t active_depth_attachment_index_ = -1;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
@@ -457,6 +483,7 @@ public:
 
     std::unordered_map<std::string, Texture> textures;
     std::vector<Texture> targets;
+    std::vector<DepthAttachment> depth_attachments;
 };
 
 }

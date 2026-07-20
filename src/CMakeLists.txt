@@ -51,6 +51,9 @@ set(SRCS
     #vk_ins/shader_mgr.cpp
     vk_ins/shader_module_pack.cpp
     vk_ins/context.cpp
+    vk_ins/context_pipeline.cpp
+    vk_ins/context_commands.cpp
+    vk_ins/context_resources.cpp
     vk_ins/context_glfw.cpp
     vk_ins/context_utils.cpp)
 

@@ -1,8 +1,7 @@
 ---
 description: Project architecture and preferred extension points
-alwaysApply: true
+alwaysApply: false
 ---
-
 # Code Structure
 
 - `src/vk_ins/`: Vulkan backend. `Context` owns GPU resources, pipelines, meshes, swapchain, command recording, and presentation.

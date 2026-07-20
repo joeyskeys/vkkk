@@ -132,19 +132,15 @@ static bool shader_kind_from_stage(const vk::ShaderStageFlagBits t, shaderc_shad
             return true;
         }
 
-#ifdef shaderc_glsl_mesh_shader
         case vk::ShaderStageFlagBits::eMeshEXT: {
             out_kind = shaderc_glsl_mesh_shader;
             return true;
         }
-#endif
 
-#ifdef shaderc_glsl_task_shader
         case vk::ShaderStageFlagBits::eTaskEXT: {
             out_kind = shaderc_glsl_task_shader;
             return true;
         }
-#endif
 
         default: {
             return false;

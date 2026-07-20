@@ -15,7 +15,7 @@ enum UBOType {
     UBOType_DirectionalLight,
     UBOType_SpotLight,
     UBOType_LightClusterParams,
-    UBOType_LineGenParams
+    UBOType_LineGenMeshInfo
 };
 
 enum SSBOType {
@@ -24,7 +24,8 @@ enum SSBOType {
     SSBOType_ClusterGrid,
     SSBOType_ClusterLightIndices,
     SSBOType_Vertices,
-    SSBOType_Indices
+    SSBOType_Indices,
+    SSBOType_LineGenParams
 };
 
 struct CameraUBO : public Sizeable<CameraUBO> {

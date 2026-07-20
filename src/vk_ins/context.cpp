@@ -45,8 +45,8 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_LightClusterParams;
         return true;
     }
-    if (reflected_name == "LineGenParams") {
-        out_type = UBOType_LineGenParams;
+    if (reflected_name == "LineGenMeshInfo") {
+        out_type = UBOType_LineGenMeshInfo;
         return true;
     }
     return false;
@@ -79,6 +79,10 @@ bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
     }
     if (reflected_name == "Indices") {
         out_type = SSBOType_Indices;
+        return true;
+    }
+    if (reflected_name == "LineGenParams") {
+        out_type = SSBOType_LineGenParams;
         return true;
     }
     return false;

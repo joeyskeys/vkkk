@@ -35,6 +35,50 @@ struct ShadowResolveMeshIndicesSSBO {
     };
 };
 
+// Depth-only shadow-map generation for the main directional light (instanced).
+inline constexpr const char shadow_map_vert[] = R"(
+#version 460
+
+struct MainDirectionalShadowData {
+    mat4 lightViewProj;
+    vec4 direction;
+};
+
+layout(std430, binding = 0) readonly buffer MainDirectionalShadow {
+    MainDirectionalShadowData light;
+} main_directional_shadow;
+
+struct PhongInstanceAttr {
+    mat4 model;
+    vec4 ambient;
+    vec4 diffuse;
+    vec4 specular;
+    float shininess;
+    float _pad0;
+    float _pad1;
+    float _pad2;
+};
+
+layout(std430, binding = 3) readonly buffer PhongInstanceAttrs {
+    PhongInstanceAttr attrs[];
+} instance_attrs;
+
+layout(location = 0) in vec3 inPosition;
+layout(location = 1) in vec3 inNormal;
+
+void main() {
+    mat4 model = instance_attrs.attrs[gl_InstanceIndex].model;
+    gl_Position = main_directional_shadow.light.lightViewProj * model * vec4(inPosition, 1.0);
+}
+)";
+
+inline constexpr const char shadow_map_frag[] = R"(
+#version 450
+
+void main() {
+}
+)";
+
 inline constexpr const char shadow_resolve_vert[] = R"(
 #version 450
 
@@ -47,40 +91,6 @@ void main() {
     );
     uv = pos * 0.5 + 0.5;
     gl_Position = vec4(pos, 0.0, 1.0);
-}
-)";
-
-inline constexpr const char shadow_resolve_mesh[] = R"(
-#version 460
-#extension GL_EXT_mesh_shader : require
-
-layout(local_size_x = 1) in;
-layout(triangles) out;
-layout(max_vertices = 3, max_primitives = 1) out;
-
-layout(std430, binding = 4) readonly buffer MeshPositions {
-    vec4 positions[3];
-} mesh_positions;
-
-layout(std430, binding = 5) readonly buffer MeshIndices {
-    uvec4 triangles[1];
-} mesh_indices;
-
-layout(location = 0) out vec2 uv[];
-
-void main() {
-    const uint vertex_count = 3u;
-    const uint triangle_count = 1u;
-
-    SetMeshOutputsEXT(vertex_count, triangle_count);
-    for (uint i = 0; i < vertex_count; ++i) {
-        vec2 pos = mesh_positions.positions[i].xy;
-        gl_MeshVerticesEXT[i].gl_Position = vec4(pos, 0.0, 1.0);
-        uv[i] = pos * 0.5 + 0.5;
-    }
-    for (uint i = 0; i < triangle_count; ++i) {
-        gl_PrimitiveTriangleIndicesEXT[i] = mesh_indices.triangles[i].xyz;
-    }
 }
 )";
 

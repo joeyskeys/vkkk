@@ -1,11 +1,11 @@
 set(HEADERS
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
+    built_in_shader/phong_shadow.hpp
     built_in_shader/phong_plus.h
     built_in_shader/light_clusterize.h
     built_in_shader/line_gen.h
     built_in_shader/pbr.h
-    built_in_shader/shadow.h
     built_in_shader/shadow.h
     asset_mgr/scene.h
     asset_mgr/light_mgr.h
@@ -15,6 +15,7 @@ set(HEADERS
     concepts/mesh.h
     gui/gui.h
     renderer/renderer.hpp
+    renderer/forward.h
     renderer/forwardp.hpp
     utils/common.h
     utils/io.h
@@ -43,6 +44,7 @@ set(SRCS
     concepts/mesh.cpp
     gui/gui.cpp
     renderer/renderer.cpp
+    renderer/forward.cpp
     renderer/forwardp.cpp
     vk_ins/cmd_buf.cpp
     vk_ins/misc.cpp
@@ -78,6 +80,12 @@ endif()
 
 add_executable(vkrendererfp renderer_main_fp.cpp)
 target_link_libraries(vkrendererfp
+    PRIVATE
+        vkkk
+        OpenImageIO::OpenImageIO)
+
+add_executable(vkrendererforward renderer_main_forward.cpp)
+target_link_libraries(vkrendererforward
     PRIVATE
         vkkk
         OpenImageIO::OpenImageIO)

@@ -690,6 +690,48 @@ bool Context::bind_pipeline_render_target(const std::string& pipeline_name, uint
     return true;
 }
 
+bool Context::bind_pipeline_depth_attachment(const std::string& pipeline_name, uint32_t binding,
+    uint32_t attachment_index)
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end() || attachment_index >= depth_attachments.size()) {
+        return false;
+    }
+
+    auto& pipeline = pipeline_it->second;
+    const auto sampler_binding = pipeline.sampler_descriptor_counts.find(binding);
+    if (sampler_binding == pipeline.sampler_descriptor_counts.end()
+        || sampler_binding->second != 1
+        || pipeline.descriptor_sets.empty())
+    {
+        return false;
+    }
+
+    auto& attachment = depth_attachments[attachment_index];
+    if (!*attachment.sampler || !*attachment.view) {
+        return false;
+    }
+
+    attachment.descriptor = vk::DescriptorImageInfo{
+        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+
+    std::vector<vk::DescriptorImageInfo> image_infos(
+        pipeline.descriptor_sets.size(), attachment.descriptor);
+    std::vector<vk::WriteDescriptorSet> writes;
+    writes.reserve(pipeline.descriptor_sets.size());
+    for (size_t i = 0; i < pipeline.descriptor_sets.size(); ++i) {
+        vk::WriteDescriptorSet write{};
+        write.dstSet = *pipeline.descriptor_sets[i];
+        write.dstBinding = binding;
+        write.descriptorCount = 1;
+        write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        write.pImageInfo = &image_infos[i];
+        writes.push_back(write);
+    }
+    device.updateDescriptorSets(writes, {});
+    return true;
+}
+
 bool Context::set_render_target(uint32_t target_index) {
     if (target_index >= targets.size()) {
         std::cout << "Render target index out of range: " << target_index << std::endl;
@@ -738,6 +780,17 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
         attachment.format,
         1,
         attachment.aspect_mask);
+    attachment.sampler = create_vk_sampler(
+        vk::Filter::eLinear,
+        vk::Filter::eLinear,
+        vk::SamplerMipmapMode::eNearest,
+        vk::SamplerAddressMode::eClampToBorder,
+        false,
+        true,
+        vk::CompareOp::eLessOrEqual);
+    attachment.layout = vk::ImageLayout::eUndefined;
+    attachment.descriptor = vk::DescriptorImageInfo{
+        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
     depth_attachments.emplace_back(std::move(attachment));
     return true;
 }

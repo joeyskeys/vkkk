@@ -120,7 +120,8 @@ bool Context::create_pipeline(const std::string& name,
     const ShaderModulePack& shader_module_pack,
     const PipelineOption& option,
     const std::vector<VERT_COMP>& comps,
-    bool interleaved)
+    bool interleaved,
+    bool depth_only)
 {
     if (pipelines.find(name) != pipelines.end()) {
         std::cout << "Pipeline " << name << " already exists" << std::endl;
@@ -332,6 +333,10 @@ bool Context::create_pipeline(const std::string& name,
     local_option.vert_info.pVertexBindingDescriptions = input_binding_descs.data();
     local_option.vert_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(input_attr_descs.size());
     local_option.vert_info.pVertexAttributeDescriptions = input_attr_descs.data();
+    if (depth_only) {
+        local_option.blend_info.attachmentCount = 0;
+        local_option.blend_info.pAttachments = nullptr;
+    }
 
     vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
     if (!descriptor_layouts.empty()) {
@@ -349,8 +354,8 @@ bool Context::create_pipeline(const std::string& name,
 
     const vk::Format depth_format = find_depth_format();
     vk::PipelineRenderingCreateInfo rendering_create_info{};
-    rendering_create_info.colorAttachmentCount = 1;
-    rendering_create_info.pColorAttachmentFormats = &swapchain_surface_format.format;
+    rendering_create_info.colorAttachmentCount = depth_only ? 0u : 1u;
+    rendering_create_info.pColorAttachmentFormats = depth_only ? nullptr : &swapchain_surface_format.format;
     rendering_create_info.depthAttachmentFormat = depth_format;
     rendering_create_info.stencilAttachmentFormat = depth_format;
     vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};

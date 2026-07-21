@@ -94,6 +94,9 @@ struct DepthAttachment {
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
     vk::raii::ImageView                     view{nullptr};
+    vk::raii::Sampler                       sampler{nullptr};
+    vk::ImageLayout                         layout = vk::ImageLayout::eUndefined;
+    vk::DescriptorImageInfo                 descriptor{};
     bool                                    initialized = false;
 };
 
@@ -234,7 +237,8 @@ public:
         const ShaderModulePack& shader_module_pack,
         const PipelineOption& option,
         const std::vector<VERT_COMP>& comps,
-        bool interleaved = true);
+        bool interleaved = true,
+        bool depth_only = false);
     bool create_compute_pipeline(const std::string& name, const ComputeShader& shader);
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
 
@@ -256,6 +260,9 @@ public:
     void record_cmds(uint32_t image_index,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func = {});
+    // Depth-only dynamic rendering into a custom depth attachment (no color target).
+    bool record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachment_index,
+        const std::function<void(vk::raii::CommandBuffer&)>& emit_func);
     void draw_frame();
 
     // GPU buffers and descriptors
@@ -278,6 +285,9 @@ public:
     // Bind a sampleable render target to a reflected combined-image-sampler binding.
     bool bind_pipeline_render_target(const std::string& pipeline_name, uint32_t binding,
         uint32_t target_index);
+    // Bind a sampleable depth attachment as a combined comparison sampler (e.g. sampler2DShadow).
+    bool bind_pipeline_depth_attachment(const std::string& pipeline_name, uint32_t binding,
+        uint32_t attachment_index);
     // Bind MeshGPU vertex/index buffers as pipeline Vertices/Indices SSBOs for mesh shaders.
     bool bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, const std::string& mesh_name);
     bool alloc_compute_ssbo(const std::string& full_name);

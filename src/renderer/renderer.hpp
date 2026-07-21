@@ -48,7 +48,9 @@ public:
         const char* vert_or_mesh,
         const char* frag,
         const PipelineOption& option,
-        const std::vector<VERT_COMP>& components = {VERTEX});
+        const std::vector<VERT_COMP>& components = {VERTEX},
+        bool interleaved = true,
+        bool depth_only = false);
 
     bool create_pipeline_from_shader_src(const std::string& ppl_name,
         const char* task,

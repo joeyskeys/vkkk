@@ -17,7 +17,9 @@ bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,
     const char* vert,
     const char* frag,
     const PipelineOption& option,
-    const std::vector<VERT_COMP>& components)
+    const std::vector<VERT_COMP>& components,
+    bool interleaved,
+    bool depth_only)
 {
     if (!ctx) {
         return false;
@@ -31,7 +33,7 @@ bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,
     {
         return false;
     }
-    return ctx->create_pipeline(ppl_name, pack, option, components);
+    return ctx->create_pipeline(ppl_name, pack, option, components, interleaved, depth_only);
 }
 
 bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,

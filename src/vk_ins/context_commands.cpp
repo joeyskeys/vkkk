@@ -109,6 +109,75 @@ bool Context::record_compute(vk::CommandBuffer cmd, const std::string& pipeline_
     return true;
 }
 
+bool Context::record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachment_index,
+    const std::function<void(vk::raii::CommandBuffer&)>& emit_func)
+{
+    if (attachment_index >= depth_attachments.size() || !emit_func) {
+        return false;
+    }
+
+    auto& attachment = depth_attachments[attachment_index];
+    const vk::Image depth_image_handle = *attachment.image;
+    const vk::ImageAspectFlags aspect_mask = attachment.aspect_mask;
+    const vk::ImageLayout old_layout = attachment.initialized
+        ? attachment.layout : vk::ImageLayout::eUndefined;
+
+    transit_presentation_image_layout(
+        cmd,
+        depth_image_handle,
+        old_layout,
+        vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        old_layout == vk::ImageLayout::eDepthStencilReadOnlyOptimal
+            ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        old_layout == vk::ImageLayout::eDepthStencilReadOnlyOptimal
+            ? vk::PipelineStageFlagBits2::eFragmentShader
+            : vk::PipelineStageFlagBits2::eTopOfPipe,
+        vk::PipelineStageFlagBits2::eEarlyFragmentTests
+            | vk::PipelineStageFlagBits2::eLateFragmentTests,
+        aspect_mask);
+
+    vk::RenderingAttachmentInfo depth_attachment_info{};
+    depth_attachment_info.imageView = *attachment.view;
+    depth_attachment_info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+    depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
+    depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
+    depth_attachment_info.clearValue = vk::ClearDepthStencilValue(1.f, 0);
+
+    const vk::Extent2D render_extent{attachment.width, attachment.height};
+    vk::RenderingInfo rendering_info{};
+    rendering_info.renderArea.offset = vk::Offset2D{0, 0};
+    rendering_info.renderArea.extent = render_extent;
+    rendering_info.layerCount = 1;
+    rendering_info.colorAttachmentCount = 0;
+    rendering_info.pDepthAttachment = &depth_attachment_info;
+
+    cmd.beginRendering(rendering_info);
+    cmd.setViewport(0, vk::Viewport{
+        0.f, 0.f,
+        static_cast<float>(render_extent.width),
+        static_cast<float>(render_extent.height),
+        0.f, 1.f
+    });
+    cmd.setScissor(0, vk::Rect2D{{0, 0}, render_extent});
+    emit_func(cmd);
+    cmd.endRendering();
+
+    transit_presentation_image_layout(
+        cmd,
+        depth_image_handle,
+        vk::ImageLayout::eDepthStencilAttachmentOptimal,
+        vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+        vk::AccessFlagBits2::eShaderRead,
+        vk::PipelineStageFlagBits2::eLateFragmentTests,
+        vk::PipelineStageFlagBits2::eFragmentShader,
+        aspect_mask);
+    attachment.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+    attachment.initialized = true;
+    return true;
+}
+
 void Context::record_cmds(uint32_t image_index,
     const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
     const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func)

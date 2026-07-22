@@ -16,7 +16,8 @@ enum UBOType {
     UBOType_SpotLight,
     UBOType_LightClusterParams,
     UBOType_LineGenMeshInfo,
-    UBOType_ShadowResolve
+    UBOType_ShadowResolve,
+    UBOType_MainDirectionalShadow
 };
 
 enum SSBOType {

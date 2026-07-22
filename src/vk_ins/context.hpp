@@ -93,7 +93,10 @@ struct DepthAttachment {
     vk::ImageAspectFlags                    aspect_mask = vk::ImageAspectFlagBits::eDepth;
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
+    // Full aspect view for depth(/stencil) attachment use in rendering.
     vk::raii::ImageView                     view{nullptr};
+    // Depth-only view for sampler2DShadow (combined depth+stencil views are invalid to sample).
+    vk::raii::ImageView                     sampleView{nullptr};
     vk::raii::Sampler                       sampler{nullptr};
     vk::ImageLayout                         layout = vk::ImageLayout::eUndefined;
     vk::DescriptorImageInfo                 descriptor{};

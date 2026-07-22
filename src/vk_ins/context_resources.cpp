@@ -48,6 +48,10 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_ShadowResolve;
         return true;
     }
+    if (reflected_name == "MainDirectionalShadow") {
+        out_type = UBOType_MainDirectionalShadow;
+        return true;
+    }
     return false;
 }
 
@@ -201,6 +205,15 @@ void Context::sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_i
     const auto capacity = static_cast<uint32_t>(ssbo.size * ssbo.vecsize);
     const auto upload_size = byte_size == 0 ? capacity : std::min(byte_size, capacity);
     if (upload_size == 0) {
+        return;
+    }
+
+    // Host-visible SSBOs: map directly. Staging + queueSubmit while another command
+    // buffer from the same pool is still recording can leave storage contents stale.
+    if (swapchain_idx < ssbo.memos.size()) {
+        void* mapped = ssbo.memos[swapchain_idx].mapMemory(0, upload_size);
+        std::memcpy(mapped, data, upload_size);
+        ssbo.memos[swapchain_idx].unmapMemory();
         return;
     }
 
@@ -708,12 +721,12 @@ bool Context::bind_pipeline_depth_attachment(const std::string& pipeline_name, u
     }
 
     auto& attachment = depth_attachments[attachment_index];
-    if (!*attachment.sampler || !*attachment.view) {
+    if (!*attachment.sampler || !*attachment.sampleView) {
         return false;
     }
 
     attachment.descriptor = vk::DescriptorImageInfo{
-        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+        *attachment.sampler, *attachment.sampleView, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
 
     std::vector<vk::DescriptorImageInfo> image_infos(
         pipeline.descriptor_sets.size(), attachment.descriptor);
@@ -780,6 +793,12 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
         attachment.format,
         1,
         attachment.aspect_mask);
+    // Sampler must use a depth-only view; Depth|Stencil aspect views are illegal for sampling.
+    attachment.sampleView = create_vk_imageview(
+        attachment.image,
+        attachment.format,
+        1,
+        vk::ImageAspectFlagBits::eDepth);
     attachment.sampler = create_vk_sampler(
         vk::Filter::eLinear,
         vk::Filter::eLinear,
@@ -790,7 +809,7 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
         vk::CompareOp::eLessOrEqual);
     attachment.layout = vk::ImageLayout::eUndefined;
     attachment.descriptor = vk::DescriptorImageInfo{
-        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+        *attachment.sampler, *attachment.sampleView, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
     depth_attachments.emplace_back(std::move(attachment));
     return true;
 }
@@ -1083,6 +1102,10 @@ vk::raii::Sampler Context::create_vk_sampler(vk::Filter mag_filter, vk::Filter m
     sampler_info.maxAnisotropy = props.limits.maxSamplerAnisotropy;
     sampler_info.compareEnable = compare_enable;
     sampler_info.compareOp = compare_op;
+    // Shadow maps: ClampToBorder with far depth (1) so out-of-frustum taps count as lit.
+    if (compare_enable && address_mode == vk::SamplerAddressMode::eClampToBorder) {
+        sampler_info.borderColor = vk::BorderColor::eFloatOpaqueWhite;
+    }
     return vk::raii::Sampler(device, sampler_info);
 }
 

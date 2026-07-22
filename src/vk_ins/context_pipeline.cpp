@@ -45,6 +45,10 @@ bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
         out_type = UBOType_ShadowResolve;
         return true;
     }
+    if (reflected_name == "MainDirectionalShadow") {
+        out_type = UBOType_MainDirectionalShadow;
+        return true;
+    }
     return false;
 }
 

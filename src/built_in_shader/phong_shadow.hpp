@@ -77,13 +77,9 @@ layout(binding = 4) uniform ShadowResolve {
     vec4 pcfRadiusReserved;
 } shadow_resolve;
 
-struct MainDirectionalShadowData {
+layout(binding = 5) uniform MainDirectionalShadow {
     mat4 lightViewProj;
     vec4 direction;
-};
-
-layout(std430, binding = 5) readonly buffer MainDirectionalShadow {
-    MainDirectionalShadowData light;
 } main_directional_shadow;
 
 layout(location = 0) in vec3 fragPos;
@@ -96,8 +92,7 @@ layout(location = 5) flat in float fragShininess;
 layout(location = 0) out vec4 outColor;
 
 float sample_shadow_pcf(vec3 world_pos) {
-    MainDirectionalShadowData shadow_light = main_directional_shadow.light;
-    vec4 light_clip = shadow_light.lightViewProj * vec4(world_pos, 1.0);
+    vec4 light_clip = main_directional_shadow.lightViewProj * vec4(world_pos, 1.0);
     vec3 light_ndc = light_clip.xyz / max(light_clip.w, 1e-6);
     if (light_ndc.x < -1.0 || light_ndc.x > 1.0 || light_ndc.y < -1.0 || light_ndc.y > 1.0) {
         return 1.0;

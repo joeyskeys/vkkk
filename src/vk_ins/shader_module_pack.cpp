@@ -71,8 +71,15 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
             struct_size = static_cast<uint32_t>(
                 comp.type_struct_member_array_stride(base_type_info, 0));
             const auto member_type = comp.get_type(base_type_info.member_types[0]);
-            if (struct_size == 0 && !member_type.member_types.empty()) {
-                struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+            if (!member_type.member_types.empty()) {
+                // Nested struct member (e.g. MainDirectionalShadowData light;): use the
+                // declared struct size. Array stride can be 0/wrong for non-array members
+                // and would fall through to the 16-byte default in create_pipeline.
+                const auto nested_size =
+                    static_cast<uint32_t>(comp.get_declared_struct_size(member_type));
+                if (nested_size > 0) {
+                    struct_size = nested_size;
+                }
             }
             if (!member_type.array.empty()) {
                 // Runtime arrays report 0; capacity is set later by the user.

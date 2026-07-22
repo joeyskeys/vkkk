@@ -61,7 +61,7 @@ PipelineOption ForwardRenderer::make_shadow_pipeline_option() const {
     PipelineOption option;
     option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
-        vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, true);
+        vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(true, true, vk::CompareOp::eLess, false, false);
     option.setup_viewport(0.0f, 0.0f, static_cast<float>(kShadowMapSize),
         static_cast<float>(kShadowMapSize), 0.0f, 1.0f);
@@ -146,8 +146,6 @@ void ForwardRenderer::allocate_ssbo() {
                 batch.batch_infos.back().instance_offset + batch.batch_infos.back().instance_count;
             ctx->resize_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs, std::max(instance_count, size_t{1}));
             ctx->alloc_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs);
-            ctx->resize_pipeline_ssbo(pipeline_name, SSBOType_MainDirectionalShadow, 1);
-            ctx->alloc_pipeline_ssbo(pipeline_name, SSBOType_MainDirectionalShadow);
         }
     };
     alloc_instance_ssbo(opaqueBatches);
@@ -157,12 +155,11 @@ void ForwardRenderer::allocate_ssbo() {
         : shadowBatchInfos.back().instance_offset + shadowBatchInfos.back().instance_count;
     ctx->resize_pipeline_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs, shadow_instance_count);
     ctx->alloc_pipeline_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs);
-    ctx->resize_pipeline_ssbo(kShadowDepthPipeline, SSBOType_MainDirectionalShadow, 1);
-    ctx->alloc_pipeline_ssbo(kShadowDepthPipeline, SSBOType_MainDirectionalShadow);
 }
 
 void ForwardRenderer::update_main_directional_shadow() {
-    mainDirectionalShadow.direction = glm::vec4(glm::normalize(glm::vec3(-0.35f, -1.0f, -0.2f)), 0.0f);
+    // Fallback: enter through open front (+Z), 45° down into the box.
+    mainDirectionalShadow.direction = glm::vec4(glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f)), 0.0f);
     if (scene != nullptr && scene->light_mgr != nullptr) {
         for (const auto& [pipeline_name, _] : opaqueBatches) {
             const auto* storage = scene->light_mgr->pipeline_storage(pipeline_name);
@@ -175,14 +172,16 @@ void ForwardRenderer::update_main_directional_shadow() {
     }
 
     const glm::vec3 direction = glm::normalize(glm::vec3(mainDirectionalShadow.direction));
-    const glm::vec3 light_position = -direction * 30.0f;
+    // Place the light outside the cornell box looking at the origin.
+    const glm::vec3 light_position = -direction * 5.0f;
     const glm::vec3 up = std::abs(direction.y) > 0.99f
         ? glm::vec3(0.0f, 0.0f, 1.0f)
         : glm::vec3(0.0f, 1.0f, 0.0f);
-    glm::mat4 projection = glm::ortho(-25.0f, 25.0f, -25.0f, 25.0f, 0.1f, 100.0f);
+    // Explicit RH_ZO ortho: Vulkan clip Z is [0,1]. Fit the cornell room (~[-1,1]^3).
+    glm::mat4 projection = glm::orthoRH_ZO(-2.5f, 2.5f, -2.5f, 2.5f, 0.5f, 12.0f);
     projection[1][1] *= -1.0f;
     mainDirectionalShadow.light_view_proj =
-        projection * glm::lookAt(light_position, glm::vec3(0.0f), up);
+        projection * glm::lookAtRH(light_position, glm::vec3(0.0f), up);
 
     if (scene != nullptr && scene->camera != nullptr) {
         shadowResolve.inv_view_proj = glm::inverse(
@@ -201,6 +200,14 @@ void ForwardRenderer::sync_shadow_resources(uint32_t swapchain_image_idx) {
             return;
         }
         const auto& pipeline = pipeline_it->second;
+
+        const auto shadow_ubo_it = pipeline.ubos.find(UBOType_MainDirectionalShadow);
+        if (shadow_ubo_it != pipeline.ubos.end()
+            && swapchain_image_idx < shadow_ubo_it->second.memos.size())
+        {
+            ctx->sync_uniform(shadow_ubo_it->second.memos[swapchain_image_idx],
+                &mainDirectionalShadow, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
+        }
 
         const auto shadow_ssbo_it = pipeline.ssbos.find(SSBOType_MainDirectionalShadow);
         if (shadow_ssbo_it != pipeline.ssbos.end()) {

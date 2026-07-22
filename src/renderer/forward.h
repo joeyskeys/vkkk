@@ -4,14 +4,11 @@
 #include <string>
 #include <vector>
 
-#include <glm/mat4x4.hpp>
-#include <glm/vec4.hpp>
-
-#include "built_in_shader/phong.h"
-#include "built_in_shader/shadow.h"
 #include "renderer/renderer.hpp"
 #include "vk_ins/context.hpp"
 #include "vk_ins/shader_module_pack.hpp"
+#include "built_in_shader/phong.h"
+#include "built_in_shader/shadow.h"
 
 namespace vkkk
 {

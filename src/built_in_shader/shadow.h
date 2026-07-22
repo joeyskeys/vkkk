@@ -39,13 +39,11 @@ struct ShadowResolveMeshIndicesSSBO {
 inline constexpr const char shadow_map_vert[] = R"(
 #version 460
 
-struct MainDirectionalShadowData {
+// UBO (not SSBO): allocated at pipeline creation and updated via mapMemory, so the
+// light matrix is not lost when syncing during command-buffer recording.
+layout(binding = 0) uniform MainDirectionalShadow {
     mat4 lightViewProj;
     vec4 direction;
-};
-
-layout(std430, binding = 0) readonly buffer MainDirectionalShadow {
-    MainDirectionalShadowData light;
 } main_directional_shadow;
 
 struct PhongInstanceAttr {
@@ -68,7 +66,7 @@ layout(location = 1) in vec3 inNormal;
 
 void main() {
     mat4 model = instance_attrs.attrs[gl_InstanceIndex].model;
-    gl_Position = main_directional_shadow.light.lightViewProj * model * vec4(inPosition, 1.0);
+    gl_Position = main_directional_shadow.lightViewProj * model * vec4(inPosition, 1.0);
 }
 )";
 
@@ -106,13 +104,9 @@ layout(binding = 2) uniform ShadowResolve {
     vec4 pcfRadiusReserved;
 } shadow_resolve;
 
-struct MainDirectionalShadowData {
+layout(binding = 3) uniform MainDirectionalShadow {
     mat4 lightViewProj;
     vec4 direction;
-};
-
-layout(std430, binding = 3) readonly buffer MainDirectionalShadow {
-    MainDirectionalShadowData light;
 } main_directional_shadow;
 
 layout(location = 0) in vec2 uv;
@@ -125,8 +119,7 @@ vec3 reconstruct_world_pos(vec2 frag_uv, float depth) {
 }
 
 float sample_shadow_pcf(vec3 world_pos) {
-    MainDirectionalShadowData light = main_directional_shadow.light;
-    vec4 light_clip = light.lightViewProj * vec4(world_pos, 1.0);
+    vec4 light_clip = main_directional_shadow.lightViewProj * vec4(world_pos, 1.0);
     vec3 light_ndc = light_clip.xyz / max(light_clip.w, 1e-6);
     if (light_ndc.x < -1.0 || light_ndc.x > 1.0 || light_ndc.y < -1.0 || light_ndc.y > 1.0) {
         return 1.0;

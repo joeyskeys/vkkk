@@ -197,7 +197,8 @@ int main() {
     point_light.color = glm::vec4(1.0f);
     light_storage.pt_lights.push_back(point_light);
     vkkk::DirectionalLightUBO dir_light{};
-    dir_light.vec = glm::vec4(glm::normalize(glm::vec3(-0.35f, -1.0f, -0.2f)), 0.0f);
+    // Enter through the open front (+Z), 45° down into the box (-Y, -Z).
+    dir_light.vec = glm::vec4(glm::normalize(glm::vec3(0.0f, -1.0f, -1.0f)), 0.0f);
     dir_light.color = glm::vec4(1.0f);
     light_storage.dir_lights.push_back(dir_light);
     scene.light_mgr->register_pipeline(kShadingPipeline, light_storage);

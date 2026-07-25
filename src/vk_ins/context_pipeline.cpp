@@ -356,12 +356,12 @@ bool Context::create_pipeline(const std::string& name,
     pipeline_layout_info.pSetLayouts = descriptor_set_layout != nullptr ? &set_layout_handle : nullptr;
     vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
 
-    const vk::Format depth_format = find_depth_format();
+    const vk::Format depth_format = depth_only ? find_depth_only_format() : find_depth_format();
     vk::PipelineRenderingCreateInfo rendering_create_info{};
     rendering_create_info.colorAttachmentCount = depth_only ? 0u : 1u;
     rendering_create_info.pColorAttachmentFormats = depth_only ? nullptr : &swapchain_surface_format.format;
     rendering_create_info.depthAttachmentFormat = depth_format;
-    rendering_create_info.stencilAttachmentFormat = depth_format;
+    rendering_create_info.stencilAttachmentFormat = depth_only ? vk::Format::eUndefined : depth_format;
     vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};
     graphics_pipeline_create_info.pNext = &rendering_create_info;
     graphics_pipeline_create_info.stageCount = static_cast<uint32_t>(shader_stage_infos.size());

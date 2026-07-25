@@ -62,38 +62,24 @@ public:
     template <typename T>
     void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
         const T* ubo_data,
-        const Pipeline& pipeline)
+        const std::string& pipeline_name)
     {
         if (!ctx) {
             return;
         }
-
-        auto ubo_it = pipeline.ubos.find(type);
-        if (ubo_it == pipeline.ubos.end()) {
-            return;
-        }
-        auto* ubo = &ubo_it->second;
-        if (swapchain_idx >= ubo->memos.size()) {
-            return;
-        }
-        ctx->sync_uniform(ubo->memos[swapchain_idx], ubo_data, ubo->size * ubo->vecsize);
+        ctx->sync_ubo(pipeline_name, type, ubo_data, swapchain_idx);
     }
 
-    void sync_ssbo(const void* ssbo_data, const Pipeline& pipeline,
+    void sync_ssbo(const void* ssbo_data, const std::string& pipeline_name,
         uint32_t swapchain_idx, uint32_t byte_size = 0)
     {
         if (!ctx) {
             return;
         }
-
-        auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
-        if (ssbo_it == pipeline.ssbos.end()) {
-            return;
-        }
-        ctx->sync_ssbo(ssbo_it->second, ssbo_data, swapchain_idx, byte_size);
+        ctx->sync_ssbo(pipeline_name, SSBOType_InstanceAttrs, ssbo_data, swapchain_idx, byte_size);
     }
 
-    void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string pipeline_name, const Pipeline& pipeline);
+    void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string& pipeline_name);
 
 public:
     Context* ctx = nullptr;

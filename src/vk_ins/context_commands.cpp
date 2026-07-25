@@ -58,6 +58,34 @@ bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh
     return true;
 }
 
+bool Context::bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end()) {
+        return false;
+    }
+    const auto& pipeline = pipeline_it->second;
+    cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+    if (!pipeline.descriptor_sets.empty()) {
+        const auto idx = std::min(frame_idx, static_cast<uint32_t>(pipeline.descriptor_sets.size() - 1));
+        const vk::DescriptorSet desc_set = *pipeline.descriptor_sets[idx];
+        cmd.bindDescriptorSets(
+            vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline_layout, 0, {desc_set}, {});
+    }
+    return true;
+}
+
+bool Context::draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
+    uint32_t instance_count, uint32_t instance_offset) const
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end()) {
+        return false;
+    }
+    return draw_mesh_instanced(
+        cmd, mesh_name, *pipeline_it->second.vk_pipeline_layout, instance_count, instance_offset, nullptr);
+}
+
 void Context::dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y,
     uint32_t group_z, uint32_t descriptor_set_index)
 {

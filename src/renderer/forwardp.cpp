@@ -186,6 +186,7 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
     params.config = glm::uvec4(max_lights_per_cluster, width, height, 0u);
     params.depth_range = glm::vec4(scene->camera->near, scene->camera->far, 0.0f, 0.0f);
 
+    // Compute pipeline still uses string-keyed UBOs.
     try {
         auto& params_ubo = ctx->require_ubo(params_name);
         if (swapchain_image_idx >= params_ubo.memos.size()) {
@@ -199,19 +200,8 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
 
     const auto sync_graphics_cluster_params = [&](const Batches& batches) {
         for (const auto& [pipeline_name, _] : batches) {
-            const auto pipeline_it = ctx->pipelines.find(pipeline_name);
-            if (pipeline_it == ctx->pipelines.end()) {
-                continue;
-            }
-            const auto ubo_it = pipeline_it->second.ubos.find(UBOType_LightClusterParams);
-            if (ubo_it != pipeline_it->second.ubos.end()
-                && swapchain_image_idx < ubo_it->second.memos.size())
-            {
-                ctx->sync_uniform(
-                    ubo_it->second.memos[swapchain_image_idx],
-                    &params,
-                    static_cast<uint32_t>(sizeof(params)));
-            }
+            ctx->sync_ubo(pipeline_name, UBOType_LightClusterParams, &params,
+                swapchain_image_idx, static_cast<uint32_t>(sizeof(params)));
         }
     };
     sync_graphics_cluster_params(opaque_batches);
@@ -237,21 +227,13 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchai
     }
 
     for (const auto& [pipeline_name, batch] : batches) {
-        const auto pipeline_it = ctx->pipelines.find(pipeline_name);
-        if (pipeline_it == ctx->pipelines.end()) {
+        if (!ctx->pipelines.contains(pipeline_name)) {
             continue;
         }
 
-        const auto& pipeline = pipeline_it->second;
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
+        sync_uniforms(swapchain_image_idx, scene, pipeline_name);
 
-        sync_uniforms(swapchain_image_idx, scene, pipeline_name, pipeline);
-
-        const vk::DescriptorSet* desc_set = nullptr;
-        if (swapchain_image_idx < pipeline.descriptor_sets.size()) {
-            desc_set = &*pipeline.descriptor_sets[swapchain_image_idx];
-        }
-
+        const auto& pipeline = ctx->pipelines.at(pipeline_name);
         const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
         const size_t elem_size = ssbo_it != pipeline.ssbos.end() ? ssbo_it->second.size : 0;
         size_t upload_bytes = 0;
@@ -259,16 +241,16 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchai
             upload_bytes = std::max(upload_bytes,
                 (batch_info.instance_offset + batch_info.instance_count) * elem_size);
         }
-        sync_ssbo(batch.buffer.get(), pipeline, swapchain_image_idx, static_cast<uint32_t>(upload_bytes));
+        sync_ssbo(batch.buffer.get(), pipeline_name, swapchain_image_idx,
+            static_cast<uint32_t>(upload_bytes));
+
+        if (!ctx->bind(cmd, pipeline_name, swapchain_image_idx)) {
+            continue;
+        }
         for (const auto& batch_info : batch.batch_infos) {
-            ctx->draw_mesh_instanced(
-                cmd,
-                batch_info.mesh_name,
-                *pipeline.vk_pipeline_layout,
-                batch_info.instance_count,
-                batch_info.instance_offset,
-                desc_set
-            );
+            ctx->draw(cmd, pipeline_name, batch_info.mesh_name,
+                static_cast<uint32_t>(batch_info.instance_count),
+                static_cast<uint32_t>(batch_info.instance_offset));
         }
     }
 }

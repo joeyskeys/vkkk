@@ -65,30 +65,37 @@ bool Renderer::create_pipeline_from_shader_src(const std::string& ppl_name,
     return ctx->create_pipeline(ppl_name, pack, option, components);
 }
 
-void Renderer::sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string pipeline_name, const Pipeline& pipeline) {
-    if (!ctx) {
+void Renderer::sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string& pipeline_name) {
+    if (!ctx || !scene || !scene->camera || !scene->light_mgr) {
+        return;
+    }
+
+    const auto pipeline_it = ctx->pipelines.find(pipeline_name);
+    if (pipeline_it == ctx->pipelines.end()) {
         return;
     }
 
     const auto* light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
-    
-    for (const auto& [ubo_type, ubo] : pipeline.ubos) {
-        if (swapchain_idx >= ubo.memos.size()) {
-            continue;
-        }
-
+    for (const auto& [ubo_type, ubo] : pipeline_it->second.ubos) {
+        (void)ubo;
         switch (ubo_type) {
             case UBOType_Camera:
-                sync_uniform(ubo_type, swapchain_idx, &(scene->camera->ubo_data), pipeline);
+                sync_uniform(ubo_type, swapchain_idx, &(scene->camera->ubo_data), pipeline_name);
                 break;
             case UBOType_PointLight:
-                sync_uniform(ubo_type, swapchain_idx, light_storage->pt_lights.data(), pipeline);
+                if (light_storage != nullptr && !light_storage->pt_lights.empty()) {
+                    sync_uniform(ubo_type, swapchain_idx, light_storage->pt_lights.data(), pipeline_name);
+                }
                 break;
             case UBOType_DirectionalLight:
-                sync_uniform(ubo_type, swapchain_idx, light_storage->dir_lights.data(), pipeline);
+                if (light_storage != nullptr && !light_storage->dir_lights.empty()) {
+                    sync_uniform(ubo_type, swapchain_idx, light_storage->dir_lights.data(), pipeline_name);
+                }
                 break;
             case UBOType_SpotLight:
-                sync_uniform(ubo_type, swapchain_idx, light_storage->spot_lights.data(), pipeline);
+                if (light_storage != nullptr && !light_storage->spot_lights.empty()) {
+                    sync_uniform(ubo_type, swapchain_idx, light_storage->spot_lights.data(), pipeline_name);
+                }
                 break;
             default:
                 break;

@@ -93,10 +93,9 @@ struct DepthAttachment {
     vk::ImageAspectFlags                    aspect_mask = vk::ImageAspectFlagBits::eDepth;
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
-    // Full aspect view for depth(/stencil) attachment use in rendering.
+    // Single depth-aspect view: used both as depth attachment and for sampling.
+    // Created with a depth-only format so one view is valid for both purposes.
     vk::raii::ImageView                     view{nullptr};
-    // Depth-only view for sampler2DShadow (combined depth+stencil views are invalid to sample).
-    vk::raii::ImageView                     sampleView{nullptr};
     vk::raii::Sampler                       sampler{nullptr};
     vk::ImageLayout                         layout = vk::ImageLayout::eUndefined;
     vk::DescriptorImageInfo                 descriptor{};
@@ -279,6 +278,16 @@ public:
         vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
     void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
+    // Typed sync helpers: look up pipeline resources by name/type (no DeviceMemory poking).
+    bool sync_ubo(const std::string& pipeline_name, UBOType type, const void* data,
+        uint32_t frame_idx, uint32_t byte_size = 0) const;
+    bool sync_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
+        uint32_t frame_idx, uint32_t byte_size = 0) const;
+    // Bind graphics pipeline + per-frame descriptor set.
+    bool bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const;
+    // Draw a named mesh. Call bind() first for the same pipeline/frame.
+    bool draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
+        uint32_t instance_count, uint32_t instance_offset = 0) const;
     bool alloc_pipeline_ssbo(const std::string& pipeline_name);
     bool resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize);
     bool alloc_pipeline_ssbo(const std::string& pipeline_name, SSBOType type);
@@ -315,7 +324,8 @@ public:
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
     bool set_render_target(uint32_t target_index);
     void set_render_to_framebuffer();
-    // Custom depth attachments are sampleable so they can later serve shadow-map passes.
+    // Sampleable depth attachment (shadow maps, etc.). Defaults to a depth-only format
+    // so a single ImageView can be used for both writing and sampling.
     bool add_depth_attachment(uint32_t width = 0, uint32_t height = 0,
         vk::Format format = vk::Format::eUndefined,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
@@ -397,6 +407,11 @@ private:
     vk::Format find_supported_format(const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features) const;
     inline vk::Format find_depth_format() const {
         return find_supported_format({vk::Format::eD32SfloatS8Uint, vk::Format::eD24UnormS8Uint, vk::Format::eD32Sfloat}, vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
+    }
+    // Depth-only formats used by sampleable DepthAttachment / depth-only pipelines.
+    inline vk::Format find_depth_only_format() const {
+        return find_supported_format({vk::Format::eD32Sfloat, vk::Format::eD16Unorm},
+            vk::ImageTiling::eOptimal, vk::FormatFeatureFlagBits::eDepthStencilAttachment);
     }
 
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size,

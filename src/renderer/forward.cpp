@@ -195,33 +195,12 @@ void ForwardRenderer::sync_shadow_resources(uint32_t swapchain_image_idx) {
     }
 
     const auto sync_pipeline_shadow = [&](const std::string& pipeline_name) {
-        const auto pipeline_it = ctx->pipelines.find(pipeline_name);
-        if (pipeline_it == ctx->pipelines.end()) {
-            return;
-        }
-        const auto& pipeline = pipeline_it->second;
-
-        const auto shadow_ubo_it = pipeline.ubos.find(UBOType_MainDirectionalShadow);
-        if (shadow_ubo_it != pipeline.ubos.end()
-            && swapchain_image_idx < shadow_ubo_it->second.memos.size())
-        {
-            ctx->sync_uniform(shadow_ubo_it->second.memos[swapchain_image_idx],
-                &mainDirectionalShadow, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
-        }
-
-        const auto shadow_ssbo_it = pipeline.ssbos.find(SSBOType_MainDirectionalShadow);
-        if (shadow_ssbo_it != pipeline.ssbos.end()) {
-            ctx->sync_ssbo(shadow_ssbo_it->second, &mainDirectionalShadow, swapchain_image_idx,
-                static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
-        }
-
-        const auto resolve_ubo_it = pipeline.ubos.find(UBOType_ShadowResolve);
-        if (resolve_ubo_it != pipeline.ubos.end()
-            && swapchain_image_idx < resolve_ubo_it->second.memos.size())
-        {
-            ctx->sync_uniform(resolve_ubo_it->second.memos[swapchain_image_idx],
-                &shadowResolve, static_cast<uint32_t>(sizeof(shadowResolve)));
-        }
+        ctx->sync_ubo(pipeline_name, UBOType_MainDirectionalShadow, &mainDirectionalShadow,
+            swapchain_image_idx, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
+        ctx->sync_ssbo(pipeline_name, SSBOType_MainDirectionalShadow, &mainDirectionalShadow,
+            swapchain_image_idx, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
+        ctx->sync_ubo(pipeline_name, UBOType_ShadowResolve, &shadowResolve,
+            swapchain_image_idx, static_cast<uint32_t>(sizeof(shadowResolve)));
     };
 
     sync_pipeline_shadow(kShadowDepthPipeline);
@@ -229,14 +208,9 @@ void ForwardRenderer::sync_shadow_resources(uint32_t swapchain_image_idx) {
         sync_pipeline_shadow(pipeline_name);
     }
 
-    const auto pipeline_it = ctx->pipelines.find(kShadowDepthPipeline);
-    if (pipeline_it == ctx->pipelines.end()) {
-        return;
-    }
-    const auto instance_ssbo_it = pipeline_it->second.ssbos.find(SSBOType_InstanceAttrs);
-    if (instance_ssbo_it != pipeline_it->second.ssbos.end() && !shadowInstanceData.empty()) {
-        ctx->sync_ssbo(instance_ssbo_it->second, shadowInstanceData.data(), swapchain_image_idx,
-            static_cast<uint32_t>(shadowInstanceData.size()));
+    if (!shadowInstanceData.empty()) {
+        ctx->sync_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs, shadowInstanceData.data(),
+            swapchain_image_idx, static_cast<uint32_t>(shadowInstanceData.size()));
     }
 }
 
@@ -250,21 +224,13 @@ void ForwardRenderer::pass_shadow(vk::raii::CommandBuffer& cmd, uint32_t swapcha
     update_main_directional_shadow();
     sync_shadow_resources(swapchain_image_idx);
 
-    const auto pipeline_it = ctx->pipelines.find(kShadowDepthPipeline);
-    if (pipeline_it == ctx->pipelines.end()) {
-        return;
-    }
-
     ctx->record_depth_pass(cmd, shadowDepthAttachmentIndex, [&](vk::raii::CommandBuffer& pass_cmd) {
-        pass_cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline_it->second.vk_pipeline);
-        if (swapchain_image_idx < pipeline_it->second.descriptor_sets.size()) {
-            const vk::DescriptorSet descriptor_set = *pipeline_it->second.descriptor_sets[swapchain_image_idx];
-            pass_cmd.bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
-                *pipeline_it->second.vk_pipeline_layout, 0, {descriptor_set}, {});
+        if (!ctx->bind(pass_cmd, kShadowDepthPipeline, swapchain_image_idx)) {
+            return;
         }
         for (const auto& batch_info : shadowBatchInfos) {
-            ctx->draw_mesh_instanced(pass_cmd, batch_info.mesh_name,
-                *pipeline_it->second.vk_pipeline_layout, static_cast<uint32_t>(batch_info.instance_count),
+            ctx->draw(pass_cmd, kShadowDepthPipeline, batch_info.mesh_name,
+                static_cast<uint32_t>(batch_info.instance_count),
                 static_cast<uint32_t>(batch_info.instance_offset));
         }
     });
@@ -278,20 +244,13 @@ void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, uint32_t swapchain_image
     }
 
     for (const auto& [pipeline_name, batch] : batches) {
-        const auto pipeline_it = ctx->pipelines.find(pipeline_name);
-        if (pipeline_it == ctx->pipelines.end() || batch.buffer == nullptr) {
+        if (batch.buffer == nullptr || !ctx->pipelines.contains(pipeline_name)) {
             continue;
         }
 
-        const auto& pipeline = pipeline_it->second;
-        cmd.bindPipeline(vk::PipelineBindPoint::eGraphics, *pipeline.vk_pipeline);
-        sync_uniforms(swapchain_image_idx, scene, pipeline_name, pipeline);
+        sync_uniforms(swapchain_image_idx, scene, pipeline_name);
 
-        const vk::DescriptorSet* descriptor_set = nullptr;
-        if (swapchain_image_idx < pipeline.descriptor_sets.size()) {
-            descriptor_set = &*pipeline.descriptor_sets[swapchain_image_idx];
-        }
-
+        const auto& pipeline = ctx->pipelines.at(pipeline_name);
         const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
         const size_t elem_size = ssbo_it != pipeline.ssbos.end() ? ssbo_it->second.size : 0;
         size_t upload_bytes = 0;
@@ -299,19 +258,16 @@ void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, uint32_t swapchain_image
             upload_bytes = std::max(upload_bytes,
                 (batch_info.instance_offset + batch_info.instance_count) * elem_size);
         }
-        if (ssbo_it != pipeline.ssbos.end()) {
-            ctx->sync_ssbo(ssbo_it->second, batch.buffer.get(), swapchain_image_idx,
-                static_cast<uint32_t>(upload_bytes));
-        }
+        ctx->sync_ssbo(pipeline_name, SSBOType_InstanceAttrs, batch.buffer.get(),
+            swapchain_image_idx, static_cast<uint32_t>(upload_bytes));
 
+        if (!ctx->bind(cmd, pipeline_name, swapchain_image_idx)) {
+            continue;
+        }
         for (const auto& batch_info : batch.batch_infos) {
-            ctx->draw_mesh_instanced(
-                cmd,
-                batch_info.mesh_name,
-                *pipeline.vk_pipeline_layout,
+            ctx->draw(cmd, pipeline_name, batch_info.mesh_name,
                 static_cast<uint32_t>(batch_info.instance_count),
-                static_cast<uint32_t>(batch_info.instance_offset),
-                descriptor_set);
+                static_cast<uint32_t>(batch_info.instance_offset));
         }
     }
 }

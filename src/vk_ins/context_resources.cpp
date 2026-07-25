@@ -197,6 +197,45 @@ void Context::sync_uniform(const vk::raii::DeviceMemory& memo, const void* data,
     memo.unmapMemory();
 }
 
+bool Context::sync_ubo(const std::string& pipeline_name, UBOType type, const void* data,
+    uint32_t frame_idx, uint32_t byte_size) const
+{
+    if (data == nullptr) {
+        return false;
+    }
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end()) {
+        return false;
+    }
+    const auto ubo_it = pipeline_it->second.ubos.find(type);
+    if (ubo_it == pipeline_it->second.ubos.end() || frame_idx >= ubo_it->second.memos.size()) {
+        return false;
+    }
+    const auto& ubo = ubo_it->second;
+    const auto capacity = static_cast<uint32_t>(ubo.size * ubo.vecsize);
+    const auto upload_size = byte_size == 0 ? capacity : std::min(byte_size, capacity);
+    if (upload_size == 0) {
+        return false;
+    }
+    sync_uniform(ubo.memos[frame_idx], data, upload_size);
+    return true;
+}
+
+bool Context::sync_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
+    uint32_t frame_idx, uint32_t byte_size) const
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    if (pipeline_it == pipelines.end()) {
+        return false;
+    }
+    const auto ssbo_it = pipeline_it->second.ssbos.find(type);
+    if (ssbo_it == pipeline_it->second.ssbos.end()) {
+        return false;
+    }
+    sync_ssbo(ssbo_it->second, data, frame_idx, byte_size);
+    return true;
+}
+
 void Context::sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size) const {
     if (data == nullptr || ssbo.gpu_bufs.empty() || swapchain_idx >= ssbo.gpu_bufs.size()) {
         return;
@@ -721,12 +760,12 @@ bool Context::bind_pipeline_depth_attachment(const std::string& pipeline_name, u
     }
 
     auto& attachment = depth_attachments[attachment_index];
-    if (!*attachment.sampler || !*attachment.sampleView) {
+    if (!*attachment.sampler || !*attachment.view) {
         return false;
     }
 
     attachment.descriptor = vk::DescriptorImageInfo{
-        *attachment.sampler, *attachment.sampleView, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
 
     std::vector<vk::DescriptorImageInfo> image_infos(
         pipeline.descriptor_sets.size(), attachment.descriptor);
@@ -771,13 +810,16 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
     DepthAttachment attachment{};
     attachment.width = attachment_width;
     attachment.height = attachment_height;
-    attachment.format = format == vk::Format::eUndefined ? find_depth_format() : format;
-    attachment.aspect_mask = vk::ImageAspectFlagBits::eDepth;
+    // Prefer depth-only formats so one ImageView is valid for both attachment and sampling.
+    attachment.format = format == vk::Format::eUndefined ? find_depth_only_format() : format;
     if (attachment.format == vk::Format::eD32SfloatS8Uint
         || attachment.format == vk::Format::eD24UnormS8Uint)
     {
-        attachment.aspect_mask |= vk::ImageAspectFlagBits::eStencil;
+        std::cout << "add_depth_attachment requires a depth-only format "
+            "(packed depth+stencil formats need a separate sample view)" << std::endl;
+        return false;
     }
+    attachment.aspect_mask = vk::ImageAspectFlagBits::eDepth;
 
     std::tie(attachment.image, attachment.memo) = create_vk_image(
         attachment.width,
@@ -793,12 +835,6 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
         attachment.format,
         1,
         attachment.aspect_mask);
-    // Sampler must use a depth-only view; Depth|Stencil aspect views are illegal for sampling.
-    attachment.sampleView = create_vk_imageview(
-        attachment.image,
-        attachment.format,
-        1,
-        vk::ImageAspectFlagBits::eDepth);
     attachment.sampler = create_vk_sampler(
         vk::Filter::eLinear,
         vk::Filter::eLinear,
@@ -809,7 +845,7 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
         vk::CompareOp::eLessOrEqual);
     attachment.layout = vk::ImageLayout::eUndefined;
     attachment.descriptor = vk::DescriptorImageInfo{
-        *attachment.sampler, *attachment.sampleView, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
     depth_attachments.emplace_back(std::move(attachment));
     return true;
 }

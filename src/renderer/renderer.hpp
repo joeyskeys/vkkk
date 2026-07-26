@@ -60,23 +60,23 @@ public:
         const std::vector<VERT_COMP>& components = {});
 
     template <typename T>
-    void sync_uniform(const UBOType type, const uint32_t swapchain_idx,
+    void sync_uniform(const std::string& block_name, const uint32_t swapchain_idx,
         const T* ubo_data,
         const std::string& pipeline_name)
     {
         if (!ctx) {
             return;
         }
-        ctx->sync_ubo(pipeline_name, type, ubo_data, swapchain_idx);
+        ctx->sync_ubo(pipeline_name, block_name, ubo_data, swapchain_idx);
     }
 
     void sync_ssbo(const void* ssbo_data, const std::string& pipeline_name,
-        uint32_t swapchain_idx, uint32_t byte_size = 0)
+        const std::string& block_name, uint32_t swapchain_idx, uint32_t byte_size = 0)
     {
         if (!ctx) {
             return;
         }
-        ctx->sync_ssbo(pipeline_name, SSBOType_InstanceAttrs, ssbo_data, swapchain_idx, byte_size);
+        ctx->sync_ssbo(pipeline_name, block_name, ssbo_data, swapchain_idx, byte_size);
     }
 
     void sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, const std::string& pipeline_name);

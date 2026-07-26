@@ -10,98 +10,6 @@
 namespace vkkk
 {
 
-namespace {
-
-bool resolve_ubo_type(const std::string& reflected_name, UBOType& out_type) {
-    // Match GLSL block/type names from reflection (get_name(base_type_id)).
-    if (reflected_name == "CameraUBO"
-        || reflected_name == "UniformBufferObject"
-        || reflected_name == "Camera")
-    {
-        out_type = UBOType_Camera;
-        return true;
-    }
-    if (reflected_name == "PointLightUBO" || reflected_name == "PhongLight") {
-        out_type = UBOType_PointLight;
-        return true;
-    }
-    if (reflected_name == "DirectionalLightUBO") {
-        out_type = UBOType_DirectionalLight;
-        return true;
-    }
-    if (reflected_name == "SpotLightUBO") {
-        out_type = UBOType_SpotLight;
-        return true;
-    }
-    if (reflected_name == "LightClusterParams") {
-        out_type = UBOType_LightClusterParams;
-        return true;
-    }
-    if (reflected_name == "LineGenMeshInfo") {
-        out_type = UBOType_LineGenMeshInfo;
-        return true;
-    }
-    if (reflected_name == "ShadowResolve") {
-        out_type = UBOType_ShadowResolve;
-        return true;
-    }
-    if (reflected_name == "MainDirectionalShadow") {
-        out_type = UBOType_MainDirectionalShadow;
-        return true;
-    }
-    return false;
-}
-
-bool resolve_ssbo_type(const std::string& reflected_name, SSBOType& out_type) {
-    // Match GLSL block/type names from reflection (get_name(base_type_id)).
-    if (reflected_name == "PhongInstanceAttrs"
-        || reflected_name == "PhongPlusInstanceAttrs"
-        || reflected_name == "InstanceAttrs")
-    {
-        out_type = SSBOType_InstanceAttrs;
-        return true;
-    }
-    if (reflected_name == "PointLights") {
-        out_type = SSBOType_PointLights;
-        return true;
-    }
-    if (reflected_name == "ClusterGrid") {
-        out_type = SSBOType_ClusterGrid;
-        return true;
-    }
-    if (reflected_name == "ClusterLightIndices") {
-        out_type = SSBOType_ClusterLightIndices;
-        return true;
-    }
-    if (reflected_name == "Vertices") {
-        out_type = SSBOType_Vertices;
-        return true;
-    }
-    if (reflected_name == "Indices") {
-        out_type = SSBOType_Indices;
-        return true;
-    }
-    if (reflected_name == "LineGenParams") {
-        out_type = SSBOType_LineGenParams;
-        return true;
-    }
-    if (reflected_name == "MainDirectionalShadow") {
-        out_type = SSBOType_MainDirectionalShadow;
-        return true;
-    }
-    if (reflected_name == "MeshPositions") {
-        out_type = SSBOType_ShadowResolveMeshVertices;
-        return true;
-    }
-    if (reflected_name == "MeshIndices") {
-        out_type = SSBOType_ShadowResolveMeshIndices;
-        return true;
-    }
-    return false;
-}
-
-} // namespace
-
 static std::vector<vk::VertexInputBindingDescription> gen_binding_desc(const std::vector<VERT_COMP>& comps, bool interleaved) {
     // a vertex binding itself being interleaved or not is irrelavent to others
     // the mesh format can be quite flexible, for example, vertices being a single buf,
@@ -135,12 +43,12 @@ bool Context::create_pipeline(const std::string& name,
     std::vector<vk::VertexInputBindingDescription> input_binding_descs;
     std::vector<vk::VertexInputAttributeDescription> input_attr_descs;
     std::map<uint32_t, vk::DescriptorSetLayoutBinding> descriptor_bindings;
-    std::map<uint32_t, UBOType> ubo_binding_to_type;
-    std::map<uint32_t, SSBOType> storage_binding_to_type;
+    std::map<uint32_t, std::string> ubo_binding_to_name;
+    std::map<uint32_t, std::string> storage_binding_to_name;
     std::map<uint32_t, std::string> tex_binding_to_name;
     std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
-    std::unordered_map<UBOType, UBO> pipeline_ubos;
-    std::unordered_map<SSBOType, SSBO> pipeline_ssbos;
+    std::unordered_map<std::string, UBO> pipeline_ubos;
+    std::unordered_map<std::string, SSBO> pipeline_ssbos;
     const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eTaskEXT);
@@ -216,14 +124,9 @@ bool Context::create_pipeline(const std::string& name,
 
         for (const auto& [ubo_name, ubo_info] : module.buf_infos) {
             const auto& [struct_size, array_size, binding] = ubo_info;
-            UBOType ubo_type{};
-            if (!resolve_ubo_type(ubo_name, ubo_type)) {
-                assert(false && "Unsupported UBO type in create_pipeline reflection.");
-                continue;
-            }
             const uint32_t alloc_size = struct_size == 0 ? 16u : struct_size;
-            add_ubo(pipeline_ubos, ubo_type, binding, alloc_size, array_size);
-            ubo_binding_to_type[binding] = ubo_type;
+            add_ubo(pipeline_ubos, ubo_name, binding, alloc_size, array_size);
+            ubo_binding_to_name[binding] = ubo_name;
 
             vk::DescriptorSetLayoutBinding layout_binding{};
             layout_binding.binding = binding;
@@ -235,22 +138,15 @@ bool Context::create_pipeline(const std::string& name,
 
         if (!module.storage_buf_infos.empty()) {
             for (const auto& [ssbo_name, ssbo_info] : module.storage_buf_infos) {
-                SSBOType ssbo_type{};
-                if (!resolve_ssbo_type(ssbo_name, ssbo_type)) {
-                    std::cout << "Unsupported SSBO type " << ssbo_name
-                        << " in pipeline " << name << std::endl;
-                    return false;
-                }
-
                 const auto& [struct_size, array_size, binding] = ssbo_info;
-                const auto existing = pipeline_ssbos.find(ssbo_type);
+                const auto existing = pipeline_ssbos.find(ssbo_name);
                 if (existing == pipeline_ssbos.end()) {
                     SSBO ssbo{};
                     ssbo.size = struct_size == 0 ? 16u : struct_size;
                     ssbo.vecsize = array_size;
                     ssbo.binding = binding;
                     ssbo.descriptor_type = vk::DescriptorType::eStorageBuffer;
-                    pipeline_ssbos.emplace(ssbo_type, std::move(ssbo));
+                    pipeline_ssbos.emplace(ssbo_name, std::move(ssbo));
                 }
                 else if (existing->second.binding != binding) {
                     std::cout << "SSBO " << ssbo_name << " uses inconsistent bindings in pipeline "
@@ -258,7 +154,7 @@ bool Context::create_pipeline(const std::string& name,
                     return false;
                 }
 
-                storage_binding_to_type[binding] = ssbo_type;
+                storage_binding_to_name[binding] = ssbo_name;
                 vk::DescriptorSetLayoutBinding layout_binding{};
                 layout_binding.binding = binding;
                 layout_binding.descriptorType = vk::DescriptorType::eStorageBuffer;
@@ -395,16 +291,16 @@ bool Context::create_pipeline(const std::string& name,
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     uint32_t uniform_desc_count = 0;
-    for (const auto& [binding, ubo_type] : ubo_binding_to_type) {
+    for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
         (void)binding;
-        const auto ubo_found = pipeline.ubos.find(ubo_type);
+        const auto ubo_found = pipeline.ubos.find(ubo_name);
         assert(ubo_found != pipeline.ubos.end());
         uniform_desc_count += static_cast<uint32_t>(ubo_found->second.vecsize);
     }
     uint32_t storage_desc_count = 0;
-    for (const auto& [binding, ssbo_type] : storage_binding_to_type) {
+    for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
         (void)binding;
-        const auto ssbo_found = pipeline.ssbos.find(ssbo_type);
+        const auto ssbo_found = pipeline.ssbos.find(ssbo_name);
         assert(ssbo_found != pipeline.ssbos.end());
         storage_desc_count += 1;
     }
@@ -453,13 +349,13 @@ bool Context::create_pipeline(const std::string& name,
             std::vector<vk::DescriptorBufferInfo> buffer_infos;
             std::vector<vk::DescriptorImageInfo> image_infos;
             std::vector<vk::WriteDescriptorSet> writes;
-            buffer_infos.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size());
+            buffer_infos.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size());
             image_infos.reserve(pipeline.sampler_descriptor_counts.size());
-            writes.reserve(ubo_binding_to_type.size() + storage_binding_to_type.size()
+            writes.reserve(ubo_binding_to_name.size() + storage_binding_to_name.size()
                 + pipeline.sampler_descriptor_counts.size());
 
-            for (const auto& [binding, ubo_type] : ubo_binding_to_type) {
-                const auto ubo_found = pipeline.ubos.find(ubo_type);
+            for (const auto& [binding, ubo_name] : ubo_binding_to_name) {
+                const auto ubo_found = pipeline.ubos.find(ubo_name);
                 assert(ubo_found != pipeline.ubos.end());
                 auto& ubo = ubo_found->second;
                 vk::DescriptorBufferInfo buffer_info{};
@@ -476,8 +372,8 @@ bool Context::create_pipeline(const std::string& name,
                 writes.push_back(write);
             }
 
-            for (const auto& [binding, ssbo_type] : storage_binding_to_type) {
-                const auto ssbo_found = pipeline.ssbos.find(ssbo_type);
+            for (const auto& [binding, ssbo_name] : storage_binding_to_name) {
+                const auto ssbo_found = pipeline.ssbos.find(ssbo_name);
                 assert(ssbo_found != pipeline.ssbos.end());
                 const auto& ssbo = ssbo_found->second;
                 if (ssbo.uses_borrowed_descriptors) {

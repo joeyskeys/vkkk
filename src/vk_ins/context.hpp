@@ -110,8 +110,9 @@ struct Pipeline {
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
     bool uses_mesh_shader = false;
 
-    std::unordered_map<UBOType, UBO> ubos;
-    std::unordered_map<SSBOType, SSBO> ssbos;
+    // Keys are reflected GLSL block/type names from SPIR-V.
+    std::unordered_map<std::string, UBO> ubos;
+    std::unordered_map<std::string, SSBO> ssbos;
     std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
 };
 
@@ -268,32 +269,28 @@ public:
     void draw_frame();
 
     // GPU buffers and descriptors
-    bool add_ubo(std::unordered_map<UBOType, UBO>& ubos, UBOType type, uint32_t binding,
-        uint32_t size, uint32_t vecsize = 1,
-        vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
-        vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
     bool add_ubo(std::unordered_map<std::string, UBO>& ubos, const std::string& name, uint32_t binding,
         uint32_t size, uint32_t vecsize = 1,
         vk::BufferUsageFlags usage = vk::BufferUsageFlagBits::eUniformBuffer,
         vk::DescriptorType descriptor_type = vk::DescriptorType::eUniformBuffer);
     void sync_uniform(const vk::raii::DeviceMemory& memo, const void* data, uint32_t size) const;
     void sync_ssbo(const SSBO& ssbo, const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
-    // Typed sync helpers: look up pipeline resources by name/type (no DeviceMemory poking).
-    bool sync_ubo(const std::string& pipeline_name, UBOType type, const void* data,
+    // Sync by reflected GLSL block/type name (allocated from SPIR-V sizes at create_pipeline).
+    bool sync_ubo(const std::string& pipeline_name, const std::string& block_name, const void* data,
         uint32_t frame_idx, uint32_t byte_size = 0) const;
-    bool sync_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
+    bool sync_ssbo(const std::string& pipeline_name, const std::string& block_name, const void* data,
         uint32_t frame_idx, uint32_t byte_size = 0) const;
     // Bind graphics pipeline + per-frame descriptor set.
     bool bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const;
     // Draw a named mesh. Call bind() first for the same pipeline/frame.
     bool draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
         uint32_t instance_count, uint32_t instance_offset = 0) const;
-    bool alloc_pipeline_ssbo(const std::string& pipeline_name);
-    bool resize_pipeline_ssbo(const std::string& pipeline_name, size_t new_vecsize);
-    bool alloc_pipeline_ssbo(const std::string& pipeline_name, SSBOType type);
-    bool resize_pipeline_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
-    bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name, SSBOType graphics_type,
-        const std::string& compute_pipeline_name, SSBOType compute_type);
+    bool alloc_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name);
+    bool resize_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name,
+        size_t new_vecsize);
+    bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name,
+        const std::string& graphics_block_name, const std::string& compute_pipeline_name,
+        const std::string& compute_block_name);
     // Bind a sampleable render target to a reflected combined-image-sampler binding.
     bool bind_pipeline_render_target(const std::string& pipeline_name, uint32_t binding,
         uint32_t target_index);
@@ -306,10 +303,11 @@ public:
     bool resize_compute_ssbo(const std::string& full_name, size_t new_vecsize);
     bool sync_compute_ssbo(const std::string& full_name, const void* data,
         uint32_t swapchain_idx, uint32_t byte_size = 0) const;
-    bool alloc_compute_ssbo(const std::string& pipeline_name, SSBOType type);
-    bool resize_compute_ssbo(const std::string& pipeline_name, SSBOType type, size_t new_vecsize);
-    bool sync_compute_ssbo(const std::string& pipeline_name, SSBOType type, const void* data,
-        uint32_t swapchain_idx, uint32_t byte_size = 0) const;
+    bool alloc_compute_ssbo(const std::string& pipeline_name, const std::string& block_name);
+    bool resize_compute_ssbo(const std::string& pipeline_name, const std::string& block_name,
+        size_t new_vecsize);
+    bool sync_compute_ssbo(const std::string& pipeline_name, const std::string& block_name,
+        const void* data, uint32_t swapchain_idx, uint32_t byte_size = 0) const;
     UBO& require_ubo(const std::string& full_name);
     const SSBO& require_compute_ssbo(const std::string& full_name) const;
 

@@ -162,8 +162,8 @@ int main() {
             "cornell_cube", pipeline_name, attr_size, reinterpret_cast<const char*>(&attrs[i]));
     }
     renderer.allocate_ssbo();
-    if (!ctx.resize_pipeline_ssbo(pipeline_name, vkkk::SSBOType_InstanceAttrs, std::size(attrs))
-        || !ctx.alloc_pipeline_ssbo(pipeline_name, vkkk::SSBOType_InstanceAttrs))
+    if (!ctx.resize_pipeline_ssbo(pipeline_name, vkkk::buf::PhongInstanceAttrs, std::size(attrs))
+        || !ctx.alloc_pipeline_ssbo(pipeline_name, vkkk::buf::PhongInstanceAttrs))
     {
         throw std::runtime_error("failed to allocate instance attributes");
     }

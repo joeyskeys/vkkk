@@ -9,29 +9,26 @@
 namespace vkkk
 {
 
-enum UBOType {
-    UBOType_Camera,
-    UBOType_PointLight,
-    UBOType_DirectionalLight,
-    UBOType_SpotLight,
-    UBOType_LightClusterParams,
-    UBOType_LineGenMeshInfo,
-    UBOType_ShadowResolve,
-    UBOType_MainDirectionalShadow
-};
+// Reflected GLSL block/type names used as Context UBO/SSBO keys (Option E).
+// Keep these equal to the shader `uniform` / `buffer` block type names.
+namespace buf {
+inline constexpr const char* CameraUBO = "CameraUBO";
+inline constexpr const char* PointLightUBO = "PointLightUBO";
+inline constexpr const char* DirectionalLightUBO = "DirectionalLightUBO";
+inline constexpr const char* SpotLightUBO = "SpotLightUBO";
+inline constexpr const char* LightClusterParams = "LightClusterParams";
+inline constexpr const char* LineGenMeshInfo = "LineGenMeshInfo";
+inline constexpr const char* ShadowResolve = "ShadowResolve";
+inline constexpr const char* MainDirectionalShadow = "MainDirectionalShadow";
 
-enum SSBOType {
-    SSBOType_InstanceAttrs,
-    SSBOType_PointLights,
-    SSBOType_ClusterGrid,
-    SSBOType_ClusterLightIndices,
-    SSBOType_Vertices,
-    SSBOType_Indices,
-    SSBOType_LineGenParams,
-    SSBOType_MainDirectionalShadow,
-    SSBOType_ShadowResolveMeshVertices,
-    SSBOType_ShadowResolveMeshIndices
-};
+inline constexpr const char* PhongInstanceAttrs = "PhongInstanceAttrs";
+inline constexpr const char* PointLights = "PointLights";
+inline constexpr const char* ClusterGrid = "ClusterGrid";
+inline constexpr const char* ClusterLightIndices = "ClusterLightIndices";
+inline constexpr const char* Vertices = "Vertices";
+inline constexpr const char* Indices = "Indices";
+inline constexpr const char* LineGenParams = "LineGenParams";
+}
 
 struct CameraUBO : public Sizeable<CameraUBO> {
     glm::mat4 view{1.0f};

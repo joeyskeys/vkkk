@@ -75,30 +75,23 @@ void Renderer::sync_uniforms(const uint32_t swapchain_idx, const Scene* scene, c
         return;
     }
 
+    const auto& ubos = pipeline_it->second.ubos;
     const auto* light_storage = scene->light_mgr->pipeline_storage(pipeline_name);
-    for (const auto& [ubo_type, ubo] : pipeline_it->second.ubos) {
-        (void)ubo;
-        switch (ubo_type) {
-            case UBOType_Camera:
-                sync_uniform(ubo_type, swapchain_idx, &(scene->camera->ubo_data), pipeline_name);
-                break;
-            case UBOType_PointLight:
-                if (light_storage != nullptr && !light_storage->pt_lights.empty()) {
-                    sync_uniform(ubo_type, swapchain_idx, light_storage->pt_lights.data(), pipeline_name);
-                }
-                break;
-            case UBOType_DirectionalLight:
-                if (light_storage != nullptr && !light_storage->dir_lights.empty()) {
-                    sync_uniform(ubo_type, swapchain_idx, light_storage->dir_lights.data(), pipeline_name);
-                }
-                break;
-            case UBOType_SpotLight:
-                if (light_storage != nullptr && !light_storage->spot_lights.empty()) {
-                    sync_uniform(ubo_type, swapchain_idx, light_storage->spot_lights.data(), pipeline_name);
-                }
-                break;
-            default:
-                break;
+
+    if (ubos.contains(buf::CameraUBO)) {
+        sync_uniform(buf::CameraUBO, swapchain_idx, &(scene->camera->ubo_data), pipeline_name);
+    }
+    if (light_storage != nullptr) {
+        if (ubos.contains(buf::PointLightUBO) && !light_storage->pt_lights.empty()) {
+            sync_uniform(buf::PointLightUBO, swapchain_idx, light_storage->pt_lights.data(), pipeline_name);
+        }
+        if (ubos.contains(buf::DirectionalLightUBO) && !light_storage->dir_lights.empty()) {
+            sync_uniform(buf::DirectionalLightUBO, swapchain_idx, light_storage->dir_lights.data(),
+                pipeline_name);
+        }
+        if (ubos.contains(buf::SpotLightUBO) && !light_storage->spot_lights.empty()) {
+            sync_uniform(buf::SpotLightUBO, swapchain_idx, light_storage->spot_lights.data(),
+                pipeline_name);
         }
     }
 }

@@ -124,12 +124,13 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
     const std::string params_name = std::string(light_cluster_pipeline_name) + ":LightClusterParams";
 
     const size_t point_light_capacity = std::max(light_storage->pt_lights.size(), size_t{1});
-    if (!ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_PointLights, point_light_capacity)
-        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterGrid, cluster_count)
-        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterLightIndices, light_index_capacity)
-        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_PointLights)
-        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterGrid)
-        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, SSBOType_ClusterLightIndices))
+    if (!ctx->resize_compute_ssbo(light_cluster_pipeline_name, buf::PointLights, point_light_capacity)
+        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, buf::ClusterGrid, cluster_count)
+        || !ctx->resize_compute_ssbo(light_cluster_pipeline_name, buf::ClusterLightIndices,
+            light_index_capacity)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, buf::PointLights)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, buf::ClusterGrid)
+        || !ctx->alloc_compute_ssbo(light_cluster_pipeline_name, buf::ClusterLightIndices))
     {
         return;
     }
@@ -141,20 +142,20 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
                 continue;
             }
             const auto& ssbos = pipeline_it->second.ssbos;
-            if (ssbos.contains(SSBOType_PointLights)) {
+            if (ssbos.contains(buf::PointLights)) {
                 ctx->bind_pipeline_ssbo_from_compute(
-                    pipeline_name, SSBOType_PointLights,
-                    light_cluster_pipeline_name, SSBOType_PointLights);
+                    pipeline_name, buf::PointLights,
+                    light_cluster_pipeline_name, buf::PointLights);
             }
-            if (ssbos.contains(SSBOType_ClusterGrid)) {
+            if (ssbos.contains(buf::ClusterGrid)) {
                 ctx->bind_pipeline_ssbo_from_compute(
-                    pipeline_name, SSBOType_ClusterGrid,
-                    light_cluster_pipeline_name, SSBOType_ClusterGrid);
+                    pipeline_name, buf::ClusterGrid,
+                    light_cluster_pipeline_name, buf::ClusterGrid);
             }
-            if (ssbos.contains(SSBOType_ClusterLightIndices)) {
+            if (ssbos.contains(buf::ClusterLightIndices)) {
                 ctx->bind_pipeline_ssbo_from_compute(
-                    pipeline_name, SSBOType_ClusterLightIndices,
-                    light_cluster_pipeline_name, SSBOType_ClusterLightIndices);
+                    pipeline_name, buf::ClusterLightIndices,
+                    light_cluster_pipeline_name, buf::ClusterLightIndices);
             }
         }
     };
@@ -169,7 +170,7 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
         light_storage->pt_lights.size() * sizeof(PointLightUBO));
     if (!ctx->sync_compute_ssbo(
             light_cluster_pipeline_name,
-            SSBOType_PointLights,
+            buf::PointLights,
             light_data,
             swapchain_image_idx,
             light_bytes))
@@ -200,7 +201,7 @@ void ForwardPRenderer::prepare_light_clusters(vk::CommandBuffer cmd, const uint3
 
     const auto sync_graphics_cluster_params = [&](const Batches& batches) {
         for (const auto& [pipeline_name, _] : batches) {
-            ctx->sync_ubo(pipeline_name, UBOType_LightClusterParams, &params,
+            ctx->sync_ubo(pipeline_name, buf::LightClusterParams, &params,
                 swapchain_image_idx, static_cast<uint32_t>(sizeof(params)));
         }
     };
@@ -234,14 +235,14 @@ void ForwardPRenderer::draw_batch(vk::CommandBuffer cmd, const uint32_t swapchai
         sync_uniforms(swapchain_image_idx, scene, pipeline_name);
 
         const auto& pipeline = ctx->pipelines.at(pipeline_name);
-        const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+        const auto ssbo_it = pipeline.ssbos.find(buf::PhongInstanceAttrs);
         const size_t elem_size = ssbo_it != pipeline.ssbos.end() ? ssbo_it->second.size : 0;
         size_t upload_bytes = 0;
         for (const auto& batch_info : batch.batch_infos) {
             upload_bytes = std::max(upload_bytes,
                 (batch_info.instance_offset + batch_info.instance_count) * elem_size);
         }
-        sync_ssbo(batch.buffer.get(), pipeline_name, swapchain_image_idx,
+        sync_ssbo(batch.buffer.get(), pipeline_name, buf::PhongInstanceAttrs, swapchain_image_idx,
             static_cast<uint32_t>(upload_bytes));
 
         if (!ctx->bind(cmd, pipeline_name, swapchain_image_idx)) {

@@ -184,8 +184,8 @@ int main() {
     }
 
     const auto allocate_instance_ssbo = [&](const char* name, size_t instance_count) {
-        return ctx.resize_pipeline_ssbo(name, vkkk::SSBOType_LineGenParams, instance_count)
-            && ctx.alloc_pipeline_ssbo(name, vkkk::SSBOType_LineGenParams);
+        return ctx.resize_pipeline_ssbo(name, vkkk::buf::LineGenParams, instance_count)
+            && ctx.alloc_pipeline_ssbo(name, vkkk::buf::LineGenParams);
     };
     if (!allocate_instance_ssbo(plane_pipeline_name, plane_instances.size())
         || !allocate_instance_ssbo(cube_pipeline_name, cube_instances.size()))
@@ -246,9 +246,9 @@ int main() {
                 }
 
                 const auto& pipeline = pipeline_it->second;
-                const auto camera_ubo_it = pipeline.ubos.find(vkkk::UBOType_Camera);
-                const auto mesh_info_ubo_it = pipeline.ubos.find(vkkk::UBOType_LineGenMeshInfo);
-                const auto instance_ssbo_it = pipeline.ssbos.find(vkkk::SSBOType_LineGenParams);
+                const auto camera_ubo_it = pipeline.ubos.find(vkkk::buf::CameraUBO);
+                const auto mesh_info_ubo_it = pipeline.ubos.find(vkkk::buf::LineGenMeshInfo);
+                const auto instance_ssbo_it = pipeline.ssbos.find(vkkk::buf::LineGenParams);
                 if (camera_ubo_it == pipeline.ubos.end()
                     || mesh_info_ubo_it == pipeline.ubos.end()
                     || instance_ssbo_it == pipeline.ssbos.end()
@@ -263,17 +263,11 @@ int main() {
                 mesh_info.vertex_stride_floats = 6;
                 mesh_info.index_count = index_count;
                 mesh_info.instance_count = static_cast<uint32_t>(instance_params.size());
-                ctx.sync_uniform(
-                    camera_ubo_it->second.memos[swapchain_index],
-                    &camera.ubo_data,
+                ctx.sync_ubo(pipeline_name, vkkk::buf::CameraUBO, &camera.ubo_data, swapchain_index,
                     static_cast<uint32_t>(sizeof(camera.ubo_data)));
-                ctx.sync_uniform(
-                    mesh_info_ubo_it->second.memos[swapchain_index],
-                    &mesh_info,
+                ctx.sync_ubo(pipeline_name, vkkk::buf::LineGenMeshInfo, &mesh_info, swapchain_index,
                     static_cast<uint32_t>(sizeof(mesh_info)));
-                ctx.sync_ssbo(
-                    instance_ssbo_it->second,
-                    instance_params.data(),
+                ctx.sync_ssbo(pipeline_name, vkkk::buf::LineGenParams, instance_params.data(),
                     swapchain_index,
                     static_cast<uint32_t>(instance_params.size() * sizeof(vkkk::LineGenParamsUBO)));
 

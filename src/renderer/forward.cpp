@@ -144,8 +144,9 @@ void ForwardRenderer::allocate_ssbo() {
             }
             const size_t instance_count =
                 batch.batch_infos.back().instance_offset + batch.batch_infos.back().instance_count;
-            ctx->resize_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs, std::max(instance_count, size_t{1}));
-            ctx->alloc_pipeline_ssbo(pipeline_name, SSBOType_InstanceAttrs);
+            ctx->resize_pipeline_ssbo(pipeline_name, buf::PhongInstanceAttrs,
+                std::max(instance_count, size_t{1}));
+            ctx->alloc_pipeline_ssbo(pipeline_name, buf::PhongInstanceAttrs);
         }
     };
     alloc_instance_ssbo(opaqueBatches);
@@ -153,8 +154,8 @@ void ForwardRenderer::allocate_ssbo() {
 
     const size_t shadow_instance_count = shadowBatchInfos.empty() ? 1
         : shadowBatchInfos.back().instance_offset + shadowBatchInfos.back().instance_count;
-    ctx->resize_pipeline_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs, shadow_instance_count);
-    ctx->alloc_pipeline_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs);
+    ctx->resize_pipeline_ssbo(kShadowDepthPipeline, buf::PhongInstanceAttrs, shadow_instance_count);
+    ctx->alloc_pipeline_ssbo(kShadowDepthPipeline, buf::PhongInstanceAttrs);
 }
 
 void ForwardRenderer::update_main_directional_shadow() {
@@ -195,11 +196,9 @@ void ForwardRenderer::sync_shadow_resources(uint32_t swapchain_image_idx) {
     }
 
     const auto sync_pipeline_shadow = [&](const std::string& pipeline_name) {
-        ctx->sync_ubo(pipeline_name, UBOType_MainDirectionalShadow, &mainDirectionalShadow,
+        ctx->sync_ubo(pipeline_name, buf::MainDirectionalShadow, &mainDirectionalShadow,
             swapchain_image_idx, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
-        ctx->sync_ssbo(pipeline_name, SSBOType_MainDirectionalShadow, &mainDirectionalShadow,
-            swapchain_image_idx, static_cast<uint32_t>(sizeof(mainDirectionalShadow)));
-        ctx->sync_ubo(pipeline_name, UBOType_ShadowResolve, &shadowResolve,
+        ctx->sync_ubo(pipeline_name, buf::ShadowResolve, &shadowResolve,
             swapchain_image_idx, static_cast<uint32_t>(sizeof(shadowResolve)));
     };
 
@@ -209,7 +208,7 @@ void ForwardRenderer::sync_shadow_resources(uint32_t swapchain_image_idx) {
     }
 
     if (!shadowInstanceData.empty()) {
-        ctx->sync_ssbo(kShadowDepthPipeline, SSBOType_InstanceAttrs, shadowInstanceData.data(),
+        ctx->sync_ssbo(kShadowDepthPipeline, buf::PhongInstanceAttrs, shadowInstanceData.data(),
             swapchain_image_idx, static_cast<uint32_t>(shadowInstanceData.size()));
     }
 }
@@ -251,14 +250,14 @@ void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, uint32_t swapchain_image
         sync_uniforms(swapchain_image_idx, scene, pipeline_name);
 
         const auto& pipeline = ctx->pipelines.at(pipeline_name);
-        const auto ssbo_it = pipeline.ssbos.find(SSBOType_InstanceAttrs);
+        const auto ssbo_it = pipeline.ssbos.find(buf::PhongInstanceAttrs);
         const size_t elem_size = ssbo_it != pipeline.ssbos.end() ? ssbo_it->second.size : 0;
         size_t upload_bytes = 0;
         for (const auto& batch_info : batch.batch_infos) {
             upload_bytes = std::max(upload_bytes,
                 (batch_info.instance_offset + batch_info.instance_count) * elem_size);
         }
-        ctx->sync_ssbo(pipeline_name, SSBOType_InstanceAttrs, batch.buffer.get(),
+        ctx->sync_ssbo(pipeline_name, buf::PhongInstanceAttrs, batch.buffer.get(),
             swapchain_image_idx, static_cast<uint32_t>(upload_bytes));
 
         if (!ctx->bind(cmd, pipeline_name, swapchain_image_idx)) {

@@ -137,48 +137,218 @@ bool Context::record_compute(vk::CommandBuffer cmd, const std::string& pipeline_
     return true;
 }
 
-bool Context::record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachment_index,
-    const std::function<void(vk::raii::CommandBuffer&)>& emit_func)
-{
-    if (attachment_index >= depth_attachments.size() || !emit_func) {
-        return false;
+namespace {
+
+vk::AttachmentLoadOp to_vk_load_op(PassLoadOp op) {
+    switch (op) {
+    case PassLoadOp::Load: return vk::AttachmentLoadOp::eLoad;
+    case PassLoadOp::DontCare: return vk::AttachmentLoadOp::eDontCare;
+    case PassLoadOp::Clear:
+    default: return vk::AttachmentLoadOp::eClear;
+    }
+}
+
+vk::AttachmentStoreOp to_vk_store_op(PassStoreOp op) {
+    switch (op) {
+    case PassStoreOp::DontCare: return vk::AttachmentStoreOp::eDontCare;
+    case PassStoreOp::Store:
+    default: return vk::AttachmentStoreOp::eStore;
+    }
+}
+
+} // namespace
+
+void Context::begin_cmds(uint32_t image_index) {
+    auto& cmd = command_buffers[image_index];
+    cmd.reset({});
+    cmd.begin({});
+}
+
+void Context::end_cmds(uint32_t image_index) {
+    command_buffers[image_index].end();
+}
+
+void Context::begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass) {
+    if (image_index >= swapchain_images.size()) {
+        throw std::runtime_error("begin_pass: image_index out of range");
     }
 
-    auto& attachment = depth_attachments[attachment_index];
-    const vk::Image depth_image_handle = *attachment.image;
-    const vk::ImageAspectFlags aspect_mask = attachment.aspect_mask;
-    const vk::ImageLayout old_layout = attachment.initialized
-        ? attachment.layout : vk::ImageLayout::eUndefined;
+    std::vector<vk::RenderingAttachmentInfo> color_infos;
+    color_infos.reserve(pass.colors.size());
+    vk::Extent2D render_extent{0, 0};
 
-    transit_presentation_image_layout(
-        cmd,
-        depth_image_handle,
-        old_layout,
-        vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        old_layout == vk::ImageLayout::eDepthStencilReadOnlyOptimal
-            ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
-        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-        old_layout == vk::ImageLayout::eDepthStencilReadOnlyOptimal
-            ? vk::PipelineStageFlagBits2::eFragmentShader
-            : vk::PipelineStageFlagBits2::eTopOfPipe,
-        vk::PipelineStageFlagBits2::eEarlyFragmentTests
-            | vk::PipelineStageFlagBits2::eLateFragmentTests,
-        aspect_mask);
+    for (const auto& color : pass.colors) {
+        vk::ImageView view = nullptr;
+        vk::Image image = nullptr;
+        vk::Extent2D extent{};
+        vk::ImageLayout old_layout = vk::ImageLayout::eUndefined;
 
-    vk::RenderingAttachmentInfo depth_attachment_info{};
-    depth_attachment_info.imageView = *attachment.view;
-    depth_attachment_info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
-    depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
-    depth_attachment_info.clearValue = vk::ClearDepthStencilValue(1.f, 0);
+        if (color.target_index == kSwapchainTarget) {
+            view = *swapchain_image_views[image_index];
+            image = swapchain_images[image_index];
+            extent = swapchain_extent;
+            old_layout = vk::ImageLayout::eUndefined;
+            transit_presentation_image_layout(
+                cmd, image, old_layout, vk::ImageLayout::eColorAttachmentOptimal,
+                {}, vk::AccessFlagBits2::eColorAttachmentWrite,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                vk::ImageAspectFlagBits::eColor);
+        }
+        else {
+            if (color.target_index < 0
+                || static_cast<size_t>(color.target_index) >= targets.size())
+            {
+                throw std::runtime_error("begin_pass: color target_index out of range");
+            }
+            auto& target = targets[static_cast<size_t>(color.target_index)];
+            view = *target.view;
+            image = *target.image;
+            extent = vk::Extent2D{target.width, target.height};
+            old_layout = target.layout;
+            transit_presentation_image_layout(
+                cmd, image, old_layout, vk::ImageLayout::eColorAttachmentOptimal,
+                vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+                vk::AccessFlagBits2::eColorAttachmentWrite,
+                vk::PipelineStageFlagBits2::eAllCommands,
+                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                vk::ImageAspectFlagBits::eColor);
+            target.layout = vk::ImageLayout::eColorAttachmentOptimal;
+        }
 
-    const vk::Extent2D render_extent{attachment.width, attachment.height};
+        if (render_extent.width == 0) {
+            render_extent = extent;
+        }
+        else if (extent.width != render_extent.width || extent.height != render_extent.height) {
+            throw std::runtime_error("begin_pass: MRT color targets must share the same extent");
+        }
+
+        vk::RenderingAttachmentInfo info{};
+        info.imageView = view;
+        info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
+        info.loadOp = to_vk_load_op(color.load);
+        info.storeOp = to_vk_store_op(color.store);
+        info.clearValue = vk::ClearColorValue(color.clear);
+        color_infos.push_back(info);
+    }
+
+    vk::RenderingAttachmentInfo depth_info{};
+    const vk::RenderingAttachmentInfo* depth_ptr = nullptr;
+    const bool use_depth = pass.depth_index != kNoDepth;
+
+    if (use_depth) {
+        vk::Image depth_image_handle = nullptr;
+        vk::ImageView depth_view_handle = nullptr;
+        vk::ImageAspectFlags depth_aspect = vk::ImageAspectFlagBits::eDepth;
+        vk::Extent2D depth_extent{};
+        bool* depth_initialized = nullptr;
+        vk::ImageLayout* depth_layout = nullptr;
+        DepthAttachment* custom_depth = nullptr;
+
+        if (pass.depth_index == kDefaultDepth) {
+            if (active_depth_attachment_index_ >= 0
+                && static_cast<size_t>(active_depth_attachment_index_) < depth_attachments.size())
+            {
+                custom_depth =
+                    &depth_attachments[static_cast<size_t>(active_depth_attachment_index_)];
+            }
+        }
+        else if (pass.depth_index >= 0
+            && static_cast<size_t>(pass.depth_index) < depth_attachments.size())
+        {
+            custom_depth = &depth_attachments[static_cast<size_t>(pass.depth_index)];
+        }
+        else if (pass.depth_index != kDefaultDepth) {
+            throw std::runtime_error("begin_pass: depth_index out of range");
+        }
+
+        if (custom_depth != nullptr) {
+            depth_image_handle = *custom_depth->image;
+            depth_view_handle = *custom_depth->view;
+            depth_aspect = custom_depth->aspect_mask;
+            depth_extent = vk::Extent2D{custom_depth->width, custom_depth->height};
+            depth_initialized = &custom_depth->initialized;
+            depth_layout = &custom_depth->layout;
+        }
+        else {
+            depth_image_handle = *depth_image;
+            depth_view_handle = *depth_view;
+            const vk::Format default_depth_format = find_depth_format();
+            if (default_depth_format == vk::Format::eD32SfloatS8Uint
+                || default_depth_format == vk::Format::eD24UnormS8Uint)
+            {
+                depth_aspect |= vk::ImageAspectFlagBits::eStencil;
+            }
+            depth_extent = swapchain_extent;
+            depth_initialized = &depth_image_initialized;
+        }
+
+        if (render_extent.width == 0) {
+            render_extent = depth_extent;
+        }
+        else if (depth_extent.width != render_extent.width
+            || depth_extent.height != render_extent.height)
+        {
+            throw std::runtime_error("begin_pass: depth extent does not match color targets");
+        }
+
+        const vk::ImageLayout old_depth_layout = (depth_layout != nullptr && *depth_initialized)
+            ? *depth_layout
+            : (*depth_initialized ? vk::ImageLayout::eDepthStencilAttachmentOptimal
+                                  : vk::ImageLayout::eUndefined);
+        const bool from_sampled = old_depth_layout == vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+        const bool from_undefined = old_depth_layout == vk::ImageLayout::eUndefined;
+
+        if (from_undefined || from_sampled || !*depth_initialized) {
+            transit_presentation_image_layout(
+                cmd, depth_image_handle,
+                from_undefined || !*depth_initialized
+                    ? vk::ImageLayout::eUndefined : old_depth_layout,
+                vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                from_sampled ? vk::AccessFlagBits2::eShaderRead : vk::AccessFlags2{},
+                vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                from_sampled ? vk::PipelineStageFlagBits2::eFragmentShader
+                             : vk::PipelineStageFlagBits2::eTopOfPipe,
+                vk::PipelineStageFlagBits2::eEarlyFragmentTests
+                    | vk::PipelineStageFlagBits2::eLateFragmentTests,
+                depth_aspect);
+        }
+        else {
+            transit_presentation_image_layout(
+                cmd, depth_image_handle,
+                vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                vk::ImageLayout::eDepthStencilAttachmentOptimal,
+                vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+                vk::PipelineStageFlagBits2::eLateFragmentTests,
+                vk::PipelineStageFlagBits2::eEarlyFragmentTests
+                    | vk::PipelineStageFlagBits2::eLateFragmentTests,
+                depth_aspect);
+        }
+        *depth_initialized = true;
+        if (depth_layout != nullptr) {
+            *depth_layout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        }
+
+        depth_info.imageView = depth_view_handle;
+        depth_info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
+        depth_info.loadOp = to_vk_load_op(pass.depth_load);
+        depth_info.storeOp = to_vk_store_op(pass.depth_store);
+        depth_info.clearValue = vk::ClearDepthStencilValue(pass.depth_clear, 0);
+        depth_ptr = &depth_info;
+    }
+
+    if (render_extent.width == 0 || render_extent.height == 0) {
+        throw std::runtime_error("begin_pass: no color or depth target to determine extent");
+    }
+
     vk::RenderingInfo rendering_info{};
     rendering_info.renderArea.offset = vk::Offset2D{0, 0};
     rendering_info.renderArea.extent = render_extent;
     rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = 0;
-    rendering_info.pDepthAttachment = &depth_attachment_info;
+    rendering_info.colorAttachmentCount = static_cast<uint32_t>(color_infos.size());
+    rendering_info.pColorAttachments = color_infos.empty() ? nullptr : color_infos.data();
+    rendering_info.pDepthAttachment = depth_ptr;
 
     cmd.beginRendering(rendering_info);
     cmd.setViewport(0, vk::Viewport{
@@ -188,21 +358,81 @@ bool Context::record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachmen
         0.f, 1.f
     });
     cmd.setScissor(0, vk::Rect2D{{0, 0}, render_extent});
-    emit_func(cmd);
+}
+
+void Context::end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass) {
+    if (image_index >= swapchain_images.size()) {
+        throw std::runtime_error("end_pass: image_index out of range");
+    }
+
     cmd.endRendering();
 
-    transit_presentation_image_layout(
-        cmd,
-        depth_image_handle,
-        vk::ImageLayout::eDepthStencilAttachmentOptimal,
-        vk::ImageLayout::eDepthStencilReadOnlyOptimal,
-        vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-        vk::AccessFlagBits2::eShaderRead,
-        vk::PipelineStageFlagBits2::eLateFragmentTests,
-        vk::PipelineStageFlagBits2::eFragmentShader,
-        aspect_mask);
-    attachment.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
-    attachment.initialized = true;
+    for (const auto& color : pass.colors) {
+        if (color.target_index == kSwapchainTarget) {
+            if (pass.present) {
+                transit_presentation_image_layout(
+                    cmd, swapchain_images[image_index],
+                    vk::ImageLayout::eColorAttachmentOptimal,
+                    vk::ImageLayout::ePresentSrcKHR,
+                    vk::AccessFlagBits2::eColorAttachmentWrite, {},
+                    vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                    vk::PipelineStageFlagBits2::eBottomOfPipe,
+                    vk::ImageAspectFlagBits::eColor);
+            }
+            continue;
+        }
+        if (color.target_index < 0
+            || static_cast<size_t>(color.target_index) >= targets.size())
+        {
+            throw std::runtime_error("end_pass: color target_index out of range");
+        }
+        auto& target = targets[static_cast<size_t>(color.target_index)];
+        // Restore to the layout used for sampling/general access after the write.
+        const vk::ImageLayout restore_layout = target.descriptor.imageLayout;
+        transit_presentation_image_layout(
+            cmd, *target.image,
+            vk::ImageLayout::eColorAttachmentOptimal, restore_layout,
+            vk::AccessFlagBits2::eColorAttachmentWrite,
+            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+            vk::PipelineStageFlagBits2::eAllCommands,
+            vk::ImageAspectFlagBits::eColor);
+        target.layout = restore_layout;
+    }
+
+    // Depth-only custom attachments (e.g. shadow maps) become sampleable after the pass.
+    if (pass.colors.empty() && pass.depth_index >= 0
+        && static_cast<size_t>(pass.depth_index) < depth_attachments.size())
+    {
+        auto& attachment = depth_attachments[static_cast<size_t>(pass.depth_index)];
+        transit_presentation_image_layout(
+            cmd, *attachment.image,
+            vk::ImageLayout::eDepthStencilAttachmentOptimal,
+            vk::ImageLayout::eDepthStencilReadOnlyOptimal,
+            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
+            vk::AccessFlagBits2::eShaderRead,
+            vk::PipelineStageFlagBits2::eLateFragmentTests,
+            vk::PipelineStageFlagBits2::eFragmentShader,
+            attachment.aspect_mask);
+        attachment.layout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
+        attachment.initialized = true;
+    }
+}
+
+bool Context::record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachment_index,
+    const std::function<void(vk::raii::CommandBuffer&)>& emit_func)
+{
+    if (attachment_index >= depth_attachments.size() || !emit_func) {
+        return false;
+    }
+
+    PassDesc pass{};
+    pass.colors.clear();
+    pass.depth_index = static_cast<int32_t>(attachment_index);
+    pass.present = false;
+    begin_pass(cmd, 0, pass);
+    emit_func(cmd);
+    end_pass(cmd, 0, pass);
     return true;
 }
 
@@ -210,166 +440,43 @@ void Context::record_cmds(uint32_t image_index,
     const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
     const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func)
 {
+    begin_cmds(image_index);
     auto& cmd_buf = command_buffers[image_index];
-    cmd_buf.reset({});
-    cmd_buf.begin({});
-
-    Texture* active_target = nullptr;
-    if (active_render_target_index_ >= 0
-        && static_cast<size_t>(active_render_target_index_) < targets.size())
-    {
-        active_target = &targets[static_cast<size_t>(active_render_target_index_)];
-    }
-    DepthAttachment* active_depth_attachment = nullptr;
-    if (active_depth_attachment_index_ >= 0
-        && static_cast<size_t>(active_depth_attachment_index_) < depth_attachments.size())
-    {
-        active_depth_attachment =
-            &depth_attachments[static_cast<size_t>(active_depth_attachment_index_)];
-    }
-    const vk::Image active_depth_image = active_depth_attachment != nullptr
-        ? static_cast<vk::Image>(*active_depth_attachment->image)
-        : static_cast<vk::Image>(*depth_image);
-    const vk::ImageView active_depth_view = active_depth_attachment != nullptr
-        ? static_cast<vk::ImageView>(*active_depth_attachment->view)
-        : static_cast<vk::ImageView>(*depth_view);
-    vk::ImageAspectFlags default_depth_aspect = vk::ImageAspectFlagBits::eDepth;
-    const vk::Format default_depth_format = find_depth_format();
-    if (default_depth_format == vk::Format::eD32SfloatS8Uint
-        || default_depth_format == vk::Format::eD24UnormS8Uint)
-    {
-        default_depth_aspect |= vk::ImageAspectFlagBits::eStencil;
-    }
-    const vk::ImageAspectFlags active_depth_aspect =
-        active_depth_attachment != nullptr ? active_depth_attachment->aspect_mask : default_depth_aspect;
-    bool& active_depth_initialized = active_depth_attachment != nullptr
-        ? active_depth_attachment->initialized
-        : depth_image_initialized;
-
-    transit_presentation_image_layout(
-        cmd_buf,
-        swapchain_images[image_index],
-        vk::ImageLayout::eUndefined,
-        vk::ImageLayout::eColorAttachmentOptimal,
-        {},
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::ImageAspectFlagBits::eColor);
-
-    if (!active_depth_initialized) {
-        transit_presentation_image_layout(
-            cmd_buf,
-            active_depth_image,
-            vk::ImageLayout::eUndefined,
-            vk::ImageLayout::eDepthStencilAttachmentOptimal,
-            {},
-            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-            vk::PipelineStageFlagBits2::eTopOfPipe,
-            vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-            active_depth_aspect);
-        active_depth_initialized = true;
-    }
-    else {
-        // Keep the selected depth image in attachment layout across frames and insert
-        // an explicit dependency between consecutive depth write passes.
-        transit_presentation_image_layout(
-            cmd_buf,
-            active_depth_image,
-            vk::ImageLayout::eDepthStencilAttachmentOptimal,
-            vk::ImageLayout::eDepthStencilAttachmentOptimal,
-            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-            vk::AccessFlagBits2::eDepthStencilAttachmentWrite,
-            vk::PipelineStageFlagBits2::eLateFragmentTests,
-            vk::PipelineStageFlagBits2::eEarlyFragmentTests | vk::PipelineStageFlagBits2::eLateFragmentTests,
-            active_depth_aspect);
-    }
-
-    vk::ClearValue clear_value = vk::ClearColorValue(std::array<float, 4>{0.f, 0.f, 0.f, 1.f});
-    vk::ClearValue depth_clear_value = vk::ClearDepthStencilValue(1.f, 0);
-
-    if (active_target != nullptr) {
-        transit_presentation_image_layout(
-            cmd_buf,
-            static_cast<vk::Image>(*active_target->image),
-            active_target->layout,
-            vk::ImageLayout::eColorAttachmentOptimal,
-            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-            vk::AccessFlagBits2::eColorAttachmentWrite,
-            vk::PipelineStageFlagBits2::eAllCommands,
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::ImageAspectFlagBits::eColor);
-    }
-
-    vk::RenderingAttachmentInfo color_attachment_info{};
-    color_attachment_info.imageView = active_target == nullptr
-        ? *swapchain_image_views[image_index]
-        : *active_target->view;
-    color_attachment_info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
-    color_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
-    color_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
-    color_attachment_info.clearValue = clear_value;
-    vk::RenderingAttachmentInfo depth_attachment_info{};
-    depth_attachment_info.imageView = active_depth_view;
-    depth_attachment_info.imageLayout = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-    depth_attachment_info.loadOp = vk::AttachmentLoadOp::eClear;
-    depth_attachment_info.storeOp = vk::AttachmentStoreOp::eStore;
-    depth_attachment_info.clearValue = depth_clear_value;
-    vk::RenderingInfo rendering_info{};
-    rendering_info.renderArea.offset = vk::Offset2D{0, 0};
-    const vk::Extent2D render_extent = active_target == nullptr
-        ? swapchain_extent
-        : vk::Extent2D{active_target->width, active_target->height};
-    if (active_depth_attachment != nullptr
-        && (active_depth_attachment->width != render_extent.width
-            || active_depth_attachment->height != render_extent.height))
-    {
-        throw std::runtime_error("selected depth attachment dimensions do not match render target");
-    }
-    rendering_info.renderArea.extent = render_extent;
-    rendering_info.layerCount = 1;
-    rendering_info.colorAttachmentCount = 1;
-    rendering_info.pColorAttachments = &color_attachment_info;
-    rendering_info.pDepthAttachment = &depth_attachment_info;
     if (pre_render_func) {
         pre_render_func(cmd_buf, image_index);
     }
-    cmd_buf.beginRendering(rendering_info);
-    cmd_buf.setViewport(0, vk::Viewport{
-        0.f, 0.f,
-        static_cast<float>(render_extent.width),
-        static_cast<float>(render_extent.height),
-        0.f, 1.f
-    });
-    cmd_buf.setScissor(0, vk::Rect2D{{0, 0}, render_extent});
 
+    PassDesc pass{};
+    if (active_render_target_index_ >= 0
+        && static_cast<size_t>(active_render_target_index_) < targets.size())
+    {
+        pass.colors = { ColorTargetRef{
+            .target_index = active_render_target_index_,
+        } };
+        pass.present = false;
+    }
+    if (active_depth_attachment_index_ >= 0
+        && static_cast<size_t>(active_depth_attachment_index_) < depth_attachments.size())
+    {
+        pass.depth_index = active_depth_attachment_index_;
+    }
+
+    begin_pass(cmd_buf, image_index, pass);
     emit_func(cmd_buf, image_index);
+    end_pass(cmd_buf, image_index, pass);
 
-    cmd_buf.endRendering();
-
-    if (active_target != nullptr) {
+    // draw_frame always presents; if this pass did not touch the swapchain, still
+    // move it to PresentSrc so the queue present is valid.
+    if (!pass.present) {
         transit_presentation_image_layout(
-            cmd_buf,
-            static_cast<vk::Image>(*active_target->image),
-            vk::ImageLayout::eColorAttachmentOptimal,
-            active_target->layout,
-            vk::AccessFlagBits2::eColorAttachmentWrite,
-            vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
-            vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-            vk::PipelineStageFlagBits2::eAllCommands,
+            cmd_buf, swapchain_images[image_index],
+            vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR,
+            {}, {},
+            vk::PipelineStageFlagBits2::eTopOfPipe,
+            vk::PipelineStageFlagBits2::eBottomOfPipe,
             vk::ImageAspectFlagBits::eColor);
     }
-    transit_presentation_image_layout(
-        cmd_buf,
-        swapchain_images[image_index],
-        vk::ImageLayout::eColorAttachmentOptimal,
-        vk::ImageLayout::ePresentSrcKHR,
-        vk::AccessFlagBits2::eColorAttachmentWrite,
-        {},
-        vk::PipelineStageFlagBits2::eColorAttachmentOutput,
-        vk::PipelineStageFlagBits2::eBottomOfPipe,
-        vk::ImageAspectFlagBits::eColor);
-    cmd_buf.end();
+    end_cmds(image_index);
 }
 
 void Context::draw_frame() {

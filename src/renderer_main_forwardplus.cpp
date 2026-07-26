@@ -238,14 +238,15 @@ int main() {
         ImGui::Text("Point lights: %u", point_light_count);
         ImGui::End();
 
-        ctx.record_cmds(image_index,
-            [&](vk::raii::CommandBuffer& cmd, uint32_t swapchain_index) {
-                renderer.record_commands(cmd, swapchain_index);
-                hud.render(static_cast<VkCommandBuffer>(*cmd));
-            },
-            [&](vk::raii::CommandBuffer& cmd, uint32_t swapchain_index) {
-                renderer.prepare_light_clusters(cmd, swapchain_index);
-            });
+        ctx.begin_cmds(image_index);
+        auto& cmd = ctx.command_buffers[image_index];
+        renderer.prepare_light_clusters(cmd, image_index);
+        const vkkk::PassDesc pass{};
+        ctx.begin_pass(cmd, image_index, pass);
+        renderer.record_commands(cmd, image_index);
+        hud.render(static_cast<VkCommandBuffer>(*cmd));
+        ctx.end_pass(cmd, image_index, pass);
+        ctx.end_cmds(image_index);
     });
 
     using Clock = std::chrono::steady_clock;

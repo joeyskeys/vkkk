@@ -1,5 +1,6 @@
 #pragma once
 
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <cstring>
@@ -77,6 +78,7 @@ struct Texture {
     size_t                                  vecsize;
     uint32_t                                width = 0;
     uint32_t                                height = 0;
+    vk::Format                              format = vk::Format::eUndefined;
     vk::ImageUsageFlags                     usage{};
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
@@ -84,6 +86,32 @@ struct Texture {
     vk::ImageLayout                         layout;
     vk::DescriptorImageInfo                 descriptor;
     vk::raii::Sampler                       sampler{nullptr};
+};
+
+// PassDesc target indices: swapchain color, default/no depth.
+inline constexpr int32_t kSwapchainTarget = -1;
+inline constexpr int32_t kNoDepth = -1;
+inline constexpr int32_t kDefaultDepth = -2;
+
+enum class PassLoadOp : uint8_t { Clear, Load, DontCare };
+enum class PassStoreOp : uint8_t { Store, DontCare };
+
+struct ColorTargetRef {
+    int32_t target_index = kSwapchainTarget;
+    PassLoadOp load = PassLoadOp::Clear;
+    PassStoreOp store = PassStoreOp::Store;
+    std::array<float, 4> clear = {0.f, 0.f, 0.f, 1.f};
+};
+
+struct PassDesc {
+    std::vector<ColorTargetRef> colors = { ColorTargetRef{} };
+    // kDefaultDepth = Context depth; kNoDepth = none; >=0 = depth_attachments[i]
+    int32_t depth_index = kDefaultDepth;
+    PassLoadOp depth_load = PassLoadOp::Clear;
+    PassStoreOp depth_store = PassStoreOp::Store;
+    float depth_clear = 1.f;
+    // Transition swapchain color targets to PresentSrc after the pass.
+    bool present = true;
 };
 
 struct DepthAttachment {
@@ -241,7 +269,8 @@ public:
         const PipelineOption& option,
         const std::vector<VERT_COMP>& comps,
         bool interleaved = true,
-        bool depth_only = false);
+        bool depth_only = false,
+        const std::vector<vk::Format>& color_formats = {});
     bool create_compute_pipeline(const std::string& name, const ComputeShader& shader);
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
 
@@ -260,6 +289,13 @@ public:
     bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
         vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
         const vk::DescriptorSet* desc_set = nullptr) const;
+    // Reset/begin (or end) the per-swapchain command buffer.
+    void begin_cmds(uint32_t image_index);
+    void end_cmds(uint32_t image_index);
+    // Dynamic rendering pass with load/store, MRT, and optional present.
+    void begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass);
+    void end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass);
+    // Convenience: begin_cmds + optional pre + default PassDesc + emit + end_cmds.
     void record_cmds(uint32_t image_index,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& pre_render_func = {});

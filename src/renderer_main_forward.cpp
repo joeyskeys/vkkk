@@ -243,12 +243,15 @@ int main() {
         ImGui::Text("Box instances: %d", 2);
         ImGui::End();
 
-        ctx.record_cmds(idx, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
-            renderer.record_commands(cmd_buf, image_index);
-            hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
-        }, [&](vk::raii::CommandBuffer& cmd_buf, uint32_t image_index) {
-            renderer.pass_shadow(cmd_buf, image_index);
-        });
+        ctx.begin_cmds(idx);
+        auto& cmd_buf = ctx.command_buffers[idx];
+        renderer.pass_shadow(cmd_buf, idx);
+        const vkkk::PassDesc pass{};
+        ctx.begin_pass(cmd_buf, idx, pass);
+        renderer.record_commands(cmd_buf, idx);
+        hud.render(static_cast<VkCommandBuffer>(*cmd_buf));
+        ctx.end_pass(cmd_buf, idx, pass);
+        ctx.end_cmds(idx);
     });
 
     using Clock = std::chrono::steady_clock;

@@ -33,7 +33,8 @@ bool Context::create_pipeline(const std::string& name,
     const PipelineOption& option,
     const std::vector<VERT_COMP>& comps,
     bool interleaved,
-    bool depth_only)
+    bool depth_only,
+    const std::vector<vk::Format>& color_formats)
 {
     if (pipelines.find(name) != pipelines.end()) {
         std::cout << "Pipeline " << name << " already exists" << std::endl;
@@ -233,9 +234,25 @@ bool Context::create_pipeline(const std::string& name,
     local_option.vert_info.pVertexBindingDescriptions = input_binding_descs.data();
     local_option.vert_info.vertexAttributeDescriptionCount = static_cast<uint32_t>(input_attr_descs.size());
     local_option.vert_info.pVertexAttributeDescriptions = input_attr_descs.data();
-    if (depth_only) {
+
+    std::vector<vk::Format> resolved_color_formats;
+    if (!depth_only) {
+        if (color_formats.empty()) {
+            resolved_color_formats.push_back(swapchain_surface_format.format);
+        }
+        else {
+            resolved_color_formats = color_formats;
+        }
+    }
+    std::vector<vk::PipelineColorBlendAttachmentState> blend_attachments;
+    if (depth_only || resolved_color_formats.empty()) {
         local_option.blend_info.attachmentCount = 0;
         local_option.blend_info.pAttachments = nullptr;
+    }
+    else {
+        blend_attachments.assign(resolved_color_formats.size(), local_option.blend_attachment_info);
+        local_option.blend_info.attachmentCount = static_cast<uint32_t>(blend_attachments.size());
+        local_option.blend_info.pAttachments = blend_attachments.data();
     }
 
     vk::raii::DescriptorSetLayout descriptor_set_layout{nullptr};
@@ -254,8 +271,9 @@ bool Context::create_pipeline(const std::string& name,
 
     const vk::Format depth_format = depth_only ? find_depth_only_format() : find_depth_format();
     vk::PipelineRenderingCreateInfo rendering_create_info{};
-    rendering_create_info.colorAttachmentCount = depth_only ? 0u : 1u;
-    rendering_create_info.pColorAttachmentFormats = depth_only ? nullptr : &swapchain_surface_format.format;
+    rendering_create_info.colorAttachmentCount = static_cast<uint32_t>(resolved_color_formats.size());
+    rendering_create_info.pColorAttachmentFormats =
+        resolved_color_formats.empty() ? nullptr : resolved_color_formats.data();
     rendering_create_info.depthAttachmentFormat = depth_format;
     rendering_create_info.stencilAttachmentFormat = depth_only ? vk::Format::eUndefined : depth_format;
     vk::GraphicsPipelineCreateInfo graphics_pipeline_create_info{};

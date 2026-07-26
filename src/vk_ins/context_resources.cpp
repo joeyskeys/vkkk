@@ -531,6 +531,7 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     }
     target.width = target_width;
     target.height = target_height;
+    target.format = format;
     target.usage = usage;
 
     std::tie(target.image, target.memo) = create_vk_image(

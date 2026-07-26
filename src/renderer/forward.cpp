@@ -223,16 +223,19 @@ void ForwardRenderer::pass_shadow(vk::raii::CommandBuffer& cmd, uint32_t swapcha
     update_main_directional_shadow();
     sync_shadow_resources(swapchain_image_idx);
 
-    ctx->record_depth_pass(cmd, shadowDepthAttachmentIndex, [&](vk::raii::CommandBuffer& pass_cmd) {
-        if (!ctx->bind(pass_cmd, kShadowDepthPipeline, swapchain_image_idx)) {
-            return;
-        }
+    PassDesc shadow_pass{};
+    shadow_pass.colors.clear();
+    shadow_pass.depth_index = static_cast<int32_t>(shadowDepthAttachmentIndex);
+    shadow_pass.present = false;
+    ctx->begin_pass(cmd, swapchain_image_idx, shadow_pass);
+    if (ctx->bind(cmd, kShadowDepthPipeline, swapchain_image_idx)) {
         for (const auto& batch_info : shadowBatchInfos) {
-            ctx->draw(pass_cmd, kShadowDepthPipeline, batch_info.mesh_name,
+            ctx->draw(cmd, kShadowDepthPipeline, batch_info.mesh_name,
                 static_cast<uint32_t>(batch_info.instance_count),
                 static_cast<uint32_t>(batch_info.instance_offset));
         }
-    });
+    }
+    ctx->end_pass(cmd, swapchain_image_idx, shadow_pass);
 }
 
 void ForwardRenderer::draw_batch(vk::CommandBuffer cmd, uint32_t swapchain_image_idx,

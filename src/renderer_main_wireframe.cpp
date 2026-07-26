@@ -233,65 +233,70 @@ int main() {
         ImGui::Text("Box instances: %d", 2);
         ImGui::End();
 
-        ctx.record_cmds(image_index, [&](vk::raii::CommandBuffer& cmd, uint32_t swapchain_index) {
-            const auto draw_instances = [&](const char* pipeline_name, const char* mesh_name,
-                const std::vector<vkkk::LineGenParamsUBO>& instance_params)
+        ctx.begin_cmds(image_index);
+        auto& cmd = ctx.command_buffers[image_index];
+        const vkkk::PassDesc pass{};
+        ctx.begin_pass(cmd, image_index, pass);
+
+        const auto draw_instances = [&](const char* pipeline_name, const char* mesh_name,
+            const std::vector<vkkk::LineGenParamsUBO>& instance_params)
+        {
+            const auto pipeline_it = ctx.pipelines.find(pipeline_name);
+            const auto mesh_it = ctx.meshes.find(mesh_name);
+            if (pipeline_it == ctx.pipelines.end() || mesh_it == ctx.meshes.end()
+                || instance_params.empty())
             {
-                const auto pipeline_it = ctx.pipelines.find(pipeline_name);
-                const auto mesh_it = ctx.meshes.find(mesh_name);
-                if (pipeline_it == ctx.pipelines.end() || mesh_it == ctx.meshes.end()
-                    || instance_params.empty())
-                {
-                    return;
-                }
+                return;
+            }
 
-                const auto& pipeline = pipeline_it->second;
-                const auto camera_ubo_it = pipeline.ubos.find(vkkk::buf::CameraUBO);
-                const auto mesh_info_ubo_it = pipeline.ubos.find(vkkk::buf::LineGenMeshInfo);
-                const auto instance_ssbo_it = pipeline.ssbos.find(vkkk::buf::LineGenParams);
-                if (camera_ubo_it == pipeline.ubos.end()
-                    || mesh_info_ubo_it == pipeline.ubos.end()
-                    || instance_ssbo_it == pipeline.ssbos.end()
-                    || swapchain_index >= camera_ubo_it->second.memos.size()
-                    || swapchain_index >= mesh_info_ubo_it->second.memos.size())
-                {
-                    return;
-                }
+            const auto& pipeline = pipeline_it->second;
+            const auto camera_ubo_it = pipeline.ubos.find(vkkk::buf::CameraUBO);
+            const auto mesh_info_ubo_it = pipeline.ubos.find(vkkk::buf::LineGenMeshInfo);
+            const auto instance_ssbo_it = pipeline.ssbos.find(vkkk::buf::LineGenParams);
+            if (camera_ubo_it == pipeline.ubos.end()
+                || mesh_info_ubo_it == pipeline.ubos.end()
+                || instance_ssbo_it == pipeline.ssbos.end()
+                || image_index >= camera_ubo_it->second.memos.size()
+                || image_index >= mesh_info_ubo_it->second.memos.size())
+            {
+                return;
+            }
 
-                const uint32_t index_count = mesh_it->second.icnt * 3u;
-                vkkk::LineGenMeshInfoUBO mesh_info{};
-                mesh_info.vertex_stride_floats = 6;
-                mesh_info.index_count = index_count;
-                mesh_info.instance_count = static_cast<uint32_t>(instance_params.size());
-                ctx.sync_ubo(pipeline_name, vkkk::buf::CameraUBO, &camera.ubo_data, swapchain_index,
-                    static_cast<uint32_t>(sizeof(camera.ubo_data)));
-                ctx.sync_ubo(pipeline_name, vkkk::buf::LineGenMeshInfo, &mesh_info, swapchain_index,
-                    static_cast<uint32_t>(sizeof(mesh_info)));
-                ctx.sync_ssbo(pipeline_name, vkkk::buf::LineGenParams, instance_params.data(),
-                    swapchain_index,
-                    static_cast<uint32_t>(instance_params.size() * sizeof(vkkk::LineGenParamsUBO)));
+            const uint32_t index_count = mesh_it->second.icnt * 3u;
+            vkkk::LineGenMeshInfoUBO mesh_info{};
+            mesh_info.vertex_stride_floats = 6;
+            mesh_info.index_count = index_count;
+            mesh_info.instance_count = static_cast<uint32_t>(instance_params.size());
+            ctx.sync_ubo(pipeline_name, vkkk::buf::CameraUBO, &camera.ubo_data, image_index,
+                static_cast<uint32_t>(sizeof(camera.ubo_data)));
+            ctx.sync_ubo(pipeline_name, vkkk::buf::LineGenMeshInfo, &mesh_info, image_index,
+                static_cast<uint32_t>(sizeof(mesh_info)));
+            ctx.sync_ssbo(pipeline_name, vkkk::buf::LineGenParams, instance_params.data(),
+                image_index,
+                static_cast<uint32_t>(instance_params.size() * sizeof(vkkk::LineGenParamsUBO)));
 
-                const uint32_t triangles_per_instance = index_count / 3u;
-                const uint32_t task_groups_per_instance =
-                    (triangles_per_instance + vkkk::line_gen_triangles_per_task - 1u)
-                    / vkkk::line_gen_triangles_per_task;
-                if (!ctx.record_mesh_tasks(
-                        cmd,
-                        pipeline_name,
-                        task_groups_per_instance * mesh_info.instance_count,
-                        1,
-                        1,
-                        swapchain_index))
-                {
-                    throw std::runtime_error("failed to record mesh tasks for wireframe draw");
-                }
-            };
+            const uint32_t triangles_per_instance = index_count / 3u;
+            const uint32_t task_groups_per_instance =
+                (triangles_per_instance + vkkk::line_gen_triangles_per_task - 1u)
+                / vkkk::line_gen_triangles_per_task;
+            if (!ctx.record_mesh_tasks(
+                    cmd,
+                    pipeline_name,
+                    task_groups_per_instance * mesh_info.instance_count,
+                    1,
+                    1,
+                    image_index))
+            {
+                throw std::runtime_error("failed to record mesh tasks for wireframe draw");
+            }
+        };
 
-            draw_instances(plane_pipeline_name, "cornell_plane", plane_instances);
-            draw_instances(cube_pipeline_name, "cornell_cube", cube_instances);
+        draw_instances(plane_pipeline_name, "cornell_plane", plane_instances);
+        draw_instances(cube_pipeline_name, "cornell_cube", cube_instances);
+        hud.render(static_cast<VkCommandBuffer>(*cmd));
 
-            hud.render(static_cast<VkCommandBuffer>(*cmd));
-        });
+        ctx.end_pass(cmd, image_index, pass);
+        ctx.end_cmds(image_index);
     });
 
     using Clock = std::chrono::steady_clock;

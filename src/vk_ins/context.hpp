@@ -80,6 +80,9 @@ struct Texture {
     uint32_t                                height = 0;
     vk::Format                              format = vk::Format::eUndefined;
     vk::ImageUsageFlags                     usage{};
+    vk::SampleCountFlagBits                 samples = vk::SampleCountFlagBits::e1;
+    // True when created with width/height 0 (follow swapchain extent on resize).
+    bool                                    matchSwapchain = false;
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
     vk::raii::ImageView                     view{nullptr};
@@ -119,6 +122,9 @@ struct DepthAttachment {
     uint32_t                                height = 0;
     vk::Format                              format = vk::Format::eUndefined;
     vk::ImageAspectFlags                    aspect_mask = vk::ImageAspectFlagBits::eDepth;
+    vk::SampleCountFlagBits                 samples = vk::SampleCountFlagBits::e1;
+    // True when created with width/height 0 (follow swapchain extent on resize).
+    bool                                    matchSwapchain = false;
     vk::raii::Image                         image{nullptr};
     vk::raii::DeviceMemory                  memo{nullptr};
     // Single depth-aspect view: used both as depth attachment and for sampling.
@@ -356,6 +362,7 @@ public:
         uint32_t width = 0, uint32_t height = 0,
         vk::ImageLayout layout = vk::ImageLayout::eGeneral,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    bool resize_render_target(uint32_t target_index, uint32_t width, uint32_t height);
     bool set_render_target(uint32_t target_index);
     void set_render_to_framebuffer();
     // Sampleable depth attachment (shadow maps, etc.). Defaults to a depth-only format
@@ -363,6 +370,7 @@ public:
     bool add_depth_attachment(uint32_t width = 0, uint32_t height = 0,
         vk::Format format = vk::Format::eUndefined,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    bool resize_depth_attachment(uint32_t attachment_index, uint32_t width, uint32_t height);
     bool set_depth_attachment(uint32_t attachment_index);
     void set_default_depth_attachment();
 
@@ -400,7 +408,10 @@ public:
     void end_single_commands(vk::raii::CommandBuffer&& cmd_buf) const;
 
     using UpdateCallback = std::function<void(uint32_t image_index, float dt)>;
+    using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
     void set_update_cbk(UpdateCallback cbk) { update_cbk_ = std::move(cbk); }
+    void set_resize_cbk(ResizeCallback cbk) { resize_cbk_ = std::move(cbk); }
+    vk::Extent2D extent() const { return swapchain_extent; }
 
     // Global runtime toggle: try to use mesh shaders for compatible pipelines.
     // When true, Context enables VK_EXT_mesh_shader + required feature bits during init.
@@ -532,6 +543,7 @@ private:
     uint32_t current_frame = 0;
     GLFWwindow* window = nullptr;
     UpdateCallback update_cbk_;
+    ResizeCallback resize_cbk_;
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
@@ -539,6 +551,15 @@ private:
     bool depth_image_initialized = false;
     int32_t active_render_target_index_ = -1;
     int32_t active_depth_attachment_index_ = -1;
+
+    // Pipelines that sample a custom color RT or depth attachment (rebind after resize).
+    struct SampledAttachmentBind {
+        std::string pipeline_name;
+        uint32_t binding = 0;
+        uint32_t attachment_index = 0;
+        bool is_depth = false;
+    };
+    std::vector<SampledAttachmentBind> sampled_attachment_binds;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;

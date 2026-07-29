@@ -87,7 +87,7 @@ glm::vec4 phong_ambient(const glm::vec3& color) {
 
 int main() {
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Forward Cornell (Shadow)");
+    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Forward Cornell (Shadow)", true);
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
 
@@ -117,6 +117,14 @@ int main() {
     {
         throw std::runtime_error("failed to bind shadow map to phong_shadow_mat");
     }
+
+    ctx.set_resize_cbk([&](uint32_t w, uint32_t h) {
+        cam.ratio = static_cast<float>(w) / static_cast<float>(std::max(h, 1u));
+        renderer.on_resize(w, h);
+        // Fixed-size shadow map survives recreate_swapchain; rebind in case descriptors moved.
+        ctx.bind_pipeline_depth_attachment(
+            kShadingPipeline, 1, renderer.shadow_depth_attachment_index());
+    });
 
     constexpr auto phong_attr_size = sizeof(vkkk::built_in_shader::PhongInstanceAttrs);
     vkkk::built_in_shader::PhongInstanceAttrs phong_attrs[7] = {
@@ -220,7 +228,8 @@ int main() {
 
     ctx.set_update_cbk([&](uint32_t idx, float duration) {
         raw_frame_dt = duration;
-        cam.ratio = WIDTH / static_cast<float>(HEIGHT);
+        const auto ext = ctx.extent();
+        cam.ratio = static_cast<float>(ext.width) / static_cast<float>(std::max(ext.height, 1u));
         cam.update_position(frame_dt);
         cam.update_orientation();
         cam.update_ubo_data();

@@ -50,8 +50,8 @@ void Context::recreate_swapchain() {
     depth_view = nullptr;
     depth_image = nullptr;
     depth_memo = nullptr;
-    depth_attachments.clear();
-    active_depth_attachment_index_ = -1;
+    // Keep custom render targets / depth attachments (shadow maps, HDR, etc.).
+    // Swapchain-sized ones are resized below; fixed-size ones (e.g. shadow) survive as-is.
     swapchain = nullptr;
 
     create_swapchain();
@@ -69,6 +69,21 @@ void Context::recreate_swapchain() {
     cmd_buf_alloc_info.level = vk::CommandBufferLevel::ePrimary;
     cmd_buf_alloc_info.commandBufferCount = static_cast<uint32_t>(swapchain_images.size());
     command_buffers = vk::raii::CommandBuffers(device, cmd_buf_alloc_info);
+
+    for (uint32_t i = 0; i < static_cast<uint32_t>(targets.size()); ++i) {
+        if (targets[i].matchSwapchain) {
+            resize_render_target(i, swapchain_extent.width, swapchain_extent.height);
+        }
+    }
+    for (uint32_t i = 0; i < static_cast<uint32_t>(depth_attachments.size()); ++i) {
+        if (depth_attachments[i].matchSwapchain) {
+            resize_depth_attachment(i, swapchain_extent.width, swapchain_extent.height);
+        }
+    }
+
+    if (resize_cbk_) {
+        resize_cbk_(swapchain_extent.width, swapchain_extent.height);
+    }
 }
 
 } // namespace vkkk

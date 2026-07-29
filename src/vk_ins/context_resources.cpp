@@ -522,6 +522,8 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     Texture target{};
     target.binding = static_cast<uint32_t>(targets.size());
     target.vecsize = 1;
+    target.matchSwapchain = (width == 0 || height == 0);
+    target.samples = samples;
 
     const uint32_t target_width = width == 0 ? swapchain_extent.width : width;
     const uint32_t target_height = height == 0 ? swapchain_extent.height : height;
@@ -554,6 +556,54 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
 
     targets.emplace_back(std::move(target));
+    return true;
+}
+
+bool Context::resize_render_target(uint32_t target_index, uint32_t width, uint32_t height) {
+    if (target_index >= targets.size()) {
+        std::cout << "Render target index out of range: " << target_index << std::endl;
+        return false;
+    }
+    if (width == 0 || height == 0) {
+        std::cout << "Render target dimensions must be non-zero" << std::endl;
+        return false;
+    }
+
+    auto& target = targets[target_index];
+    if (target.width == width && target.height == height && target.image != nullptr) {
+        return true;
+    }
+
+    device.waitIdle();
+
+    vk::ImageAspectFlags aspect_mask = vk::ImageAspectFlagBits::eColor;
+    if (target.format == vk::Format::eD32SfloatS8Uint
+        || target.format == vk::Format::eD24UnormS8Uint)
+    {
+        aspect_mask = vk::ImageAspectFlagBits::eDepth | vk::ImageAspectFlagBits::eStencil;
+    }
+    else if (target.format == vk::Format::eD16Unorm || target.format == vk::Format::eD32Sfloat
+        || target.format == vk::Format::eX8D24UnormPack32)
+    {
+        aspect_mask = vk::ImageAspectFlagBits::eDepth;
+    }
+
+    target.view = nullptr;
+    target.image = nullptr;
+    target.memo = nullptr;
+    target.width = width;
+    target.height = height;
+    std::tie(target.image, target.memo) = create_vk_image(
+        width, height, 1, target.samples, target.format, vk::ImageTiling::eOptimal,
+        target.usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
+    target.view = create_vk_imageview(target.image, target.format, aspect_mask);
+    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
+
+    for (const auto& bind : sampled_attachment_binds) {
+        if (!bind.is_depth && bind.attachment_index == target_index) {
+            bind_pipeline_render_target(bind.pipeline_name, bind.binding, bind.attachment_index);
+        }
+    }
     return true;
 }
 
@@ -595,6 +645,18 @@ bool Context::bind_pipeline_render_target(const std::string& pipeline_name, uint
         writes.push_back(write);
     }
     device.updateDescriptorSets(writes, {});
+
+    const auto existing = std::find_if(sampled_attachment_binds.begin(), sampled_attachment_binds.end(),
+        [&](const SampledAttachmentBind& bind) {
+            return !bind.is_depth && bind.pipeline_name == pipeline_name && bind.binding == binding;
+        });
+    if (existing != sampled_attachment_binds.end()) {
+        existing->attachment_index = target_index;
+    }
+    else {
+        sampled_attachment_binds.push_back(SampledAttachmentBind{
+            pipeline_name, binding, target_index, false});
+    }
     return true;
 }
 
@@ -637,6 +699,18 @@ bool Context::bind_pipeline_depth_attachment(const std::string& pipeline_name, u
         writes.push_back(write);
     }
     device.updateDescriptorSets(writes, {});
+
+    const auto existing = std::find_if(sampled_attachment_binds.begin(), sampled_attachment_binds.end(),
+        [&](const SampledAttachmentBind& bind) {
+            return bind.is_depth && bind.pipeline_name == pipeline_name && bind.binding == binding;
+        });
+    if (existing != sampled_attachment_binds.end()) {
+        existing->attachment_index = attachment_index;
+    }
+    else {
+        sampled_attachment_binds.push_back(SampledAttachmentBind{
+            pipeline_name, binding, attachment_index, true});
+    }
     return true;
 }
 
@@ -656,6 +730,7 @@ void Context::set_render_to_framebuffer() {
 bool Context::add_depth_attachment(uint32_t width, uint32_t height,
     vk::Format format, vk::SampleCountFlagBits samples)
 {
+    const bool match_swapchain = (width == 0 || height == 0);
     const uint32_t attachment_width = width == 0 ? swapchain_extent.width : width;
     const uint32_t attachment_height = height == 0 ? swapchain_extent.height : height;
     if (attachment_width == 0 || attachment_height == 0) {
@@ -666,6 +741,8 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
     DepthAttachment attachment{};
     attachment.width = attachment_width;
     attachment.height = attachment_height;
+    attachment.samples = samples;
+    attachment.matchSwapchain = match_swapchain;
     // Prefer depth-only formats so one ImageView is valid for both attachment and sampling.
     attachment.format = format == vk::Format::eUndefined ? find_depth_only_format() : format;
     if (attachment.format == vk::Format::eD32SfloatS8Uint
@@ -703,6 +780,54 @@ bool Context::add_depth_attachment(uint32_t width, uint32_t height,
     attachment.descriptor = vk::DescriptorImageInfo{
         *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
     depth_attachments.emplace_back(std::move(attachment));
+    return true;
+}
+
+bool Context::resize_depth_attachment(uint32_t attachment_index, uint32_t width, uint32_t height) {
+    if (attachment_index >= depth_attachments.size()) {
+        std::cout << "Depth attachment index out of range: " << attachment_index << std::endl;
+        return false;
+    }
+    if (width == 0 || height == 0) {
+        std::cout << "Depth attachment dimensions must be non-zero" << std::endl;
+        return false;
+    }
+
+    auto& attachment = depth_attachments[attachment_index];
+    if (attachment.width == width && attachment.height == height && attachment.image != nullptr) {
+        return true;
+    }
+
+    device.waitIdle();
+    attachment.view = nullptr;
+    attachment.image = nullptr;
+    attachment.memo = nullptr;
+    attachment.width = width;
+    attachment.height = height;
+    attachment.layout = vk::ImageLayout::eUndefined;
+    attachment.initialized = false;
+    std::tie(attachment.image, attachment.memo) = create_vk_image(
+        attachment.width,
+        attachment.height,
+        1,
+        attachment.samples,
+        attachment.format,
+        vk::ImageTiling::eOptimal,
+        vk::ImageUsageFlagBits::eDepthStencilAttachment | vk::ImageUsageFlagBits::eSampled,
+        vk::MemoryPropertyFlagBits::eDeviceLocal);
+    attachment.view = create_vk_imageview(
+        attachment.image,
+        attachment.format,
+        1,
+        attachment.aspect_mask);
+    attachment.descriptor = vk::DescriptorImageInfo{
+        *attachment.sampler, *attachment.view, vk::ImageLayout::eDepthStencilReadOnlyOptimal};
+
+    for (const auto& bind : sampled_attachment_binds) {
+        if (bind.is_depth && bind.attachment_index == attachment_index) {
+            bind_pipeline_depth_attachment(bind.pipeline_name, bind.binding, bind.attachment_index);
+        }
+    }
     return true;
 }
 

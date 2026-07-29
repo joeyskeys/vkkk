@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <iterator>
@@ -93,7 +94,7 @@ vkkk::PhongPlusInstanceAttrs make_instance(
 
 int main() {
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(width, height, "Forward+ Clustered Cornell");
+    GLFWwindow* window = ctx.init_glfw(width, height, "Forward+ Clustered Cornell", true);
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan",
         vk::ApiVersion13, true, {}, glfw_extensions);
@@ -119,6 +120,11 @@ int main() {
     {
         throw std::runtime_error("failed to create clustered phong pipeline");
     }
+
+    ctx.set_resize_cbk([&](uint32_t w, uint32_t h) {
+        camera.ratio = static_cast<float>(w) / static_cast<float>(std::max(h, 1u));
+        renderer.on_resize(w, h);
+    });
 
     vkkk::PhongPlusInstanceAttrs attrs[] = {
         make_instance(
@@ -214,7 +220,8 @@ int main() {
 
     ctx.set_update_cbk([&](uint32_t image_index, float duration) {
         raw_frame_dt = duration;
-        camera.ratio = width / static_cast<float>(height);
+        const auto ext = ctx.extent();
+        camera.ratio = static_cast<float>(ext.width) / static_cast<float>(std::max(ext.height, 1u));
         camera.update_position(frame_dt);
         camera.update_orientation();
         camera.update_ubo_data();

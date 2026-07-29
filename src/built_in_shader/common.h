@@ -18,6 +18,7 @@ inline constexpr const char* DirectionalLightUBO = "DirectionalLightUBO";
 inline constexpr const char* SpotLightUBO = "SpotLightUBO";
 inline constexpr const char* LightClusterParams = "LightClusterParams";
 inline constexpr const char* LineGenMeshInfo = "LineGenMeshInfo";
+inline constexpr const char* FaceNormalMeshInfo = "FaceNormalMeshInfo";
 inline constexpr const char* ShadowResolve = "ShadowResolve";
 inline constexpr const char* MainDirectionalShadow = "MainDirectionalShadow";
 
@@ -28,6 +29,7 @@ inline constexpr const char* ClusterLightIndices = "ClusterLightIndices";
 inline constexpr const char* Vertices = "Vertices";
 inline constexpr const char* Indices = "Indices";
 inline constexpr const char* LineGenParams = "LineGenParams";
+inline constexpr const char* FaceNormalParams = "FaceNormalParams";
 }
 
 struct CameraUBO : public Sizeable<CameraUBO> {

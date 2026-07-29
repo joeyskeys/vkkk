@@ -12,6 +12,7 @@
 
 #include "asset_mgr/drawable_mgr.h"
 #include "asset_mgr/scene.h"
+#include "built_in_shader/face_normal.h"
 #include "built_in_shader/line_gen.h"
 #include "concepts/camera.h"
 #include "gui/gui.h"
@@ -25,6 +26,8 @@ constexpr uint32_t width = 800;
 constexpr uint32_t height = 600;
 constexpr char plane_pipeline_name[] = "wireframe_plane_mat";
 constexpr char cube_pipeline_name[] = "wireframe_cube_mat";
+constexpr char plane_normal_pipeline_name[] = "face_normal_plane_mat";
+constexpr char cube_normal_pipeline_name[] = "face_normal_cube_mat";
 
 vkkk::Camera camera{
     glm::vec3{0.0f, 0.0f, 3.8f},
@@ -114,15 +117,28 @@ int main() {
             make_pipeline_option(),
             {});
     };
+    const auto create_face_normal_pipeline = [&](const char* name) {
+        return renderer.create_pipeline_from_shader_src(
+            name,
+            vkkk::face_normal_task,
+            vkkk::face_normal_mesh,
+            vkkk::face_normal_frag,
+            make_pipeline_option(),
+            {});
+    };
     if (!create_wireframe_pipeline(plane_pipeline_name)
-        || !create_wireframe_pipeline(cube_pipeline_name))
+        || !create_wireframe_pipeline(cube_pipeline_name)
+        || !create_face_normal_pipeline(plane_normal_pipeline_name)
+        || !create_face_normal_pipeline(cube_normal_pipeline_name))
     {
-        throw std::runtime_error("failed to create wireframe mesh pipeline");
+        throw std::runtime_error("failed to create wireframe/face-normal mesh pipelines");
     }
     if (!ctx.bind_pipeline_ssbo_from_mesh(plane_pipeline_name, "cornell_plane")
-        || !ctx.bind_pipeline_ssbo_from_mesh(cube_pipeline_name, "cornell_cube"))
+        || !ctx.bind_pipeline_ssbo_from_mesh(cube_pipeline_name, "cornell_cube")
+        || !ctx.bind_pipeline_ssbo_from_mesh(plane_normal_pipeline_name, "cornell_plane")
+        || !ctx.bind_pipeline_ssbo_from_mesh(cube_normal_pipeline_name, "cornell_cube"))
     {
-        throw std::runtime_error("failed to bind wireframe mesh buffers");
+        throw std::runtime_error("failed to bind wireframe/face-normal mesh buffers");
     }
 
     ctx.set_resize_cbk([&](uint32_t w, uint32_t h) {
@@ -178,25 +194,36 @@ int main() {
 
     std::vector<vkkk::LineGenParamsUBO> plane_instances;
     std::vector<vkkk::LineGenParamsUBO> cube_instances;
+    std::vector<vkkk::FaceNormalParamsUBO> plane_normal_instances;
+    std::vector<vkkk::FaceNormalParamsUBO> cube_normal_instances;
     for (const auto& instance : instances) {
         vkkk::LineGenParamsUBO params{};
         params.model = instance.model;
         params.color = instance.color;
+        vkkk::FaceNormalParamsUBO normal_params{};
+        normal_params.model = instance.model;
+        normal_params.color = glm::vec4(0.2f, 0.9f, 0.3f, 1.0f);
         if (std::string_view(instance.mesh_name) == "cornell_plane") {
             plane_instances.push_back(params);
+            plane_normal_instances.push_back(normal_params);
         } else {
             cube_instances.push_back(params);
+            cube_normal_instances.push_back(normal_params);
         }
     }
 
-    const auto allocate_instance_ssbo = [&](const char* name, size_t instance_count) {
-        return ctx.resize_pipeline_ssbo(name, vkkk::buf::LineGenParams, instance_count)
-            && ctx.alloc_pipeline_ssbo(name, vkkk::buf::LineGenParams);
+    const auto allocate_instance_ssbo = [&](const char* name, const char* block, size_t instance_count) {
+        return ctx.resize_pipeline_ssbo(name, block, instance_count)
+            && ctx.alloc_pipeline_ssbo(name, block);
     };
-    if (!allocate_instance_ssbo(plane_pipeline_name, plane_instances.size())
-        || !allocate_instance_ssbo(cube_pipeline_name, cube_instances.size()))
+    if (!allocate_instance_ssbo(plane_pipeline_name, vkkk::buf::LineGenParams, plane_instances.size())
+        || !allocate_instance_ssbo(cube_pipeline_name, vkkk::buf::LineGenParams, cube_instances.size())
+        || !allocate_instance_ssbo(plane_normal_pipeline_name, vkkk::buf::FaceNormalParams,
+            plane_normal_instances.size())
+        || !allocate_instance_ssbo(cube_normal_pipeline_name, vkkk::buf::FaceNormalParams,
+            cube_normal_instances.size()))
     {
-        throw std::runtime_error("failed to allocate wireframe instance attributes");
+        throw std::runtime_error("failed to allocate wireframe/face-normal instance attributes");
     }
 
     glfwSetKeyCallback(window, key_callback);
@@ -213,6 +240,8 @@ int main() {
     float current_fps = 0.0f;
     float frame_dt = 0.0f;
     float raw_frame_dt = 0.0f;
+    bool use_mesh_normal = false;
+    float normal_length = 0.15f;
 
     ctx.set_update_cbk([&](uint32_t image_index, float duration) {
         raw_frame_dt = duration;
@@ -233,6 +262,8 @@ int main() {
         ImGui::Text("Renderer: Wireframe Mesh Shader");
         ImGui::Checkbox("Limit FPS", &limit_fps_enabled);
         ImGui::SliderFloat("Target FPS", &target_fps, 15.0f, 240.0f, "%.0f");
+        ImGui::Checkbox("Use mesh normals", &use_mesh_normal);
+        ImGui::SliderFloat("Normal length", &normal_length, 0.01f, 0.5f, "%.2f");
         ImGui::Text("FPS: %.1f", current_fps);
         ImGui::Text("Frame: %.2f ms", frame_dt * 1000.0f);
         ImGui::Text("Raw dt: %.2f ms", raw_frame_dt * 1000.0f);
@@ -245,7 +276,7 @@ int main() {
         const vkkk::PassDesc pass{};
         ctx.begin_pass(cmd, image_index, pass);
 
-        const auto draw_instances = [&](const char* pipeline_name, const char* mesh_name,
+        const auto draw_wireframe = [&](const char* pipeline_name, const char* mesh_name,
             const std::vector<vkkk::LineGenParamsUBO>& instance_params)
         {
             const auto pipeline_it = ctx.pipelines.find(pipeline_name);
@@ -298,8 +329,65 @@ int main() {
             }
         };
 
-        draw_instances(plane_pipeline_name, "cornell_plane", plane_instances);
-        draw_instances(cube_pipeline_name, "cornell_cube", cube_instances);
+        const auto draw_face_normals = [&](const char* pipeline_name, const char* mesh_name,
+            const std::vector<vkkk::FaceNormalParamsUBO>& instance_params)
+        {
+            const auto pipeline_it = ctx.pipelines.find(pipeline_name);
+            const auto mesh_it = ctx.meshes.find(mesh_name);
+            if (pipeline_it == ctx.pipelines.end() || mesh_it == ctx.meshes.end()
+                || instance_params.empty())
+            {
+                return;
+            }
+
+            const auto& pipeline = pipeline_it->second;
+            const auto camera_ubo_it = pipeline.ubos.find(vkkk::buf::CameraUBO);
+            const auto mesh_info_ubo_it = pipeline.ubos.find(vkkk::buf::FaceNormalMeshInfo);
+            const auto instance_ssbo_it = pipeline.ssbos.find(vkkk::buf::FaceNormalParams);
+            if (camera_ubo_it == pipeline.ubos.end()
+                || mesh_info_ubo_it == pipeline.ubos.end()
+                || instance_ssbo_it == pipeline.ssbos.end()
+                || image_index >= camera_ubo_it->second.memos.size()
+                || image_index >= mesh_info_ubo_it->second.memos.size())
+            {
+                return;
+            }
+
+            const uint32_t index_count = mesh_it->second.icnt * 3u;
+            vkkk::FaceNormalMeshInfoUBO mesh_info{};
+            mesh_info.vertex_stride_floats = 6;
+            mesh_info.index_count = index_count;
+            mesh_info.instance_count = static_cast<uint32_t>(instance_params.size());
+            mesh_info.use_mesh_normal = use_mesh_normal ? 1u : 0u;
+            mesh_info.normal_length = normal_length;
+            ctx.sync_ubo(pipeline_name, vkkk::buf::CameraUBO, &camera.ubo_data, image_index,
+                static_cast<uint32_t>(sizeof(camera.ubo_data)));
+            ctx.sync_ubo(pipeline_name, vkkk::buf::FaceNormalMeshInfo, &mesh_info, image_index,
+                static_cast<uint32_t>(sizeof(mesh_info)));
+            ctx.sync_ssbo(pipeline_name, vkkk::buf::FaceNormalParams, instance_params.data(),
+                image_index,
+                static_cast<uint32_t>(instance_params.size() * sizeof(vkkk::FaceNormalParamsUBO)));
+
+            const uint32_t triangles_per_instance = index_count / 3u;
+            const uint32_t task_groups_per_instance =
+                (triangles_per_instance + vkkk::face_normal_triangles_per_task - 1u)
+                / vkkk::face_normal_triangles_per_task;
+            if (!ctx.record_mesh_tasks(
+                    cmd,
+                    pipeline_name,
+                    task_groups_per_instance * mesh_info.instance_count,
+                    1,
+                    1,
+                    image_index))
+            {
+                throw std::runtime_error("failed to record mesh tasks for face-normal draw");
+            }
+        };
+
+        draw_wireframe(plane_pipeline_name, "cornell_plane", plane_instances);
+        draw_wireframe(cube_pipeline_name, "cornell_cube", cube_instances);
+        draw_face_normals(plane_normal_pipeline_name, "cornell_plane", plane_normal_instances);
+        draw_face_normals(cube_normal_pipeline_name, "cornell_cube", cube_normal_instances);
         hud.render(static_cast<VkCommandBuffer>(*cmd));
 
         ctx.end_pass(cmd, image_index, pass);

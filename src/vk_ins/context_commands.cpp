@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstring>
 #include <iostream>
 #include <stdexcept>
 
@@ -56,6 +57,72 @@ bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh
     }
     mesh_found->second.emit_draw_cmd_instanced(cmd, pipeline_layout, instance_count, ssbo_offset, desc_set);
     return true;
+}
+
+bool Context::update_push_constants(const std::string& pipeline_name, const std::string& block_name,
+    const void* data, uint32_t byte_size)
+{
+    if (data == nullptr) {
+        return false;
+    }
+
+    auto apply = [&](PushConstantBlock& block) -> bool {
+        const uint32_t capacity = block.size;
+        const uint32_t upload_size = byte_size == 0 ? capacity : std::min(byte_size, capacity);
+        if (upload_size == 0 || block.data.size() < upload_size) {
+            return false;
+        }
+        std::memcpy(block.data.data(), data, upload_size);
+        return true;
+    };
+
+    const auto graphics_it = pipelines.find(pipeline_name);
+    if (graphics_it != pipelines.end()) {
+        const auto pc_it = graphics_it->second.push_constants.find(block_name);
+        if (pc_it != graphics_it->second.push_constants.end()) {
+            return apply(pc_it->second);
+        }
+    }
+    const auto compute_it = compute_pipelines.find(pipeline_name);
+    if (compute_it != compute_pipelines.end()) {
+        const auto pc_it = compute_it->second.push_constants.find(block_name);
+        if (pc_it != compute_it->second.push_constants.end()) {
+            return apply(pc_it->second);
+        }
+    }
+    return false;
+}
+
+bool Context::push_constants(vk::CommandBuffer cmd, const std::string& pipeline_name,
+    const std::string& block_name, const void* data, uint32_t byte_size)
+{
+    if (data != nullptr && !update_push_constants(pipeline_name, block_name, data, byte_size)) {
+        return false;
+    }
+
+    const auto push = [&](const vk::raii::PipelineLayout& layout, const PushConstantBlock& block) {
+        if (block.data.empty() || block.size == 0) {
+            return false;
+        }
+        cmd.pushConstants(*layout, block.stages, block.offset, block.size, block.data.data());
+        return true;
+    };
+
+    const auto graphics_it = pipelines.find(pipeline_name);
+    if (graphics_it != pipelines.end()) {
+        const auto pc_it = graphics_it->second.push_constants.find(block_name);
+        if (pc_it != graphics_it->second.push_constants.end()) {
+            return push(graphics_it->second.vk_pipeline_layout, pc_it->second);
+        }
+    }
+    const auto compute_it = compute_pipelines.find(pipeline_name);
+    if (compute_it != compute_pipelines.end()) {
+        const auto pc_it = compute_it->second.push_constants.find(block_name);
+        if (pc_it != compute_it->second.push_constants.end()) {
+            return push(compute_it->second.vk_pipeline_layout, pc_it->second);
+        }
+    }
+    return false;
 }
 
 bool Context::bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const

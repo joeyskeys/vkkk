@@ -464,6 +464,9 @@ void Context::init(GLFWwindow* win,
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
+    // shaderc's Vulkan 1.3 target emits SPIR-V 1.6 LocalSizeId for mesh/task
+    // local_size_*; that execution mode requires maintenance4.
+    device_features.get<vk::PhysicalDeviceVulkan13Features>().maintenance4 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().shaderDemoteToHelperInvocation =
         supports_shader_demote ? vk::True : vk::False;
     device_features.get<vk::PhysicalDeviceExtendedDynamicStateFeaturesEXT>().extendedDynamicState = VK_TRUE;

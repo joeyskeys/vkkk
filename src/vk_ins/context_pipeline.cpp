@@ -50,6 +50,7 @@ bool Context::create_pipeline(const std::string& name,
     std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
     std::unordered_map<std::string, UBO> pipeline_ubos;
     std::unordered_map<std::string, SSBO> pipeline_ssbos;
+    std::unordered_map<std::string, PushConstantBlock> pipeline_push_constants;
     const bool pipeline_uses_mesh_shader = shader_module_pack.uses_mesh_shader()
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eMeshEXT)
         || shader_module_pack.modules.contains(vk::ShaderStageFlagBits::eTaskEXT);
@@ -200,6 +201,31 @@ bool Context::create_pipeline(const std::string& name,
             tex_layout_binding.stageFlags = stage;
             merge_descriptor_binding(tex_layout_binding);
         }
+
+        for (const auto& [pc_name, pc_info] : module.push_constant_infos) {
+            const auto& [pc_size, pc_offset] = pc_info;
+            auto found = pipeline_push_constants.find(pc_name);
+            if (found == pipeline_push_constants.end()) {
+                PushConstantBlock block{};
+                block.size = pc_size;
+                block.offset = pc_offset;
+                block.stages = stage;
+                block.data.assign(pc_size, 0);
+                pipeline_push_constants.emplace(pc_name, std::move(block));
+            }
+            else {
+                if (found->second.offset != pc_offset) {
+                    std::cout << "Push constant " << pc_name
+                        << " uses inconsistent offsets in pipeline " << name << std::endl;
+                    return false;
+                }
+                found->second.size = std::max(found->second.size, pc_size);
+                found->second.stages |= stage;
+                if (found->second.data.size() < found->second.size) {
+                    found->second.data.resize(found->second.size, 0);
+                }
+            }
+        }
     }
 
     std::vector<vk::DescriptorSetLayoutBinding> descriptor_layouts;
@@ -264,9 +290,22 @@ bool Context::create_pipeline(const std::string& name,
     }
 
     vk::DescriptorSetLayout set_layout_handle = descriptor_set_layout != nullptr ? static_cast<vk::DescriptorSetLayout>(*descriptor_set_layout) : nullptr;
+    std::vector<vk::PushConstantRange> push_constant_ranges;
+    push_constant_ranges.reserve(pipeline_push_constants.size());
+    for (const auto& [pc_name, block] : pipeline_push_constants) {
+        (void)pc_name;
+        vk::PushConstantRange range{};
+        range.stageFlags = block.stages;
+        range.offset = block.offset;
+        range.size = block.size;
+        push_constant_ranges.push_back(range);
+    }
     vk::PipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.setLayoutCount = descriptor_set_layout != nullptr ? 1u : 0u;
     pipeline_layout_info.pSetLayouts = descriptor_set_layout != nullptr ? &set_layout_handle : nullptr;
+    pipeline_layout_info.pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size());
+    pipeline_layout_info.pPushConstantRanges =
+        push_constant_ranges.empty() ? nullptr : push_constant_ranges.data();
     vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
 
     const vk::Format depth_format = depth_only ? find_depth_only_format() : find_depth_format();
@@ -305,6 +344,7 @@ bool Context::create_pipeline(const std::string& name,
     pipeline.uses_mesh_shader = pipeline_uses_mesh_shader;
     pipeline.ubos = std::move(pipeline_ubos);
     pipeline.ssbos = std::move(pipeline_ssbos);
+    pipeline.push_constants = std::move(pipeline_push_constants);
     pipeline.sampler_descriptor_counts = std::move(sampler_descriptor_counts);
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
@@ -469,6 +509,7 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     std::map<uint32_t, std::string> tex_binding_to_name;
     std::unordered_map<std::string, UBO> compute_ubos;
     std::unordered_map<std::string, SSBO> compute_ssbos;
+    std::unordered_map<std::string, PushConstantBlock> compute_push_constants;
 
     for (const auto& binding : shader.bindings) {
         if (binding.kind == ComputeDescriptorKind::StorageImage)
@@ -507,6 +548,15 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
         descriptor_layouts.push_back(layout_binding);
     }
 
+    for (const auto& pc : shader.push_constants) {
+        PushConstantBlock block{};
+        block.size = pc.size;
+        block.offset = pc.offset;
+        block.stages = vk::ShaderStageFlagBits::eCompute;
+        block.data.assign(pc.size, 0);
+        compute_push_constants.emplace(pc.name, std::move(block));
+    }
+
     vk::raii::ShaderModule shader_module{nullptr};
     {
         vk::ShaderModuleCreateInfo shader_module_create_info{};
@@ -526,9 +576,22 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     vk::DescriptorSetLayout set_layout_handle = descriptor_set_layout != nullptr
         ? static_cast<vk::DescriptorSetLayout>(*descriptor_set_layout)
         : nullptr;
+    std::vector<vk::PushConstantRange> push_constant_ranges;
+    push_constant_ranges.reserve(compute_push_constants.size());
+    for (const auto& [pc_name, block] : compute_push_constants) {
+        (void)pc_name;
+        vk::PushConstantRange range{};
+        range.stageFlags = block.stages;
+        range.offset = block.offset;
+        range.size = block.size;
+        push_constant_ranges.push_back(range);
+    }
     vk::PipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.setLayoutCount = descriptor_set_layout != nullptr ? 1u : 0u;
     pipeline_layout_info.pSetLayouts = descriptor_set_layout != nullptr ? &set_layout_handle : nullptr;
+    pipeline_layout_info.pushConstantRangeCount = static_cast<uint32_t>(push_constant_ranges.size());
+    pipeline_layout_info.pPushConstantRanges =
+        push_constant_ranges.empty() ? nullptr : push_constant_ranges.data();
     vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
 
     vk::PipelineShaderStageCreateInfo shader_stage_info{};
@@ -547,6 +610,7 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     pipeline.descriptor_set_layout = std::move(descriptor_set_layout);
     pipeline.ubos = std::move(compute_ubos);
     pipeline.ssbos = std::move(compute_ssbos);
+    pipeline.push_constants = std::move(compute_push_constants);
 
     const uint32_t swapchain_cnt = static_cast<uint32_t>(swapchain_images.size());
     std::unordered_map<vk::DescriptorType, uint32_t> descriptor_type_counts;

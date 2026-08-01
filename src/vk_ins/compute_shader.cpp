@@ -22,6 +22,7 @@ uint32_t reflect_array_size(const spirv_cross::SPIRType& type_info) {
 
 bool reflect_compute_shader(ComputeShader& shader) {
     shader.bindings.clear();
+    shader.push_constants.clear();
     shader.local_size = {1, 1, 1};
 
     spirv_cross::CompilerGLSL comp(shader.spirv_code);
@@ -81,6 +82,38 @@ bool reflect_compute_shader(ComputeShader& shader) {
         append_image_binding(resource, ComputeDescriptorKind::StorageImage);
     }
 
+    for (const auto& pc : resources.push_constant_buffers) {
+        std::string name = comp.get_name(pc.base_type_id);
+        if (name.empty()) {
+            name = pc.name;
+        }
+        if (name.empty()) {
+            name = "PushConstants";
+        }
+        const auto base_type_info = comp.get_type(pc.base_type_id);
+        auto struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
+        uint32_t offset = 0;
+        const auto ranges = comp.get_active_buffer_ranges(pc.id);
+        if (!ranges.empty()) {
+            offset = static_cast<uint32_t>(ranges.front().offset);
+            uint32_t end = 0;
+            for (const auto& range : ranges) {
+                end = std::max(end, static_cast<uint32_t>(range.offset + range.range));
+            }
+            if (end > offset) {
+                struct_size = end - offset;
+            }
+        }
+        if (struct_size == 0) {
+            continue;
+        }
+        shader.push_constants.push_back(ComputePushConstant{
+            .name = std::move(name),
+            .size = struct_size,
+            .offset = offset,
+        });
+    }
+
     std::sort(shader.bindings.begin(), shader.bindings.end(),
         [](const ComputeDescriptorBinding& a, const ComputeDescriptorBinding& b) {
             return a.binding < b.binding;
@@ -103,6 +136,7 @@ bool reflect_compute_shader(ComputeShader& shader) {
 bool ComputeShader::load(const char* source, const std::string& source_name) {
     spirv_code.clear();
     bindings.clear();
+    push_constants.clear();
 
     if (source == nullptr) {
         std::cout << "Compute shader source pointer is null" << std::endl;

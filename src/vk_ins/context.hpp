@@ -136,6 +136,14 @@ struct DepthAttachment {
     bool                                    initialized = false;
 };
 
+// Reflected push-constant block with CPU staging storage.
+struct PushConstantBlock {
+    uint32_t size = 0;
+    uint32_t offset = 0;
+    vk::ShaderStageFlags stages{};
+    std::vector<char> data;
+};
+
 struct Pipeline {
     vk::raii::Pipeline vk_pipeline{nullptr};
     vk::raii::PipelineLayout vk_pipeline_layout{nullptr};
@@ -147,6 +155,7 @@ struct Pipeline {
     // Keys are reflected GLSL block/type names from SPIR-V.
     std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, SSBO> ssbos;
+    std::unordered_map<std::string, PushConstantBlock> push_constants;
     std::unordered_map<uint32_t, uint32_t> sampler_descriptor_counts;
 };
 
@@ -158,6 +167,7 @@ struct ComputePipeline {
     std::vector<vk::raii::DescriptorSet> descriptor_sets;
     std::unordered_map<std::string, UBO> ubos;
     std::unordered_map<std::string, SSBO> ssbos;
+    std::unordered_map<std::string, PushConstantBlock> push_constants;
 };
 
 struct PipelineOption {
@@ -322,6 +332,12 @@ public:
         uint32_t frame_idx, uint32_t byte_size = 0) const;
     bool sync_ssbo(const std::string& pipeline_name, const std::string& block_name, const void* data,
         uint32_t frame_idx, uint32_t byte_size = 0) const;
+    // Update CPU staging for a reflected push-constant block (does not record cmds).
+    bool update_push_constants(const std::string& pipeline_name, const std::string& block_name,
+        const void* data, uint32_t byte_size = 0);
+    // Record vkCmdPushConstants. If data is non-null, updates staging first.
+    bool push_constants(vk::CommandBuffer cmd, const std::string& pipeline_name,
+        const std::string& block_name, const void* data = nullptr, uint32_t byte_size = 0);
     // Bind graphics pipeline + per-frame descriptor set.
     bool bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const;
     // Draw a named mesh. Call bind() first for the same pipeline/frame.

@@ -21,6 +21,8 @@ using StorageBufInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, u
 using ImgInfoMap = std::unordered_map<std::string, uint32_t>;
 using AttrInfoMap = std::vector<std::tuple<uint32_t, uint32_t, std::string>>;
 using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>>;
+// Keyed by GLSL block/type name → (byte size, byte offset in the push-constant space).
+using PushConstantInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, uint32_t>>;
 
 class ShaderModule {
 public:
@@ -32,6 +34,7 @@ public:
     ImgInfoMap                                      img_infos;
     AttrInfoMap                                     attr_infos;
     TexImgPairs                                     tex_img_pairs;
+    PushConstantInfoMap                             push_constant_infos;
 
     bool load(const char* source, vk::ShaderStageFlagBits t,
         const std::string& source_name = "inline_shader");

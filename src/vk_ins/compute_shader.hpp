@@ -28,11 +28,18 @@ struct ComputeDescriptorBinding {
     ComputeDescriptorKind kind = ComputeDescriptorKind::UniformBuffer;
 };
 
+struct ComputePushConstant {
+    std::string name;
+    uint32_t size = 0;
+    uint32_t offset = 0;
+};
+
 class ComputeShader {
 public:
     std::vector<char> source_code;
     std::vector<uint32_t> spirv_code;
     std::vector<ComputeDescriptorBinding> bindings;
+    std::vector<ComputePushConstant> push_constants;
     std::array<uint32_t, 3> local_size{1, 1, 1};
 
     bool load(const char* source, const std::string& source_name = "inline_compute_shader");

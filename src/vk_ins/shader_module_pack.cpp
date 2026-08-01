@@ -26,6 +26,7 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
     mod.storage_buf_infos.clear();
     mod.img_infos.clear();
     mod.attr_infos.clear();
+    mod.push_constant_infos.clear();
 
     spirv_cross::CompilerGLSL comp(mod.spirv_code);
     auto res = comp.get_shader_resources();
@@ -87,6 +88,33 @@ static bool reflect_shader_module(ShaderModule& mod, const vk::ShaderStageFlagBi
             }
         }
         mod.storage_buf_infos.emplace(name, std::make_tuple(struct_size, array_size, binding_idx));
+    }
+
+    // Push constants — key by block/type name; offset is the first used member offset.
+    for (auto& pc : res.push_constant_buffers) {
+        auto name = comp.get_name(pc.base_type_id);
+        if (name.empty())
+            name = pc.name;
+        if (name.empty())
+            name = "PushConstants";
+        const auto base_type_info = comp.get_type(pc.base_type_id);
+        auto struct_size = static_cast<uint32_t>(comp.get_declared_struct_size(base_type_info));
+        uint32_t offset = 0;
+        const auto ranges = comp.get_active_buffer_ranges(pc.id);
+        if (!ranges.empty()) {
+            offset = static_cast<uint32_t>(ranges.front().offset);
+            uint32_t end = 0;
+            for (const auto& range : ranges) {
+                end = std::max(end, static_cast<uint32_t>(range.offset + range.range));
+            }
+            if (end > offset) {
+                struct_size = end - offset;
+            }
+        }
+        if (struct_size == 0) {
+            continue;
+        }
+        mod.push_constant_infos.emplace(name, std::make_tuple(struct_size, offset));
     }
 
     // input attrs

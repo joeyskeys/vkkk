@@ -259,6 +259,15 @@ struct CameraGPU {
     void sync(Camera& cam, Context* ctx) const;
 };
 
+// GPU buffer of VkDraw(Indexed)IndirectCommand, one copy per swapchain image.
+struct IndirectBuffer {
+    bool indexed = true;
+    uint32_t command_capacity = 0;
+    uint32_t command_stride = 0;
+    std::vector<vk::raii::Buffer> gpu_bufs;
+    std::vector<vk::raii::DeviceMemory> memos;
+};
+
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
 class Context {
@@ -343,6 +352,18 @@ public:
     // Draw a named mesh. Call bind() first for the same pipeline/frame.
     bool draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
         uint32_t instance_count, uint32_t instance_offset = 0) const;
+    // Create/resize a named indirect-command buffer (per swapchain image).
+    bool create_indirect_buffer(const std::string& name, uint32_t command_capacity,
+        bool indexed = true);
+    bool resize_indirect_buffer(const std::string& name, uint32_t command_capacity);
+    // Upload Draw(Indexed)IndirectCommand array for one frame. command_count 0 = capacity.
+    bool sync_indirect_buffer(const std::string& name, const void* data, uint32_t frame_idx,
+        uint32_t command_count = 0) const;
+    // Bind mesh VB/IB then vkCmdDraw(Indexed)Indirect. Call bind() first.
+    // draw_count 0 = command_capacity; first_draw indexes into the command array.
+    bool draw_indirect(vk::CommandBuffer cmd, const std::string& mesh_name,
+        const std::string& indirect_name, uint32_t frame_idx, uint32_t draw_count = 0,
+        uint32_t first_draw = 0) const;
     bool alloc_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name);
     bool resize_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name,
         size_t new_vecsize);
@@ -581,6 +602,7 @@ public:
     std::unordered_map<std::string, Pipeline> pipelines;
     std::unordered_map<std::string, ComputePipeline> compute_pipelines;
     std::unordered_map<std::string, MeshGPU> meshes;
+    std::unordered_map<std::string, IndirectBuffer> indirect_buffers;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
     bool sample_rate_shading_enabled = false;

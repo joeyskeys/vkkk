@@ -462,6 +462,9 @@ void Context::init(GLFWwindow* win,
     device_features.get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy = VK_TRUE;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading =
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
+    // Needed for draw_indirect with draw_count > 1.
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.multiDrawIndirect =
+        supported_features.multiDrawIndirect;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
     // shaderc's Vulkan 1.3 target emits SPIR-V 1.6 LocalSizeId for mesh/task

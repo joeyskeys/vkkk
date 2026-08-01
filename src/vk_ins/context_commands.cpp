@@ -153,6 +153,131 @@ bool Context::draw(vk::CommandBuffer cmd, const std::string& pipeline_name, cons
         cmd, mesh_name, *pipeline_it->second.vk_pipeline_layout, instance_count, instance_offset, nullptr);
 }
 
+bool Context::create_indirect_buffer(const std::string& name, uint32_t command_capacity, bool indexed) {
+    if (command_capacity == 0) {
+        std::cout << "Indirect buffer " << name << " capacity must be non-zero" << std::endl;
+        return false;
+    }
+    if (indirect_buffers.contains(name)) {
+        return resize_indirect_buffer(name, command_capacity);
+    }
+
+    IndirectBuffer buf{};
+    buf.indexed = indexed;
+    buf.command_capacity = command_capacity;
+    buf.command_stride = indexed
+        ? static_cast<uint32_t>(sizeof(vk::DrawIndexedIndirectCommand))
+        : static_cast<uint32_t>(sizeof(vk::DrawIndirectCommand));
+    const vk::DeviceSize byte_size =
+        static_cast<vk::DeviceSize>(buf.command_stride) * buf.command_capacity;
+    // Host-visible for sync_indirect_buffer; storage so compute can fill commands too.
+    const auto usage = vk::BufferUsageFlagBits::eIndirectBuffer
+        | vk::BufferUsageFlagBits::eStorageBuffer
+        | vk::BufferUsageFlagBits::eTransferDst;
+    buf.gpu_bufs.reserve(swapchain_images.size());
+    buf.memos.reserve(swapchain_images.size());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        auto [gpu_buf, memo] = create_buffer(
+            byte_size, usage,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        buf.gpu_bufs.push_back(std::move(gpu_buf));
+        buf.memos.push_back(std::move(memo));
+    }
+    indirect_buffers.emplace(name, std::move(buf));
+    return true;
+}
+
+bool Context::resize_indirect_buffer(const std::string& name, uint32_t command_capacity) {
+    const auto it = indirect_buffers.find(name);
+    if (it == indirect_buffers.end() || command_capacity == 0) {
+        return false;
+    }
+    if (it->second.command_capacity == command_capacity
+        && it->second.gpu_bufs.size() == swapchain_images.size())
+    {
+        return true;
+    }
+
+    auto& buf = it->second;
+    buf.command_capacity = command_capacity;
+    buf.command_stride = buf.indexed
+        ? static_cast<uint32_t>(sizeof(vk::DrawIndexedIndirectCommand))
+        : static_cast<uint32_t>(sizeof(vk::DrawIndirectCommand));
+    const vk::DeviceSize byte_size =
+        static_cast<vk::DeviceSize>(buf.command_stride) * buf.command_capacity;
+    const auto usage = vk::BufferUsageFlagBits::eIndirectBuffer
+        | vk::BufferUsageFlagBits::eStorageBuffer
+        | vk::BufferUsageFlagBits::eTransferDst;
+    buf.gpu_bufs.clear();
+    buf.memos.clear();
+    buf.gpu_bufs.reserve(swapchain_images.size());
+    buf.memos.reserve(swapchain_images.size());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        auto [gpu_buf, memo] = create_buffer(
+            byte_size, usage,
+            vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+        buf.gpu_bufs.push_back(std::move(gpu_buf));
+        buf.memos.push_back(std::move(memo));
+    }
+    return true;
+}
+
+bool Context::sync_indirect_buffer(const std::string& name, const void* data, uint32_t frame_idx,
+    uint32_t command_count) const
+{
+    if (data == nullptr) {
+        return false;
+    }
+    const auto it = indirect_buffers.find(name);
+    if (it == indirect_buffers.end() || frame_idx >= it->second.memos.size()) {
+        return false;
+    }
+    const auto& buf = it->second;
+    const uint32_t count = command_count == 0 ? buf.command_capacity
+        : std::min(command_count, buf.command_capacity);
+    if (count == 0 || buf.command_stride == 0) {
+        return false;
+    }
+    const uint32_t byte_size = count * buf.command_stride;
+    void* mapped = buf.memos[frame_idx].mapMemory(0, byte_size);
+    std::memcpy(mapped, data, byte_size);
+    buf.memos[frame_idx].unmapMemory();
+    return true;
+}
+
+bool Context::draw_indirect(vk::CommandBuffer cmd, const std::string& mesh_name,
+    const std::string& indirect_name, uint32_t frame_idx, uint32_t draw_count,
+    uint32_t first_draw) const
+{
+    const auto mesh_it = meshes.find(mesh_name);
+    const auto indirect_it = indirect_buffers.find(indirect_name);
+    if (mesh_it == meshes.end() || indirect_it == indirect_buffers.end()) {
+        return false;
+    }
+    const auto& mesh = mesh_it->second;
+    const auto& buf = indirect_it->second;
+    if (frame_idx >= buf.gpu_bufs.size() || first_draw >= buf.command_capacity) {
+        return false;
+    }
+    const uint32_t max_draws = buf.command_capacity - first_draw;
+    const uint32_t count = draw_count == 0 ? max_draws : std::min(draw_count, max_draws);
+    if (count == 0) {
+        return false;
+    }
+
+    const vk::DeviceSize offset =
+        static_cast<vk::DeviceSize>(first_draw) * buf.command_stride;
+    cmd.bindVertexBuffers(0, *mesh.vbuf, {0});
+    if (buf.indexed) {
+        cmd.bindIndexBuffer(*mesh.ibuf, 0, vk::IndexType::eUint32);
+        cmd.drawIndexedIndirect(*buf.gpu_bufs[frame_idx], offset, count, buf.command_stride);
+    }
+    else {
+        cmd.drawIndirect(*buf.gpu_bufs[frame_idx], offset, count, buf.command_stride);
+    }
+    return true;
+}
+
 void Context::dispatch_compute(const std::string& pipeline_name, uint32_t group_x, uint32_t group_y,
     uint32_t group_z, uint32_t descriptor_set_index)
 {

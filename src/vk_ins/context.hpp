@@ -95,6 +95,7 @@ struct Texture {
 inline constexpr int32_t kSwapchainTarget = -1;
 inline constexpr int32_t kNoDepth = -1;
 inline constexpr int32_t kDefaultDepth = -2;
+inline constexpr uint32_t kInvalidTargetIndex = ~0u;
 
 enum class PassLoadOp : uint8_t { Clear, Load, DontCare };
 enum class PassStoreOp : uint8_t { Store, DontCare };
@@ -395,7 +396,8 @@ public:
         const fs::path& path);
     bool add_cubemap(const std::string& name, uint32_t binding,
         const fs::path& path);
-    bool add_render_target(vk::ImageUsageFlags usage, vk::Format format,
+    // Returns the new target index, or kInvalidTargetIndex on failure.
+    uint32_t add_render_target(vk::ImageUsageFlags usage, vk::Format format,
         uint32_t width = 0, uint32_t height = 0,
         vk::ImageLayout layout = vk::ImageLayout::eGeneral,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);

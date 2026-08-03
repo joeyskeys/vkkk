@@ -516,7 +516,7 @@ bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
     return true;
 }
 
-bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
+uint32_t Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     uint32_t width, uint32_t height, vk::ImageLayout layout, vk::SampleCountFlagBits samples)
 {
     Texture target{};
@@ -529,7 +529,7 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     const uint32_t target_height = height == 0 ? swapchain_extent.height : height;
     if (target_width == 0 || target_height == 0) {
         std::cout << "Render target dimensions must be non-zero" << std::endl;
-        return false;
+        return kInvalidTargetIndex;
     }
     target.width = target_width;
     target.height = target_height;
@@ -555,8 +555,9 @@ bool Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     target.layout = layout;
     target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
 
+    const uint32_t index = static_cast<uint32_t>(targets.size());
     targets.emplace_back(std::move(target));
-    return true;
+    return index;
 }
 
 bool Context::resize_render_target(uint32_t target_index, uint32_t width, uint32_t height) {

@@ -78,30 +78,6 @@ else()
     target_link_libraries(vkkk PRIVATE ${SHADERC_RELEASE_LIBRARIES})
 endif()
 
-add_executable(vkrendererfp renderer_main_fp.cpp)
-target_link_libraries(vkrendererfp
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkrendererforward renderer_main_forward.cpp)
-target_link_libraries(vkrendererforward
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkrendererforwardplus renderer_main_forwardplus.cpp)
-target_link_libraries(vkrendererforwardplus
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
-add_executable(vkrendererwireframe renderer_main_wireframe.cpp)
-target_link_libraries(vkrendererwireframe
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
-
 #if(VKKK_BUILD_PYTHON_BINDINGS)
     #add_subdirectory(binding)
 #endif()

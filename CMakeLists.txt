@@ -64,6 +64,8 @@ find_package(glm CONFIG REQUIRED)
 
 include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_SOURCE_DIR}/src)
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
+include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
     find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)

@@ -13,6 +13,7 @@ set(HEADERS
     concepts/camera.h
     concepts/line.h
     concepts/mesh.h
+    concepts/mesh_view.hpp
     gui/gui.h
     renderer/renderer.hpp
     renderer/forward.h
@@ -42,6 +43,7 @@ set(SRCS
     concepts/camera.cpp
     concepts/line.cpp
     concepts/mesh.cpp
+    concepts/mesh_view.cpp
     gui/gui.cpp
     renderer/renderer.cpp
     renderer/forward.cpp
@@ -58,9 +60,6 @@ set(SRCS
     vk_ins/context_resources.cpp
     vk_ins/context_glfw.cpp
     vk_ins/context_utils.cpp)
-
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
 
 add_library(vkkk ${HEADERS} ${SRCS})
 target_link_libraries(vkkk

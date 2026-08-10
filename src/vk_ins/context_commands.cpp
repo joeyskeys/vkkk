@@ -671,13 +671,17 @@ void Context::record_cmds(uint32_t image_index,
     end_cmds(image_index);
 }
 
-void Context::draw_frame() {
+bool Context::begin_frame(Frame& frame) {
+    if (frame_active) {
+        throw std::runtime_error("begin_frame called while another frame is active");
+    }
+
     device.waitForFences(*in_flight_fences[current_frame], vk::True, UINT64_MAX);
 
     auto [result, image_index] = swapchain.acquireNextImage(UINT64_MAX, *image_available_semaphores[current_frame], nullptr);
     if (result == vk::Result::eErrorOutOfDateKHR) {
         recreate_swapchain();
-        return;
+        return false;
     }
     if (result != vk::Result::eSuccess && result != vk::Result::eSuboptimalKHR) {
         throw std::runtime_error("failed to acquire swapchain image");
@@ -689,11 +693,43 @@ void Context::draw_frame() {
     images_in_flight[image_index] = *in_flight_fences[current_frame];
 
     const auto now = std::chrono::steady_clock::now();
-    const float dt = std::chrono::duration<float>(now - last_frame_time_).count();
+    frame.dt = std::chrono::duration<float>(now - last_frame_time_).count();
     last_frame_time_ = now;
+    frame.image_index = image_index;
+    frame.serial = next_frame_serial++;
+    active_frame_image_index = image_index;
+    active_frame_serial = frame.serial;
+    frame_active = true;
+    frame_recorded = false;
+    return true;
+}
 
-    if (update_cbk_) {
-        update_cbk_(image_index, dt);
+void Context::record_frame(const Frame& frame,
+    const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func)
+{
+    if (!frame_active || frame.image_index != active_frame_image_index
+        || frame.serial != active_frame_serial)
+    {
+        throw std::runtime_error("record_frame called with an inactive frame");
+    }
+    if (frame_recorded) {
+        throw std::runtime_error("record_frame called more than once for a frame");
+    }
+
+    begin_cmds(frame.image_index);
+    emit_func(command_buffers[frame.image_index], frame.image_index);
+    end_cmds(frame.image_index);
+    frame_recorded = true;
+}
+
+void Context::end_frame(const Frame& frame) {
+    if (!frame_active || frame.image_index != active_frame_image_index
+        || frame.serial != active_frame_serial)
+    {
+        throw std::runtime_error("end_frame called with an inactive frame");
+    }
+    if (!frame_recorded) {
+        throw std::runtime_error("end_frame called before record_frame");
     }
 
     device.resetFences(*in_flight_fences[current_frame]);
@@ -704,25 +740,44 @@ void Context::draw_frame() {
     submit_info.pWaitSemaphores = &*image_available_semaphores[current_frame];
     submit_info.pWaitDstStageMask = &wait_stage_mask;
     submit_info.commandBufferCount = 1;
-    submit_info.pCommandBuffers = &*command_buffers[image_index];
+    submit_info.pCommandBuffers = &*command_buffers[frame.image_index];
     submit_info.signalSemaphoreCount = 1;
-    submit_info.pSignalSemaphores = &*render_finished_semaphores[image_index];
+    submit_info.pSignalSemaphores = &*render_finished_semaphores[frame.image_index];
     queue.submit(submit_info, *in_flight_fences[current_frame]);
 
     vk::SwapchainKHR swapchains[] = {*swapchain};
     vk::PresentInfoKHR present_info{};
     present_info.waitSemaphoreCount = 1;
-    present_info.pWaitSemaphores = &*render_finished_semaphores[image_index];
+    present_info.pWaitSemaphores = &*render_finished_semaphores[frame.image_index];
     present_info.swapchainCount = 1;
     present_info.pSwapchains = swapchains;
-    present_info.pImageIndices = &image_index;
-    result = queue.presentKHR(present_info);
+    present_info.pImageIndices = &frame.image_index;
+    const auto result = queue.presentKHR(present_info);
     if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || frame_buffer_resized) {
         frame_buffer_resized = false;
         recreate_swapchain();
     }
 
     current_frame = (current_frame + 1) % max_frames_in_flight;
+    frame_active = false;
+    frame_recorded = false;
+    active_frame_image_index = ~0u;
+    active_frame_serial = 0;
+}
+
+void Context::draw_frame() {
+    Frame frame{};
+    if (!begin_frame(frame)) {
+        return;
+    }
+
+    if (update_cbk_) {
+        update_cbk_(frame.image_index, frame.dt);
+    }
+
+    // Legacy callbacks record the per-image command buffer themselves.
+    frame_recorded = true;
+    end_frame(frame);
 }
 
 } // namespace vkkk

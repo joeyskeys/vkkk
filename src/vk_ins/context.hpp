@@ -273,6 +273,12 @@ struct IndirectBuffer {
 // these parts are not frequently changed or used.
 class Context {
 public:
+    struct Frame {
+        uint32_t image_index = ~0u;
+        float dt = 0.0f;
+        uint64_t serial = 0;
+    };
+
     // Initialization, window, and swapchain
     Context(bool enable_debug_m = true);
 
@@ -328,6 +334,13 @@ public:
     // Depth-only dynamic rendering into a custom depth attachment (no color target).
     bool record_depth_pass(vk::raii::CommandBuffer& cmd, uint32_t attachment_index,
         const std::function<void(vk::raii::CommandBuffer&)>& emit_func);
+    // Explicit frame lifecycle: acquire, record commands, then submit and present.
+    // A Frame is valid only after begin_frame succeeds and until end_frame returns.
+    bool begin_frame(Frame& frame);
+    void record_frame(const Frame& frame,
+        const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func);
+    void end_frame(const Frame& frame);
+    // Legacy callback-based convenience API. Prefer begin_frame/record_frame/end_frame.
     void draw_frame();
 
     // GPU buffers and descriptors
@@ -584,6 +597,11 @@ private:
     UpdateCallback update_cbk_;
     ResizeCallback resize_cbk_;
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();
+    bool frame_active = false;
+    bool frame_recorded = false;
+    uint32_t active_frame_image_index = ~0u;
+    uint64_t active_frame_serial = 0;
+    uint64_t next_frame_serial = 1;
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
     bool task_shader_available = false;

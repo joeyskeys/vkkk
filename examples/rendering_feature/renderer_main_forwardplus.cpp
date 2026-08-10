@@ -218,7 +218,7 @@ int main() {
     float frame_dt = 0.0f;
     float raw_frame_dt = 0.0f;
 
-    ctx.set_update_cbk([&](uint32_t image_index, float duration) {
+    const auto update = [&](float duration) {
         raw_frame_dt = duration;
         const auto ext = ctx.extent();
         camera.ratio = static_cast<float>(ext.width) / static_cast<float>(std::max(ext.height, 1u));
@@ -244,24 +244,29 @@ int main() {
         ImGui::Text("Box instances: %d", 2);
         ImGui::Text("Point lights: %u", point_light_count);
         ImGui::End();
+    };
 
-        ctx.begin_cmds(image_index);
-        auto& cmd = ctx.command_buffers[image_index];
+    const auto record = [&](vk::raii::CommandBuffer& cmd, uint32_t image_index) {
         renderer.prepare_light_clusters(cmd, image_index);
         const vkkk::PassDesc pass{};
         ctx.begin_pass(cmd, image_index, pass);
         renderer.record_commands(cmd, image_index);
         hud.render(static_cast<VkCommandBuffer>(*cmd));
         ctx.end_pass(cmd, image_index, pass);
-        ctx.end_cmds(image_index);
-    });
+    };
 
     using Clock = std::chrono::steady_clock;
     auto next_frame_tick = Clock::now();
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();
         const auto frame_begin = Clock::now();
-        ctx.draw_frame();
+        vkkk::Context::Frame frame{};
+        if (!ctx.begin_frame(frame)) {
+            continue;
+        }
+        update(frame.dt);
+        ctx.record_frame(frame, record);
+        ctx.end_frame(frame);
         auto frame_end = Clock::now();
 
         if (limit_fps_enabled && target_fps > 1.0f) {

@@ -15,6 +15,7 @@ set(HEADERS
     concepts/mesh.h
     concepts/mesh_view.hpp
     gui/gui.h
+    vp/viewport.hpp
     renderer/renderer.hpp
     renderer/forward.h
     renderer/forwardp.hpp
@@ -45,6 +46,7 @@ set(SRCS
     concepts/mesh.cpp
     concepts/mesh_view.cpp
     gui/gui.cpp
+    vp/viewport.cpp
     renderer/renderer.cpp
     renderer/forward.cpp
     renderer/forwardp.cpp

@@ -23,6 +23,7 @@ inline constexpr const char* ShadowResolve = "ShadowResolve";
 inline constexpr const char* MainDirectionalShadow = "MainDirectionalShadow";
 
 inline constexpr const char* PhongInstanceAttrs = "PhongInstanceAttrs";
+inline constexpr const char* FixedColorInstanceAttrs = "FixedColorInstanceAttrs";
 inline constexpr const char* PointLights = "PointLights";
 inline constexpr const char* ClusterGrid = "ClusterGrid";
 inline constexpr const char* ClusterLightIndices = "ClusterLightIndices";

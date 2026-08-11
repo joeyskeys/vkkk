@@ -577,6 +577,7 @@ private:
     vk::raii::SwapchainKHR swapchain = nullptr;
     std::vector<vk::Image> swapchain_images;
     std::vector<vk::raii::ImageView> swapchain_image_views;
+    std::vector<vk::ImageLayout> swapchain_image_layouts;
     vk::Extent2D swapchain_extent;
     vk::SurfaceFormatKHR swapchain_surface_format;
 

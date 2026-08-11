@@ -379,13 +379,17 @@ void Context::begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, con
             view = *swapchain_image_views[image_index];
             image = swapchain_images[image_index];
             extent = swapchain_extent;
-            old_layout = vk::ImageLayout::eUndefined;
+            old_layout = swapchain_image_layouts[image_index];
+            const bool was_color_attachment = old_layout == vk::ImageLayout::eColorAttachmentOptimal;
             transit_presentation_image_layout(
                 cmd, image, old_layout, vk::ImageLayout::eColorAttachmentOptimal,
-                {}, vk::AccessFlagBits2::eColorAttachmentWrite,
-                vk::PipelineStageFlagBits2::eColorAttachmentOutput,
+                was_color_attachment ? vk::AccessFlagBits2::eColorAttachmentWrite : vk::AccessFlags2{},
+                vk::AccessFlagBits2::eColorAttachmentWrite,
+                was_color_attachment ? vk::PipelineStageFlagBits2::eColorAttachmentOutput
+                                     : vk::PipelineStageFlagBits2::eTopOfPipe,
                 vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                 vk::ImageAspectFlagBits::eColor);
+            swapchain_image_layouts[image_index] = vk::ImageLayout::eColorAttachmentOptimal;
         }
         else {
             if (color.target_index < 0
@@ -570,6 +574,7 @@ void Context::end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const
                     vk::PipelineStageFlagBits2::eColorAttachmentOutput,
                     vk::PipelineStageFlagBits2::eBottomOfPipe,
                     vk::ImageAspectFlagBits::eColor);
+                swapchain_image_layouts[image_index] = vk::ImageLayout::ePresentSrcKHR;
             }
             continue;
         }
@@ -662,11 +667,12 @@ void Context::record_cmds(uint32_t image_index,
     if (!pass.present) {
         transit_presentation_image_layout(
             cmd_buf, swapchain_images[image_index],
-            vk::ImageLayout::eUndefined, vk::ImageLayout::ePresentSrcKHR,
+            swapchain_image_layouts[image_index], vk::ImageLayout::ePresentSrcKHR,
             {}, {},
             vk::PipelineStageFlagBits2::eTopOfPipe,
             vk::PipelineStageFlagBits2::eBottomOfPipe,
             vk::ImageAspectFlagBits::eColor);
+        swapchain_image_layouts[image_index] = vk::ImageLayout::ePresentSrcKHR;
     }
     end_cmds(image_index);
 }

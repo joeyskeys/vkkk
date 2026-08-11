@@ -260,6 +260,7 @@ void Context::create_swapchain() {
     swapchain_create_info.clipped = VK_TRUE;
     swapchain = vk::raii::SwapchainKHR(device, swapchain_create_info);
     swapchain_images = swapchain.getImages();
+    swapchain_image_layouts.assign(swapchain_images.size(), vk::ImageLayout::eUndefined);
 }
 
 void Context::create_imageviews() {

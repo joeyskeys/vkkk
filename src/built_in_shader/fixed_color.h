@@ -22,39 +22,39 @@ layout(binding = 0) uniform CameraUBO {
     mat4 proj;
 } ubo;
 
+struct FixedColorInstanceAttr {
+    mat4 model;
+    vec4 color;
+};
+
 layout(std430, binding = 2) readonly buffer FixedColorInstanceAttrs {
-    mat4 model[16];
-    vec4 color[16];
+    FixedColorInstanceAttr attrs[];
 } instance_attrs;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 0) out vec4 fragColor;
 
 void main() {
-    gl_Position = ubo.proj * ubo.view * instance_attrs.model[gl_InstanceIndex] * vec4(inPosition, 1.0);
-    fragColor = instance_attrs.color[gl_InstanceIndex];
+    gl_Position = ubo.proj * ubo.view
+        * instance_attrs.attrs[gl_InstanceIndex].model * vec4(inPosition, 1.0);
+    fragColor = instance_attrs.attrs[gl_InstanceIndex].color;
 }
 )";
 
 inline constexpr const char fixed_color_frag[] = R"(
 #version 450
 
-layout(binding = 1) uniform FixedColor {
-    vec4 color;
-} fixed_color;
-
+layout(location = 0) in vec4 fragColor;
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    outColor = fixed_color.color;
+    outColor = fragColor;
 }
 )";
 
 namespace built_in_shader
 {
 using FixedColorTransformUBO = ::vkkk::CameraUBO;
-using FixedColorUBO = ::vkkk::FixedColorUBO;
-using FixedColorDrawModeUBO = ::vkkk::FixedColorDrawModeUBO;
 inline constexpr auto& fixed_color_vert = ::vkkk::fixed_color_vert;
 inline constexpr auto& fixed_color_frag = ::vkkk::fixed_color_frag;
 } // namespace built_in_shader

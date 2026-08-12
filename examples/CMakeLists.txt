@@ -22,6 +22,11 @@ target_link_libraries(vkrendererwireframe
         vkkk
         OpenImageIO::OpenImageIO)
 
+add_executable(vp_viewport viewport/viewport_main.cpp)
+target_link_libraries(vp_viewport
+    PRIVATE
+        vkkk)
+
 # add_executable(api_usage_example api_usage/api_usage_example.cpp)
 # target_link_libraries(api_usage_example
 #     PRIVATE

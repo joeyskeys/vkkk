@@ -260,7 +260,7 @@ void DrawableMgr::add_sphere(const std::string& name, const std::vector<VERT_COM
 void DrawableMgr::add_line(const std::string& name, const std::vector<VERT_COMP>& cs,
     const glm::vec3& p0, const glm::vec3& p1)
 {
-    Line line(cs);
+    Lines line(cs);
     line.load(p0, p1);
     lines.insert_or_assign(name, std::move(line));
 }
@@ -273,6 +273,9 @@ const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
 void DrawableMgr::sync_to_gpu(Context* ctx) {
     for (auto& [name, mesh] : meshes) {
         ctx->load_mesh(name, mesh);
+    }
+    for (auto& [name, line_data] : lines) {
+        ctx->load_lines(name, line_data);
     }
 }
 

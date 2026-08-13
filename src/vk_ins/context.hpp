@@ -22,6 +22,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include "concepts/line.h"
 #include "concepts/mesh.h"
 #include "vk_ins/compute_shader.hpp"
 #include "vk_ins/shader_module_pack.hpp"
@@ -246,9 +247,24 @@ struct MeshGPU {
     
     void sync(const Mesh& mesh, class Context* ctx);
     void emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
-        const vk::DescriptorSet* desc_set = nullptr) const;
+        const vk::DescriptorSet* desc_set = nullptr, uint32_t index_count = 0) const;
     void emit_draw_cmd_instanced(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
-        uint32_t instance_count, uint32_t ssbo_offset, const vk::DescriptorSet* desc_set = nullptr) const;
+        uint32_t instance_count, uint32_t ssbo_offset, const vk::DescriptorSet* desc_set = nullptr,
+        uint32_t index_count = 0) const;
+};
+
+struct LinesGPU {
+    vk::raii::Buffer                        vbuf{nullptr};
+    vk::raii::DeviceMemory                  vbuf_memo{nullptr};
+    vk::raii::Buffer                        ibuf{nullptr};
+    vk::raii::DeviceMemory                  ibuf_memo{nullptr};
+    uint32_t                                vcnt = 0;
+    uint32_t                                icnt = 0;
+    vk::DeviceSize                          vert_bytes = 0;
+
+    void sync(const Lines& lines, class Context* ctx);
+    void emit_draw_cmd(vk::CommandBuffer cmd_buf, uint32_t index_count = 0,
+        uint32_t instance_count = 1, uint32_t instance_offset = 0) const;
 };
 
 struct CameraGPU {
@@ -320,7 +336,7 @@ public:
         uint32_t descriptor_set_index = 0) const;
     bool draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
         vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
-        const vk::DescriptorSet* desc_set = nullptr) const;
+        const vk::DescriptorSet* desc_set = nullptr, uint32_t index_count = 0) const;
     // Reset/begin (or end) the per-swapchain command buffer.
     void begin_cmds(uint32_t image_index);
     void end_cmds(uint32_t image_index);
@@ -365,7 +381,15 @@ public:
     bool bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint32_t frame_idx) const;
     // Draw a named mesh. Call bind() first for the same pipeline/frame.
     bool draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
-        uint32_t instance_count, uint32_t instance_offset = 0) const;
+        uint32_t instance_count, uint32_t instance_offset = 0, uint32_t index_count = 0) const;
+    // Draw a named mesh with an explicit index count. Call bind() first for the intended pipeline/frame.
+    bool draw_indexed(vk::CommandBuffer cmd, const std::string& mesh_name, uint32_t index_count,
+        uint32_t instance_count = 1, uint32_t instance_offset = 0) const;
+    // Draw named indexed line-list data. Call bind() first with an eLineList pipeline.
+    // index_count 0 draws the complete line index buffer.
+    bool draw_lines(vk::CommandBuffer cmd, const std::string& lines_name,
+        uint32_t index_count = 0, uint32_t instance_count = 1,
+        uint32_t instance_offset = 0) const;
     // Create/resize a named indirect-command buffer (per swapchain image).
     bool create_indirect_buffer(const std::string& name, uint32_t command_capacity,
         bool indexed = true);
@@ -428,6 +452,7 @@ public:
 
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
+    bool load_lines(const std::string& name, const Lines& lines);
     void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
         size_t comp_size, size_t vcnt) const
     {
@@ -623,10 +648,13 @@ public:
     std::unordered_map<std::string, Pipeline> pipelines;
     std::unordered_map<std::string, ComputePipeline> compute_pipelines;
     std::unordered_map<std::string, MeshGPU> meshes;
+    std::unordered_map<std::string, LinesGPU> lines;
     std::unordered_map<std::string, IndirectBuffer> indirect_buffers;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
     bool sample_rate_shading_enabled = false;
+    // True when VK_FEATURE_WIDE_LINES was supported and enabled at device creation.
+    bool wide_lines_enabled = false;
 
     std::unordered_map<std::string, Texture> textures;
     std::vector<Texture> targets;

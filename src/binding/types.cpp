@@ -248,13 +248,13 @@ void bind_types(nb::module_& m) {
         })
         .def("unload", &Mesh::unload);
 
-    nb::class_<Line>(m, "Line")
+    nb::class_<Lines>(m, "Lines")
         .def(nb::init<const std::vector<VERT_COMP>&>())
-        .def(nb::init<const Line&>())
-        .def("load", [](Line& line, uint32_t v, nb::bytes& vbuf) {
+        .def(nb::init<const Lines&>())
+        .def("load", [](Lines& line, uint32_t v, nb::bytes& vbuf) {
             line.load(v, vbuf.c_str(), vbuf.size());
         })
-        .def("unload", &Line::unload);
+        .def("unload", &Lines::unload);
 
     nb::class_<DrawableMgr>(m, "DrawableMgr")
         .def_static("Instance", nb::overload_cast<>(&DrawableMgr::instance_ptr<>))

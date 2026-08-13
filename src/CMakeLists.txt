@@ -17,6 +17,7 @@ set(HEADERS
     gui/gui.h
     vp/feature.hpp
     vp/frame_axis.hpp
+    vp/grid.hpp
     vp/viewport.hpp
     renderer/renderer.hpp
     renderer/forward.h
@@ -49,6 +50,7 @@ set(SRCS
     concepts/mesh_view.cpp
     gui/gui.cpp
     vp/frame_axis.cpp
+    vp/grid.cpp
     renderer/renderer.cpp
     renderer/forward.cpp
     renderer/forwardp.cpp

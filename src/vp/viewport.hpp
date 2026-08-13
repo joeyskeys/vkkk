@@ -122,6 +122,7 @@ void Viewport<FeatureTypes...>::record_frame(const Context::Frame& frame) {
 
         PassDesc scene_pass{};
         scene_pass.present = !has_screen_overlay;
+        scene_pass.colors.front().clear = {0.38f, 0.38f, 0.38f, 1.0f};
         ctx.begin_pass(cmd, image_index, scene_pass);
         record_phase<ViewportPhase::Scene>(cmd, image_index);
         ctx.end_pass(cmd, image_index, scene_pass);

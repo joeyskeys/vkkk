@@ -49,13 +49,14 @@ bool Context::record_mesh_tasks(vk::CommandBuffer cmd, const std::string& pipeli
 
 bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh_name,
     vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
-    const vk::DescriptorSet* desc_set) const
+    const vk::DescriptorSet* desc_set, uint32_t index_count) const
 {
     const auto mesh_found = meshes.find(mesh_name);
     if (mesh_found == meshes.end()) {
         return false;
     }
-    mesh_found->second.emit_draw_cmd_instanced(cmd, pipeline_layout, instance_count, ssbo_offset, desc_set);
+    mesh_found->second.emit_draw_cmd_instanced(
+        cmd, pipeline_layout, instance_count, ssbo_offset, desc_set, index_count);
     return true;
 }
 
@@ -143,14 +144,40 @@ bool Context::bind(vk::CommandBuffer cmd, const std::string& pipeline_name, uint
 }
 
 bool Context::draw(vk::CommandBuffer cmd, const std::string& pipeline_name, const std::string& mesh_name,
-    uint32_t instance_count, uint32_t instance_offset) const
+    uint32_t instance_count, uint32_t instance_offset, uint32_t index_count) const
 {
     const auto pipeline_it = pipelines.find(pipeline_name);
     if (pipeline_it == pipelines.end()) {
         return false;
     }
     return draw_mesh_instanced(
-        cmd, mesh_name, *pipeline_it->second.vk_pipeline_layout, instance_count, instance_offset, nullptr);
+        cmd, mesh_name, *pipeline_it->second.vk_pipeline_layout, instance_count, instance_offset, nullptr,
+        index_count);
+}
+
+bool Context::draw_indexed(vk::CommandBuffer cmd, const std::string& mesh_name,
+    uint32_t index_count, uint32_t instance_count, uint32_t instance_offset) const
+{
+    const auto found = meshes.find(mesh_name);
+    if (found == meshes.end() || index_count == 0) {
+        return false;
+    }
+
+    found->second.emit_draw_cmd_instanced(cmd, vk::PipelineLayout{}, instance_count,
+        instance_offset, nullptr, index_count);
+    return true;
+}
+
+bool Context::draw_lines(vk::CommandBuffer cmd, const std::string& lines_name,
+    uint32_t index_count, uint32_t instance_count, uint32_t instance_offset) const
+{
+    const auto found = lines.find(lines_name);
+    if (found == lines.end()) {
+        return false;
+    }
+
+    found->second.emit_draw_cmd(cmd, index_count, instance_count, instance_offset);
+    return true;
 }
 
 bool Context::create_indirect_buffer(const std::string& name, uint32_t command_capacity, bool indexed) {

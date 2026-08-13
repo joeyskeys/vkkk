@@ -44,7 +44,7 @@ public:
 
 private:
     std::unordered_map<std::string, Mesh>   meshes;
-    std::unordered_map<std::string, Line>   lines;
+    std::unordered_map<std::string, Lines>  lines;
 };
 
 } // namespace vkkk

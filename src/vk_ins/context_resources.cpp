@@ -516,6 +516,13 @@ bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
     return true;
 }
 
+bool Context::load_lines(const std::string& name, const Lines& line_data) {
+    LinesGPU gpu{};
+    gpu.sync(line_data, this);
+    lines.emplace(name, std::move(gpu));
+    return true;
+}
+
 uint32_t Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     uint32_t width, uint32_t height, vk::ImageLayout layout, vk::SampleCountFlagBits samples)
 {

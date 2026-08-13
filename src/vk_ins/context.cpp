@@ -83,25 +83,46 @@ void MeshGPU::sync(const Mesh& mesh, Context* ctx) {
 }
 
 void MeshGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
-    const vk::DescriptorSet* desc_set) const
+    const vk::DescriptorSet* desc_set, uint32_t index_count) const
 {
     cmd_buf.bindVertexBuffers(0, *vbuf, {0});
     if (desc_set != nullptr) {
         cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, ppl_layout, 0, {*desc_set}, {});
     }
     cmd_buf.bindIndexBuffer(*ibuf, 0, vk::IndexType::eUint32);
-    cmd_buf.drawIndexed(icnt * 3, 1, 0, 0, 0);
+    cmd_buf.drawIndexed(index_count == 0 ? icnt * 3 : index_count, 1, 0, 0, 0);
 }
 
 void MeshGPU::emit_draw_cmd_instanced(vk::CommandBuffer cmd_buf, vk::PipelineLayout ppl_layout,
-    uint32_t instance_count, uint32_t offset, const vk::DescriptorSet* desc_set) const
+    uint32_t instance_count, uint32_t offset, const vk::DescriptorSet* desc_set,
+    uint32_t index_count) const
 {
     cmd_buf.bindVertexBuffers(0, *vbuf, {0});
     if (desc_set != nullptr) {
         cmd_buf.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, ppl_layout, 0, {*desc_set}, {});
     }
     cmd_buf.bindIndexBuffer(*ibuf, 0, vk::IndexType::eUint32);
-    cmd_buf.drawIndexed(icnt * 3, instance_count, 0, 0, offset);
+    cmd_buf.drawIndexed(index_count == 0 ? icnt * 3 : index_count, instance_count, 0, 0, offset);
+}
+
+void LinesGPU::sync(const Lines& lines, Context* ctx) {
+    if (!lines.loaded || lines.vcnt == 0 || lines.icnt == 0 || lines.icnt % 2 != 0) {
+        throw std::runtime_error("cannot sync unloaded or invalid line-list data");
+    }
+
+    ctx->create_vertex_buffer(lines.vbuf.get(), vbuf, vbuf_memo, lines.comp_size, lines.vcnt);
+    ctx->create_index_buffer(lines.ibuf.get(), ibuf, ibuf_memo, lines.icnt);
+    vcnt = lines.vcnt;
+    icnt = lines.icnt;
+    vert_bytes = static_cast<vk::DeviceSize>(lines.comp_size) * lines.vcnt * sizeof(float);
+}
+
+void LinesGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, uint32_t index_count, uint32_t instance_count,
+    uint32_t instance_offset) const
+{
+    cmd_buf.bindVertexBuffers(0, *vbuf, {0});
+    cmd_buf.bindIndexBuffer(*ibuf, 0, vk::IndexType::eUint32);
+    cmd_buf.drawIndexed(index_count == 0 ? icnt : index_count, instance_count, 0, 0, instance_offset);
 }
 
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
@@ -442,6 +463,7 @@ void Context::init(GLFWwindow* win,
 
     const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
+    wide_lines_enabled = supported_features.wideLines == vk::True;
     const auto supported_feature_chain = physical_device.getFeatures2<
         vk::PhysicalDeviceFeatures2,
         vk::PhysicalDeviceVulkan13Features,
@@ -463,6 +485,8 @@ void Context::init(GLFWwindow* win,
     device_features.get<vk::PhysicalDeviceFeatures2>().features.samplerAnisotropy = VK_TRUE;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.sampleRateShading =
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.wideLines =
+        wide_lines_enabled ? VK_TRUE : VK_FALSE;
     // Needed for draw_indirect with draw_count > 1.
     device_features.get<vk::PhysicalDeviceFeatures2>().features.multiDrawIndirect =
         supported_features.multiDrawIndirect;

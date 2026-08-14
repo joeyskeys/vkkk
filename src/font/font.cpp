@@ -224,7 +224,10 @@ TextTexture TextRenderer::render(Context& context, std::string_view text,
                 const uint8_t coverage = glyph.coverage[row * glyph.width + col];
                 const uint8_t source_alpha = static_cast<uint8_t>(
                     (static_cast<uint32_t>(coverage) * alpha + 127) / 255);
-                uint8_t* pixel = pixels.data() + ((dst_y + row) * width + dst_x + col) * 4;
+                // FreeType rows begin at the glyph top; Vulkan UV origin for this billboard
+                // maps the first uploaded image row to the quad bottom.
+                const uint32_t texture_row = height - 1 - (dst_y + row);
+                uint8_t* pixel = pixels.data() + (texture_row * width + dst_x + col) * 4;
                 pixel[0] = red;
                 pixel[1] = green;
                 pixel[2] = blue;

@@ -18,6 +18,7 @@ inline constexpr const char* DirectionalLightUBO = "DirectionalLightUBO";
 inline constexpr const char* SpotLightUBO = "SpotLightUBO";
 inline constexpr const char* LightClusterParams = "LightClusterParams";
 inline constexpr const char* LineGenMeshInfo = "LineGenMeshInfo";
+inline constexpr const char* BillboardTextData = "BillboardTextData";
 inline constexpr const char* FaceNormalMeshInfo = "FaceNormalMeshInfo";
 inline constexpr const char* ShadowResolve = "ShadowResolve";
 inline constexpr const char* MainDirectionalShadow = "MainDirectionalShadow";

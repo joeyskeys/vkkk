@@ -1,4 +1,5 @@
 set(HEADERS
+    built_in_shader/billboard_text.h
     built_in_shader/fixed_color.h
     built_in_shader/phong.h
     built_in_shader/phong_shadow.hpp
@@ -14,6 +15,7 @@ set(HEADERS
     concepts/line.h
     concepts/mesh.h
     concepts/mesh_view.hpp
+    font/font.hpp
     gui/gui.h
     vp/feature.hpp
     vp/frame_axis.hpp
@@ -48,6 +50,7 @@ set(SRCS
     concepts/line.cpp
     concepts/mesh.cpp
     concepts/mesh_view.cpp
+    font/font.cpp
     gui/gui.cpp
     vp/frame_axis.cpp
     vp/grid.cpp
@@ -63,6 +66,7 @@ set(SRCS
     vk_ins/context.cpp
     vk_ins/context_pipeline.cpp
     vk_ins/context_commands.cpp
+    vk_ins/context_billboard.cpp
     vk_ins/context_resources.cpp
     vk_ins/context_glfw.cpp
     vk_ins/context_utils.cpp)
@@ -75,6 +79,7 @@ target_link_libraries(vkkk
         fmt::fmt
         OpenImageIO::OpenImageIO
         assimp::assimp
+        Freetype::Freetype
         ${SPIRV_CROSS_LIBRARIES})
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")

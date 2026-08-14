@@ -26,6 +26,9 @@ add_executable(vp_viewport viewport/viewport_main.cpp)
 target_link_libraries(vp_viewport
     PRIVATE
         vkkk)
+target_compile_definitions(vp_viewport
+    PRIVATE
+        VKKK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
 
 # add_executable(api_usage_example api_usage/api_usage_example.cpp)
 # target_link_libraries(api_usage_example

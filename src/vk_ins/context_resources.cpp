@@ -2,6 +2,7 @@
 #include <array>
 #include <cstring>
 #include <iostream>
+#include <limits>
 #include <stdexcept>
 #include <vector>
 
@@ -567,6 +568,40 @@ uint32_t Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format
     return index;
 }
 
+uint32_t Context::create_rgba8_render_target(const uint8_t* pixels, uint32_t width, uint32_t height,
+    size_t byte_size)
+{
+    if (pixels == nullptr || width == 0 || height == 0
+        || static_cast<size_t>(width) > std::numeric_limits<size_t>::max() / height / 4)
+    {
+        return kInvalidTargetIndex;
+    }
+    const size_t required_size = static_cast<size_t>(width) * height * 4;
+    if (byte_size != required_size || required_size > std::numeric_limits<uint32_t>::max()) {
+        return kInvalidTargetIndex;
+    }
+
+    const uint32_t target_index = add_render_target(
+        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eSampled
+            | vk::ImageUsageFlagBits::eTransferDst,
+        vk::Format::eR8G8B8A8Unorm, width, height, vk::ImageLayout::eShaderReadOnlyOptimal);
+    if (target_index == kInvalidTargetIndex) {
+        return kInvalidTargetIndex;
+    }
+
+    auto [staging_buf, staging_memo] = load_into_staging_buffer(
+        const_cast<uint8_t*>(pixels), static_cast<uint32_t>(byte_size));
+    auto cmd_buf = begin_single_commands();
+    auto& target = targets[target_index];
+    transit_image_layout(cmd_buf, target.image, vk::ImageLayout::eUndefined,
+        vk::ImageLayout::eTransferDstOptimal);
+    copy_buffer_to_image(cmd_buf, staging_buf, target.image, width, height);
+    transit_image_layout(cmd_buf, target.image, vk::ImageLayout::eTransferDstOptimal,
+        vk::ImageLayout::eShaderReadOnlyOptimal);
+    end_single_commands(std::move(cmd_buf));
+    return target_index;
+}
+
 bool Context::resize_render_target(uint32_t target_index, uint32_t width, uint32_t height) {
     if (target_index >= targets.size()) {
         std::cout << "Render target index out of range: " << target_index << std::endl;
@@ -665,6 +700,40 @@ bool Context::bind_pipeline_render_target(const std::string& pipeline_name, uint
         sampled_attachment_binds.push_back(SampledAttachmentBind{
             pipeline_name, binding, target_index, false});
     }
+    return true;
+}
+
+bool Context::bind_pipeline_texture(const std::string& pipeline_name, uint32_t binding,
+    const std::string& texture_name)
+{
+    const auto pipeline_it = pipelines.find(pipeline_name);
+    const auto texture_it = textures.find(texture_name);
+    if (pipeline_it == pipelines.end() || texture_it == textures.end() || texture_it->second.vecsize != 1) {
+        return false;
+    }
+
+    auto& pipeline = pipeline_it->second;
+    const auto sampler_binding = pipeline.sampler_descriptor_counts.find(binding);
+    if (sampler_binding == pipeline.sampler_descriptor_counts.end()
+        || sampler_binding->second != 1 || pipeline.descriptor_sets.empty())
+    {
+        return false;
+    }
+
+    std::vector<vk::DescriptorImageInfo> image_infos(
+        pipeline.descriptor_sets.size(), texture_it->second.descriptor);
+    std::vector<vk::WriteDescriptorSet> writes;
+    writes.reserve(pipeline.descriptor_sets.size());
+    for (size_t i = 0; i < pipeline.descriptor_sets.size(); ++i) {
+        vk::WriteDescriptorSet write{};
+        write.dstSet = *pipeline.descriptor_sets[i];
+        write.dstBinding = binding;
+        write.descriptorCount = 1;
+        write.descriptorType = vk::DescriptorType::eCombinedImageSampler;
+        write.pImageInfo = &image_infos[i];
+        writes.push_back(write);
+    }
+    device.updateDescriptorSets(writes, {});
     return true;
 }
 

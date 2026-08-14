@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <filesystem>
 
 #include "built_in_shader/fixed_color.h"
 #include "concepts/camera.h"
@@ -12,7 +13,7 @@ namespace vkkk::vp
 // Screen-corner orientation gizmo rendered as red, green, and blue strokes.
 class FrameAxisFeature final : public ViewportFeature<ViewportPhase::ScreenOverlay> {
 public:
-    explicit FrameAxisFeature(const Camera& camera);
+    FrameAxisFeature(const Camera& camera, std::filesystem::path font_path = {});
 
     void on_attach(Context& context, vk::Extent2D extent);
     void on_update(Context& context, const Context::Frame& frame);
@@ -21,10 +22,13 @@ public:
     bool visible = true;
 
 private:
-    const Camera& camera_;
-    CameraUBO overlay_camera_{};
-    std::array<FixedColorInstanceAttrs, 3> instances_{};
+    const Camera& camera;
+    std::filesystem::path font_path;
+    CameraUBO overlay_camera{};
+    std::array<FixedColorInstanceAttrs, 3> instances{};
+    std::array<glm::vec2, 3> label_sizes{};
     bool ready = false;
+    bool labels_ready = false;
 };
 
 } // namespace vkkk::vp

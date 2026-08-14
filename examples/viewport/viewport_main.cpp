@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <filesystem>
+#include <string>
+#include <utility>
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -6,6 +9,7 @@
 #include <GLFW/glfw3.h>
 
 #include "concepts/camera.h"
+#include "font/font.hpp"
 #include "vp/frame_axis.hpp"
 #include "vp/grid.hpp"
 #include "vp/viewport.hpp"
@@ -15,6 +19,51 @@ namespace
 
 constexpr uint32_t kWidth = 800;
 constexpr uint32_t kHeight = 600;
+
+class BillboardTextFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    BillboardTextFeature(const vkkk::Camera& scene_camera, std::filesystem::path path)
+        : camera(scene_camera)
+        , font_path(std::move(path))
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (font_path.empty()) {
+            return;
+        }
+
+        constexpr const char* billboard_name = "vp_example_label";
+        vkkk::font::TextRenderer renderer(font_path);
+        vkkk::font::TextRenderOptions text_options{};
+        text_options.pixel_height = 64;
+        text_options.color = glm::vec4{0.05f, 0.05f, 0.05f, 1.0f};
+        const auto text_texture = renderer.render(context, "vkkk", text_options);
+        if (!text_texture.valid()) {
+            return;
+        }
+
+        vkkk::BillboardTextOptions options{};
+        options.position = glm::vec3{0.0f, 1.0f, 0.0f};
+        options.size = glm::vec2{1.5f,
+            1.5f * static_cast<float>(text_texture.extent.height) / text_texture.extent.width};
+        options.depth_test = false;
+        ready = context.add_billboard_text(
+            billboard_name, vkkk::BillboardTextSource::render_target(text_texture.target_index), options);
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (ready) {
+            context.draw_billboard_text(cmd, "vp_example_label", camera.ubo_data, image_index);
+        }
+    }
+
+private:
+    const vkkk::Camera& camera;
+    std::filesystem::path font_path;
+    bool ready = false;
+};
 
 class ViewportControls {
 public:
@@ -112,7 +161,7 @@ void scroll_callback(GLFWwindow*, double, double yoffset) {
 
 } // namespace
 
-int main() {
+int main(int argc, char** argv) {
     vkkk::Context ctx;
     GLFWwindow* window = ctx.init_glfw(kWidth, kHeight, "vkkk Viewport", true);
     const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
@@ -135,10 +184,17 @@ int main() {
 
     using BasicViewport = vkkk::vp::Viewport<
         vkkk::vp::GridFeature,
-        vkkk::vp::FrameAxisFeature>;
+        vkkk::vp::FrameAxisFeature,
+        BillboardTextFeature>;
     BasicViewport viewport(ctx);
+    const std::filesystem::path bundled_font_path =
+        std::filesystem::path{VKKK_SOURCE_DIR} / "resource/font/Roboto-Light.ttf";
+    // An explicit path can still override the bundled font.
+    const std::filesystem::path font_path =
+        argc > 1 ? std::filesystem::path{argv[1]} : bundled_font_path;
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
-    viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera);
+    viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
+    viewport.add_feature<BillboardTextFeature>(camera, font_path);
 
     while (!glfwWindowShouldClose(window)) {
         glfwPollEvents();

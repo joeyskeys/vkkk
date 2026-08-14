@@ -54,6 +54,7 @@ find_package(fmt CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
 find_package(minizip-ng CONFIG REQUIRED)
+find_package(Freetype REQUIRED)
 
 set(SHADERC_ROOT ${VKKK_VCPKG_INSTALLED_DIR})
 set(SPIRV_CROSS_ROOT ${VKKK_VCPKG_INSTALLED_DIR})

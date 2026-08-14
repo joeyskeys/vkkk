@@ -285,6 +285,40 @@ struct IndirectBuffer {
     std::vector<vk::raii::DeviceMemory> memos;
 };
 
+enum class BillboardTextSourceType : uint8_t {
+    Texture,
+    RenderTarget,
+};
+
+struct BillboardTextSource {
+    BillboardTextSourceType type = BillboardTextSourceType::Texture;
+    std::string texture_name;
+    uint32_t target_index = kInvalidTargetIndex;
+
+    static BillboardTextSource texture(const std::string& name) {
+        return BillboardTextSource{BillboardTextSourceType::Texture, name, kInvalidTargetIndex};
+    }
+    static BillboardTextSource render_target(uint32_t index) {
+        return BillboardTextSource{BillboardTextSourceType::RenderTarget, {}, index};
+    }
+};
+
+struct BillboardTextVertex {
+    glm::vec3 position{0.0f};
+    glm::vec2 uv{0.0f};
+};
+
+struct BillboardTextOptions {
+    glm::vec3 position{0.0f};
+    glm::vec2 size{1.0f};
+    bool depth_test = true;
+};
+
+struct BillboardTextData {
+    glm::vec4 position{0.0f, 0.0f, 0.0f, 1.0f};
+    glm::vec4 size{1.0f, 1.0f, 1.0f, 0.0f};
+};
+
 // a class manages vulkan instance, physical device, logical device, surface
 // these parts are not frequently changed or used.
 class Context {
@@ -411,6 +445,9 @@ public:
     // Bind a sampleable render target to a reflected combined-image-sampler binding.
     bool bind_pipeline_render_target(const std::string& pipeline_name, uint32_t binding,
         uint32_t target_index);
+    // Bind a named 2D texture to a reflected combined-image-sampler binding.
+    bool bind_pipeline_texture(const std::string& pipeline_name, uint32_t binding,
+        const std::string& texture_name);
     // Bind a sampleable depth attachment as a combined comparison sampler (e.g. sampler2DShadow).
     bool bind_pipeline_depth_attachment(const std::string& pipeline_name, uint32_t binding,
         uint32_t attachment_index);
@@ -438,6 +475,9 @@ public:
         uint32_t width = 0, uint32_t height = 0,
         vk::ImageLayout layout = vk::ImageLayout::eGeneral,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1);
+    // Create a sampled RGBA8 render target populated from CPU pixels.
+    uint32_t create_rgba8_render_target(const uint8_t* pixels, uint32_t width, uint32_t height,
+        size_t byte_size);
     bool resize_render_target(uint32_t target_index, uint32_t width, uint32_t height);
     bool set_render_target(uint32_t target_index);
     void set_render_to_framebuffer();
@@ -453,6 +493,18 @@ public:
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
     bool load_lines(const std::string& name, const Lines& lines);
+    // Add a camera-facing textured billboard using an auto-generated indexed quad.
+    bool add_billboard_text(const std::string& name, const BillboardTextSource& source,
+        const BillboardTextOptions& options = {});
+    // Add a camera-facing textured billboard using caller-provided local quad vertices.
+    bool add_billboard_text_quad(const std::string& name,
+        const std::array<BillboardTextVertex, 4>& vertices, const BillboardTextSource& source,
+        const BillboardTextOptions& options = {});
+    bool set_billboard_text_transform(const std::string& name, const glm::vec3& position,
+        const glm::vec2& size);
+    // Bind and draw one billboard. The caller owns pass lifetime and supplies the active camera.
+    bool draw_billboard_text(vk::CommandBuffer cmd, const std::string& name,
+        const CameraUBO& camera, uint32_t frame_idx);
     void create_vertex_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
         size_t comp_size, size_t vcnt) const
     {
@@ -643,6 +695,12 @@ private:
         bool is_depth = false;
     };
     std::vector<SampledAttachmentBind> sampled_attachment_binds;
+    struct BillboardText {
+        std::string pipeline_name;
+        std::string mesh_name;
+        BillboardTextOptions options;
+    };
+    std::unordered_map<std::string, BillboardText> billboard_texts;
 
 public:
     std::unordered_map<std::string, Pipeline> pipelines;

@@ -711,8 +711,19 @@ bool Context::begin_frame(Frame& frame) {
 
     device.waitForFences(*in_flight_fences[current_frame], vk::True, UINT64_MAX);
 
-    auto [result, image_index] = swapchain.acquireNextImage(UINT64_MAX, *image_available_semaphores[current_frame], nullptr);
+    uint32_t image_index = 0;
+    vk::Result result = vk::Result::eSuccess;
+    try {
+        std::tie(result, image_index) =
+            swapchain.acquireNextImage(UINT64_MAX, *image_available_semaphores[current_frame], nullptr);
+    }
+    catch (const vk::OutOfDateKHRError&) {
+        frame_buffer_resized = false;
+        recreate_swapchain();
+        return false;
+    }
     if (result == vk::Result::eErrorOutOfDateKHR) {
+        frame_buffer_resized = false;
         recreate_swapchain();
         return false;
     }
@@ -785,8 +796,16 @@ void Context::end_frame(const Frame& frame) {
     present_info.swapchainCount = 1;
     present_info.pSwapchains = swapchains;
     present_info.pImageIndices = &frame.image_index;
-    const auto result = queue.presentKHR(present_info);
-    if (result == vk::Result::eErrorOutOfDateKHR || result == vk::Result::eSuboptimalKHR || frame_buffer_resized) {
+    bool recreate = frame_buffer_resized;
+    try {
+        const auto result = queue.presentKHR(present_info);
+        recreate = recreate || result == vk::Result::eErrorOutOfDateKHR
+            || result == vk::Result::eSuboptimalKHR;
+    }
+    catch (const vk::OutOfDateKHRError&) {
+        recreate = true;
+    }
+    if (recreate) {
         frame_buffer_resized = false;
         recreate_swapchain();
     }

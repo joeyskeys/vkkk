@@ -17,8 +17,8 @@
 namespace
 {
 
-constexpr uint32_t kWidth = 800;
-constexpr uint32_t kHeight = 600;
+constexpr uint32_t kWidth = 1200;
+constexpr uint32_t kHeight = 800;
 
 class BillboardTextFeature final
     : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {

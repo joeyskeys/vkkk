@@ -1,5 +1,7 @@
 #include "vp/frame_axis.hpp"
 
+#include <algorithm>
+
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -129,8 +131,12 @@ void FrameAxisFeature::on_attach(Context& context, vk::Extent2D) {
 
 void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
     const glm::mat4 camera_rotation{glm::mat3(camera.ubo_data.view)};
+    const vk::Extent2D extent = context.extent();
+    const float aspect = static_cast<float>(std::max(extent.width, 1u))
+        / static_cast<float>(std::max(extent.height, 1u));
     // Keep the rotated gizmo within Vulkan's [0, 1] clip-space depth range.
-    const glm::mat4 anchor = glm::translate(glm::mat4{1.0f}, glm::vec3{-0.82f, -0.78f, 0.5f});
+    const glm::mat4 anchor = glm::translate(
+        glm::mat4{1.0f}, glm::vec3{-0.82f * aspect, -0.78f, 0.5f});
     const glm::mat4 scale = glm::scale(glm::mat4{1.0f}, glm::vec3{0.14f});
 
     const auto make_model = [&](float angle, const glm::vec3& rotation_axis) {
@@ -147,6 +153,9 @@ void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
 
     overlay_camera.view = glm::mat4{1.0f};
     overlay_camera.proj = glm::mat4{1.0f};
+    // NDC spans the viewport's width and height independently. Compensate X
+    // so a unit overlay-space vector has the same pixel scale in X and Y.
+    overlay_camera.proj[0][0] = 1.0f / aspect;
     overlay_camera.proj[1][1] = -1.0f;
 
     if (labels_ready) {

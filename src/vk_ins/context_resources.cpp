@@ -560,8 +560,8 @@ uint32_t Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format
 
     target.view = create_vk_imageview(target.image, format, aspect_mask);
     target.sampler = create_vk_sampler();
-    target.layout = layout;
-    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
+    target.layout = vk::ImageLayout::eUndefined;
+    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, layout};
 
     const uint32_t index = static_cast<uint32_t>(targets.size());
     targets.emplace_back(std::move(target));
@@ -599,6 +599,7 @@ uint32_t Context::create_rgba8_render_target(const uint8_t* pixels, uint32_t wid
     transit_image_layout(cmd_buf, target.image, vk::ImageLayout::eTransferDstOptimal,
         vk::ImageLayout::eShaderReadOnlyOptimal);
     end_single_commands(std::move(cmd_buf));
+    target.layout = vk::ImageLayout::eShaderReadOnlyOptimal;
     return target_index;
 }
 
@@ -631,6 +632,7 @@ bool Context::resize_render_target(uint32_t target_index, uint32_t width, uint32
         aspect_mask = vk::ImageAspectFlagBits::eDepth;
     }
 
+    const vk::ImageLayout resting_layout = target.descriptor.imageLayout;
     target.view = nullptr;
     target.image = nullptr;
     target.memo = nullptr;
@@ -640,13 +642,81 @@ bool Context::resize_render_target(uint32_t target_index, uint32_t width, uint32
         width, height, 1, target.samples, target.format, vk::ImageTiling::eOptimal,
         target.usage, vk::MemoryPropertyFlagBits::eDeviceLocal);
     target.view = create_vk_imageview(target.image, target.format, aspect_mask);
-    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, target.layout};
+    target.layout = vk::ImageLayout::eUndefined;
+    target.descriptor = vk::DescriptorImageInfo{*target.sampler, *target.view, resting_layout};
 
     for (const auto& bind : sampled_attachment_binds) {
         if (!bind.is_depth && bind.attachment_index == target_index) {
             bind_pipeline_render_target(bind.pipeline_name, bind.binding, bind.attachment_index);
         }
     }
+    return true;
+}
+
+namespace {
+
+size_t render_target_texel_size(vk::Format format) {
+    switch (format) {
+    case vk::Format::eR32Uint:
+    case vk::Format::eR32Sfloat:
+        return 4;
+    case vk::Format::eR8G8B8A8Unorm:
+    case vk::Format::eR8G8B8A8Srgb:
+        return 4;
+    case vk::Format::eR16G16B16A16Sfloat:
+        return 8;
+    case vk::Format::eR32G32B32A32Sfloat:
+        return 16;
+    default:
+        return 0;
+    }
+}
+
+} // namespace
+
+bool Context::read_render_target_pixel(uint32_t target_index, uint32_t x, uint32_t y,
+    void* value, size_t value_size)
+{
+    if (target_index >= targets.size() || value == nullptr) {
+        return false;
+    }
+    auto& target = targets[target_index];
+    const size_t texel_size = render_target_texel_size(target.format);
+    if (x >= target.width || y >= target.height || texel_size == 0 || value_size != texel_size
+        || (target.usage & vk::ImageUsageFlagBits::eTransferSrc) == vk::ImageUsageFlags{})
+    {
+        return false;
+    }
+
+    device.waitIdle();
+    auto [readback_buffer, readback_memory] = create_buffer(
+        texel_size, vk::BufferUsageFlagBits::eTransferDst,
+        vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent);
+    auto cmd = begin_single_commands();
+    const vk::ImageLayout original_layout = target.layout;
+    transit_presentation_image_layout(
+        cmd, *target.image, original_layout, vk::ImageLayout::eTransferSrcOptimal,
+        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::AccessFlagBits2::eTransferRead,
+        vk::PipelineStageFlagBits2::eAllCommands, vk::PipelineStageFlagBits2::eTransfer,
+        vk::ImageAspectFlagBits::eColor);
+    vk::BufferImageCopy copy{};
+    copy.imageSubresource.aspectMask = vk::ImageAspectFlagBits::eColor;
+    copy.imageSubresource.layerCount = 1;
+    copy.imageOffset = vk::Offset3D{static_cast<int32_t>(x), static_cast<int32_t>(y), 0};
+    copy.imageExtent = vk::Extent3D{1, 1, 1};
+    cmd.copyImageToBuffer(*target.image, vk::ImageLayout::eTransferSrcOptimal, *readback_buffer, {copy});
+    transit_presentation_image_layout(
+        cmd, *target.image, vk::ImageLayout::eTransferSrcOptimal, original_layout,
+        vk::AccessFlagBits2::eTransferRead,
+        vk::AccessFlagBits2::eMemoryRead | vk::AccessFlagBits2::eMemoryWrite,
+        vk::PipelineStageFlagBits2::eTransfer, vk::PipelineStageFlagBits2::eAllCommands,
+        vk::ImageAspectFlagBits::eColor);
+    end_single_commands(std::move(cmd));
+
+    const void* mapped = readback_memory.mapMemory(0, texel_size);
+    std::memcpy(value, mapped, texel_size);
+    readback_memory.unmapMemory();
     return true;
 }
 

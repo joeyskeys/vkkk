@@ -20,6 +20,7 @@ set(HEADERS
     vp/feature.hpp
     vp/frame_axis.hpp
     vp/grid.hpp
+    vp/object_picking.hpp
     vp/viewport.hpp
     renderer/renderer.hpp
     renderer/forward.h
@@ -54,6 +55,7 @@ set(SRCS
     gui/gui.cpp
     vp/frame_axis.cpp
     vp/grid.cpp
+    vp/object_picking.cpp
     renderer/renderer.cpp
     renderer/forward.cpp
     renderer/forwardp.cpp

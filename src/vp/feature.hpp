@@ -8,6 +8,7 @@ namespace vkkk::vp
 {
 
 enum class ViewportPhase {
+    Picking,
     Scene,
     ScreenOverlay,
 };

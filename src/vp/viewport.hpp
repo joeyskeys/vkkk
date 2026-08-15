@@ -120,6 +120,8 @@ void Viewport<FeatureTypes...>::record_frame(const Context::Frame& frame) {
         constexpr bool has_screen_overlay =
             ((FeatureTypes::phase == ViewportPhase::ScreenOverlay) || ...);
 
+        record_phase<ViewportPhase::Picking>(cmd, image_index);
+
         PassDesc scene_pass{};
         scene_pass.present = !has_screen_overlay;
         scene_pass.colors.front().clear = {0.38f, 0.38f, 0.38f, 1.0f};

@@ -101,21 +101,41 @@ inline constexpr uint32_t kInvalidTargetIndex = ~0u;
 enum class PassLoadOp : uint8_t { Clear, Load, DontCare };
 enum class PassStoreOp : uint8_t { Store, DontCare };
 
+template <typename T>
 struct ColorTargetRef {
     int32_t target_index = kSwapchainTarget;
     PassLoadOp load = PassLoadOp::Clear;
     PassStoreOp store = PassStoreOp::Store;
-    std::array<float, 4> clear = {0.f, 0.f, 0.f, 1.f};
+    std::array<T, 4> clear = {T{}, T{}, T{}, T{1}};
 };
 
-struct PassDesc {
-    std::vector<ColorTargetRef> colors = { ColorTargetRef{} };
+template <typename T>
+struct PassDescT {
+    std::vector<ColorTargetRef<T>> colors = { ColorTargetRef<T>{} };
     // kDefaultDepth = Context depth; kNoDepth = none; >=0 = depth_attachments[i]
     int32_t depth_index = kDefaultDepth;
     PassLoadOp depth_load = PassLoadOp::Clear;
     PassStoreOp depth_store = PassStoreOp::Store;
     float depth_clear = 1.f;
     // Transition swapchain color targets to PresentSrc after the pass.
+    bool present = true;
+};
+
+using PassDesc = PassDescT<float>;
+
+struct ColorTargetRefNative {
+    int32_t target_index = kSwapchainTarget;
+    PassLoadOp load = PassLoadOp::Clear;
+    PassStoreOp store = PassStoreOp::Store;
+    vk::ClearColorValue clear{};
+};
+
+struct PassDescNative {
+    std::vector<ColorTargetRefNative> colors;
+    int32_t depth_index = kDefaultDepth;
+    PassLoadOp depth_load = PassLoadOp::Clear;
+    PassStoreOp depth_store = PassStoreOp::Store;
+    float depth_clear = 1.f;
     bool present = true;
 };
 
@@ -375,8 +395,14 @@ public:
     void begin_cmds(uint32_t image_index);
     void end_cmds(uint32_t image_index);
     // Dynamic rendering pass with load/store, MRT, and optional present.
-    void begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass);
-    void end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass);
+    template <typename T>
+    void begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescT<T>& pass) {
+        begin_pass_impl(cmd, image_index, to_native_pass(pass));
+    }
+    template <typename T>
+    void end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescT<T>& pass) {
+        end_pass_impl(cmd, image_index, to_native_pass(pass));
+    }
     // Convenience: begin_cmds + optional pre + default PassDesc + emit + end_cmds.
     void record_cmds(uint32_t image_index,
         const std::function<void(vk::raii::CommandBuffer&, uint32_t)>& emit_func,
@@ -479,6 +505,12 @@ public:
     uint32_t create_rgba8_render_target(const uint8_t* pixels, uint32_t width, uint32_t height,
         size_t byte_size);
     bool resize_render_target(uint32_t target_index, uint32_t width, uint32_t height);
+    bool read_render_target_pixel(uint32_t target_index, uint32_t x, uint32_t y,
+        void* value, size_t value_size);
+    template <typename T>
+    bool read_render_target_pixel(uint32_t target_index, uint32_t x, uint32_t y, T& value) {
+        return read_render_target_pixel(target_index, x, y, &value, sizeof(T));
+    }
     bool set_render_target(uint32_t target_index);
     void set_render_to_framebuffer();
     // Sampleable depth attachment (shadow maps, etc.). Defaults to a depth-only format
@@ -549,6 +581,25 @@ public:
 
 private:
     // Internal device and resource helpers
+    template <typename T>
+    static PassDescNative to_native_pass(const PassDescT<T>& pass) {
+        PassDescNative native{};
+        native.depth_index = pass.depth_index;
+        native.depth_load = pass.depth_load;
+        native.depth_store = pass.depth_store;
+        native.depth_clear = pass.depth_clear;
+        native.present = pass.present;
+        native.colors.reserve(pass.colors.size());
+        for (const auto& color : pass.colors) {
+            native.colors.push_back(ColorTargetRefNative{
+                color.target_index, color.load, color.store, vk::ClearColorValue(color.clear)});
+        }
+        return native;
+    }
+    void begin_pass_impl(
+        vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescNative& pass);
+    void end_pass_impl(
+        vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescNative& pass);
     void setup_debug_messenger();
     static bool is_device_suitable(
         const vk::raii::PhysicalDevice& device,

@@ -387,7 +387,9 @@ void Context::end_cmds(uint32_t image_index) {
     command_buffers[image_index].end();
 }
 
-void Context::begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass) {
+void Context::begin_pass_impl(
+    vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescNative& pass)
+{
     if (image_index >= swapchain_images.size()) {
         throw std::runtime_error("begin_pass: image_index out of range");
     }
@@ -451,7 +453,7 @@ void Context::begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, con
         info.imageLayout = vk::ImageLayout::eColorAttachmentOptimal;
         info.loadOp = to_vk_load_op(color.load);
         info.storeOp = to_vk_store_op(color.store);
-        info.clearValue = vk::ClearColorValue(color.clear);
+        info.clearValue = color.clear;
         color_infos.push_back(info);
     }
 
@@ -583,7 +585,9 @@ void Context::begin_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, con
     cmd.setScissor(0, vk::Rect2D{{0, 0}, render_extent});
 }
 
-void Context::end_pass(vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDesc& pass) {
+void Context::end_pass_impl(
+    vk::raii::CommandBuffer& cmd, uint32_t image_index, const PassDescNative& pass)
+{
     if (image_index >= swapchain_images.size()) {
         throw std::runtime_error("end_pass: image_index out of range");
     }
@@ -674,7 +678,7 @@ void Context::record_cmds(uint32_t image_index,
     if (active_render_target_index_ >= 0
         && static_cast<size_t>(active_render_target_index_) < targets.size())
     {
-        pass.colors = { ColorTargetRef{
+        pass.colors = { ColorTargetRef<float>{
             .target_index = active_render_target_index_,
         } };
         pass.present = false;

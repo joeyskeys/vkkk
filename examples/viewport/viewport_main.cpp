@@ -17,6 +17,7 @@
 #include "vk_ins/shader_module_pack.hpp"
 #include "vp/frame_axis.hpp"
 #include "vp/grid.hpp"
+#include "vp/object_picking.hpp"
 #include "vp/viewport.hpp"
 
 namespace
@@ -26,14 +27,18 @@ constexpr uint32_t kWidth = 1200;
 constexpr uint32_t kHeight = 800;
 constexpr const char* kCubeObjectName = "viewport_center_cube_object";
 constexpr const char* kCubeMeshName = "viewport_center_cube";
+constexpr uint32_t kCubeObjectId = 1;
 constexpr const char* kCubePhongPipeline = "viewport_cube_phong";
 constexpr const char* kCubeWirePipeline = "viewport_cube_wire";
 
 class SceneCubeFeature final
     : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
 public:
-    explicit SceneCubeFeature(vkkk::Scene& scene)
+    SceneCubeFeature(vkkk::Scene& scene, vkkk::vp::ObjectPickingFeature& picker,
+        uint32_t& selected_object_id)
         : scene(scene)
+        , picker(picker)
+        , selected_object_id(selected_object_id)
     {
     }
 
@@ -54,9 +59,14 @@ public:
         if (c_down && !c_was_down) {
             if (scene.find_object(kCubeObjectName) != nullptr) {
                 scene.remove_object(kCubeObjectName);
+                picker.clear_objects();
+                if (selected_object_id == kCubeObjectId) {
+                    selected_object_id = 0;
+                }
             }
             else {
                 scene.add_object(kCubeObjectName, kCubeMeshName);
+                picker.add_object(kCubeMeshName, kCubeObjectId);
             }
         }
         c_was_down = c_down;
@@ -75,11 +85,13 @@ public:
             context.draw(cmd, kCubePhongPipeline, cube->mesh_name, 1);
         }
 
-        auto wire = wire_attrs;
-        wire.model = cube->model;
-        sync_draw_data(context, kCubeWirePipeline, image_index, wire);
-        if (context.bind(cmd, kCubeWirePipeline, image_index)) {
-            context.draw(cmd, kCubeWirePipeline, cube->mesh_name, 1);
+        if (selected_object_id == kCubeObjectId) {
+            auto wire = wire_attrs;
+            wire.model = cube->model;
+            sync_draw_data(context, kCubeWirePipeline, image_index, wire);
+            if (context.bind(cmd, kCubeWirePipeline, image_index)) {
+                context.draw(cmd, kCubeWirePipeline, cube->mesh_name, 1);
+            }
         }
     }
 
@@ -133,6 +145,8 @@ private:
     }
 
     vkkk::Scene& scene;
+    vkkk::vp::ObjectPickingFeature& picker;
+    uint32_t& selected_object_id;
     vkkk::PhongInstanceAttrs shaded_attrs{
         .model = glm::mat4{1.0f},
         .ambient = glm::vec4{0.05f, 0.08f, 0.14f, 1.0f},
@@ -320,6 +334,7 @@ int main(int argc, char** argv) {
     glfwSetScrollCallback(window, scroll_callback);
 
     using BasicViewport = vkkk::vp::Viewport<
+        vkkk::vp::ObjectPickingFeature,
         SceneCubeFeature,
         vkkk::vp::GridFeature,
         vkkk::vp::FrameAxisFeature,
@@ -330,7 +345,18 @@ int main(int argc, char** argv) {
     // An explicit path can still override the bundled font.
     const std::filesystem::path font_path =
         argc > 1 ? std::filesystem::path{argv[1]} : bundled_font_path;
-    viewport.add_feature<SceneCubeFeature>(scene);
+    uint32_t selected_object_id = 0;
+    const auto picking_handle = viewport.add_feature<vkkk::vp::ObjectPickingFeature>(camera);
+    auto* picker = viewport.find_feature(picking_handle);
+    if (picker == nullptr) {
+        return 1;
+    }
+    picker->add_object(kCubeMeshName, kCubeObjectId);
+    picker->set_pick_callback([&selected_object_id](uint32_t object_id) {
+        selected_object_id = object_id;
+    });
+
+    viewport.add_feature<SceneCubeFeature>(scene, *picker, selected_object_id);
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);

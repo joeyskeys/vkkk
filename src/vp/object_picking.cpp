@@ -68,7 +68,10 @@ bool ObjectPickingFeature::create_pipeline(Context& context) {
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(true, true, vk::CompareOp::eLess, false, false);
-    return context.create_pipeline(kPipelineName, pack, option, {VERTEX}, true, false,
+    // Picked scene meshes currently use interleaved position + normal vertices.
+    // The shader consumes only position, but the pipeline stride must match the
+    // source mesh so every indexed vertex is read at the correct offset.
+    return context.create_pipeline(kPipelineName, pack, option, {VERTEX, NORMAL}, true, false,
         {vk::Format::eR32Uint});
 }
 

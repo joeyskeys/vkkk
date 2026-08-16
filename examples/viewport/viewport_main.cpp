@@ -4,12 +4,17 @@
 #include <utility>
 
 #include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 
 #include <GLFW/glfw3.h>
 
+#include "asset_mgr/drawable_mgr.h"
+#include "asset_mgr/scene.h"
+#include "built_in_shader/phong.h"
 #include "concepts/camera.h"
 #include "font/font.hpp"
+#include "vk_ins/shader_module_pack.hpp"
 #include "vp/frame_axis.hpp"
 #include "vp/grid.hpp"
 #include "vp/viewport.hpp"
@@ -19,6 +24,132 @@ namespace
 
 constexpr uint32_t kWidth = 1200;
 constexpr uint32_t kHeight = 800;
+constexpr const char* kCubeObjectName = "viewport_center_cube_object";
+constexpr const char* kCubeMeshName = "viewport_center_cube";
+constexpr const char* kCubePhongPipeline = "viewport_cube_phong";
+constexpr const char* kCubeWirePipeline = "viewport_cube_wire";
+
+class SceneCubeFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    explicit SceneCubeFeature(vkkk::Scene& scene)
+        : scene(scene)
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (scene.camera == nullptr || !create_pipelines(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kCubePhongPipeline, vkkk::buf::PhongInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(kCubePhongPipeline, vkkk::buf::PhongInstanceAttrs)
+            && context.resize_pipeline_ssbo(
+                kCubeWirePipeline, vkkk::buf::PhongInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(kCubeWirePipeline, vkkk::buf::PhongInstanceAttrs);
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool c_down = glfwGetKey(context.get_window(), GLFW_KEY_C) == GLFW_PRESS;
+        if (c_down && !c_was_down) {
+            if (scene.find_object(kCubeObjectName) != nullptr) {
+                scene.remove_object(kCubeObjectName);
+            }
+            else {
+                scene.add_object(kCubeObjectName, kCubeMeshName);
+            }
+        }
+        c_was_down = c_down;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        const auto* cube = scene.find_object(kCubeObjectName);
+        if (!ready || cube == nullptr || scene.camera == nullptr) {
+            return;
+        }
+
+        auto shaded = shaded_attrs;
+        shaded.model = cube->model;
+        sync_draw_data(context, kCubePhongPipeline, image_index, shaded);
+        if (context.bind(cmd, kCubePhongPipeline, image_index)) {
+            context.draw(cmd, kCubePhongPipeline, cube->mesh_name, 1);
+        }
+
+        auto wire = wire_attrs;
+        wire.model = cube->model;
+        sync_draw_data(context, kCubeWirePipeline, image_index, wire);
+        if (context.bind(cmd, kCubeWirePipeline, image_index)) {
+            context.draw(cmd, kCubeWirePipeline, cube->mesh_name, 1);
+        }
+    }
+
+private:
+    static bool create_pipeline(vkkk::Context& context, const char* pipeline_name,
+        vk::PolygonMode polygon_mode, bool depth_write)
+    {
+        if (context.pipelines.contains(pipeline_name)) {
+            return true;
+        }
+
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(vkkk::phong_vert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_cube_phong_vert")
+            || !frag_module.load(vkkk::phong_frag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_cube_phong_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::eTriangleList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, polygon_mode, 1.0f,
+            vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, depth_write, vk::CompareOp::eLessOrEqual, false, false);
+        return context.create_pipeline(
+            pipeline_name, pack, option, {vkkk::VERTEX, vkkk::NORMAL});
+    }
+
+    void sync_draw_data(vkkk::Context& context, const char* pipeline_name,
+        uint32_t image_index, const vkkk::PhongInstanceAttrs& attrs)
+    {
+        vkkk::PointLightUBO light{};
+        light.vec = glm::vec4{2.0f, 3.0f, 2.0f, 1.0f};
+        light.color = glm::vec4{1.0f};
+        context.sync_ubo(
+            pipeline_name, vkkk::buf::CameraUBO, &scene.camera->ubo_data, image_index);
+        context.sync_ubo(pipeline_name, vkkk::buf::PointLightUBO, &light, image_index);
+        context.sync_ssbo(pipeline_name, vkkk::buf::PhongInstanceAttrs, &attrs, image_index);
+    }
+
+    bool create_pipelines(vkkk::Context& context) {
+        return create_pipeline(context, kCubePhongPipeline, vk::PolygonMode::eFill, true)
+            && create_pipeline(context, kCubeWirePipeline, vk::PolygonMode::eLine, false);
+    }
+
+    vkkk::Scene& scene;
+    vkkk::PhongInstanceAttrs shaded_attrs{
+        .model = glm::mat4{1.0f},
+        .ambient = glm::vec4{0.05f, 0.08f, 0.14f, 1.0f},
+        .diffuse = glm::vec4{0.25f, 0.55f, 0.9f, 1.0f},
+        .specular = glm::vec4{0.7f, 0.7f, 0.7f, 1.0f},
+        .shininess = 32.0f,
+    };
+    vkkk::PhongInstanceAttrs wire_attrs{
+        .model = glm::mat4{1.0f},
+        .ambient = glm::vec4{0.02f, 0.02f, 0.02f, 1.0f},
+        .diffuse = glm::vec4{0.03f, 0.03f, 0.03f, 1.0f},
+        .specular = glm::vec4{0.0f},
+        .shininess = 1.0f,
+    };
+    bool ready = false;
+    bool c_was_down = false;
+};
 
 class BillboardTextFeature final
     : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
@@ -178,11 +309,18 @@ int main(int argc, char** argv) {
         100.0f,
     };
     camera.update_ubo_data();
+    vkkk::Scene scene;
+    scene.camera = &camera;
+    scene.drawable_mgr->add_cube(kCubeMeshName, {vkkk::VERTEX, vkkk::NORMAL}, 1.0f);
+    scene.drawable_mgr->sync_to_gpu(&ctx);
+    scene.add_object(kCubeObjectName, kCubeMeshName);
+
     ViewportControls viewport_controls(camera);
     controls = &viewport_controls;
     glfwSetScrollCallback(window, scroll_callback);
 
     using BasicViewport = vkkk::vp::Viewport<
+        SceneCubeFeature,
         vkkk::vp::GridFeature,
         vkkk::vp::FrameAxisFeature,
         BillboardTextFeature>;
@@ -192,6 +330,7 @@ int main(int argc, char** argv) {
     // An explicit path can still override the bundled font.
     const std::filesystem::path font_path =
         argc > 1 ? std::filesystem::path{argv[1]} : bundled_font_path;
+    viewport.add_feature<SceneCubeFeature>(scene);
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);

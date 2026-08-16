@@ -1,7 +1,9 @@
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include <glm/geometric.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -11,6 +13,7 @@
 
 #include "asset_mgr/drawable_mgr.h"
 #include "asset_mgr/scene.h"
+#include "built_in_shader/fixed_color.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
 #include "font/font.hpp"
@@ -30,6 +33,174 @@ constexpr const char* kCubeMeshName = "viewport_center_cube";
 constexpr uint32_t kCubeObjectId = 1;
 constexpr const char* kCubePhongPipeline = "viewport_cube_phong";
 constexpr const char* kCubeWirePipeline = "viewport_cube_wire";
+constexpr const char* kPointSphereName = "viewport_scattered_sphere";
+constexpr const char* kPointSpherePipeline = "viewport_scattered_sphere_pipeline";
+constexpr const char* kPointSizeBlock = "PointSizeUBO";
+
+struct PointSizeUBO {
+    glm::vec4 value{8.0f, 0.0f, 0.0f, 0.0f};
+};
+
+constexpr char kPointSphereVert[] = R"(
+#version 460
+
+layout(binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 proj;
+} camera;
+
+layout(binding = 1) uniform PointSizeUBO {
+    vec4 value;
+} point_size;
+
+struct FixedColorInstanceAttr {
+    mat4 model;
+    vec4 color;
+};
+
+layout(std430, binding = 2) readonly buffer FixedColorInstanceAttrs {
+    FixedColorInstanceAttr attrs[];
+} instance_attrs;
+
+layout(location = 0) in vec3 in_position;
+layout(location = 0) out vec4 frag_color;
+
+void main() {
+    const FixedColorInstanceAttr instance = instance_attrs.attrs[gl_InstanceIndex];
+    gl_Position = camera.proj * camera.view * instance.model * vec4(in_position, 1.0);
+    gl_PointSize = point_size.value.x;
+    frag_color = instance.color;
+}
+)";
+
+constexpr char kPointSphereFrag[] = R"(
+#version 460
+
+layout(location = 0) in vec4 frag_color;
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    out_color = frag_color;
+}
+)";
+
+class ScatteredSpherePointsFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    explicit ScatteredSpherePointsFeature(const vkkk::Camera& camera)
+        : camera(camera)
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (!create_points(context) || !create_pipeline(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(
+                kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs);
+        point_size = std::clamp(point_size, context.point_size_range[0],
+            context.large_points_enabled ? context.point_size_range[1] : 1.0f);
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool p_down = glfwGetKey(context.get_window(), GLFW_KEY_P) == GLFW_PRESS;
+        if (p_down && !p_was_down) {
+            visible = !visible;
+        }
+        p_was_down = p_down;
+
+        const float max_point_size = context.large_points_enabled
+            ? context.point_size_range[1] : 1.0f;
+        const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
+        if (up_down && !up_was_down) {
+            point_size = std::min(point_size + 1.0f, max_point_size);
+        }
+        up_was_down = up_down;
+
+        const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
+        if (down_down && !down_was_down) {
+            point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
+        }
+        down_was_down = down_down;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (!ready || !visible) {
+            return;
+        }
+        const PointSizeUBO size_data{glm::vec4{point_size, 0.0f, 0.0f, 0.0f}};
+        context.sync_ubo(kPointSpherePipeline, vkkk::buf::CameraUBO, &camera.ubo_data, image_index);
+        context.sync_ubo(kPointSpherePipeline, kPointSizeBlock, &size_data, image_index);
+        context.sync_ssbo(kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs,
+            &instance, image_index);
+        if (context.bind(cmd, kPointSpherePipeline, image_index)) {
+            context.draw_points(cmd, kPointSphereName);
+        }
+    }
+
+private:
+    static bool create_points(vkkk::Context& context) {
+        if (context.points.contains(kPointSphereName)) {
+            return true;
+        }
+        constexpr uint32_t point_count = 512;
+        constexpr float golden_angle = 2.39996323f;
+        std::vector<float> positions;
+        positions.reserve(point_count * 3);
+        for (uint32_t index = 0; index < point_count; ++index) {
+            const float y = 1.0f - 2.0f
+                * (static_cast<float>(index) + 0.5f) / static_cast<float>(point_count);
+            const float radius = std::sqrt(std::max(0.0f, 1.0f - y * y));
+            const float angle = golden_angle * static_cast<float>(index);
+            positions.insert(positions.end(), {
+                radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+        vkkk::Points points({vkkk::VERTEX});
+        points.load(point_count, reinterpret_cast<const char*>(positions.data()),
+            static_cast<uint32_t>(positions.size() * sizeof(float)));
+        return context.load_points(kPointSphereName, points);
+    }
+
+    static bool create_pipeline(vkkk::Context& context) {
+        if (context.pipelines.contains(kPointSpherePipeline)) {
+            return true;
+        }
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(kPointSphereVert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_scattered_sphere_vert")
+            || !frag_module.load(kPointSphereFrag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_scattered_sphere_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::ePointList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+            vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, true, vk::CompareOp::eLessOrEqual, false, false);
+        return context.create_pipeline(kPointSpherePipeline, pack, option, {vkkk::VERTEX});
+    }
+
+    const vkkk::Camera& camera;
+    vkkk::FixedColorInstanceAttrs instance{
+        .model = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 1.5f, 0.0f}),
+        .color = glm::vec4{1.0f, 0.55f, 0.1f, 1.0f},
+    };
+    float point_size = 8.0f;
+    bool ready = false;
+    bool visible = false;
+    bool p_was_down = false;
+    bool up_was_down = false;
+    bool down_was_down = false;
+};
 
 class SceneCubeFeature final
     : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
@@ -336,6 +507,7 @@ int main(int argc, char** argv) {
     using BasicViewport = vkkk::vp::Viewport<
         vkkk::vp::ObjectPickingFeature,
         SceneCubeFeature,
+        ScatteredSpherePointsFeature,
         vkkk::vp::GridFeature,
         vkkk::vp::FrameAxisFeature,
         BillboardTextFeature>;
@@ -357,6 +529,7 @@ int main(int argc, char** argv) {
     });
 
     viewport.add_feature<SceneCubeFeature>(scene, *picker, selected_object_id);
+    viewport.add_feature<ScatteredSpherePointsFeature>(camera);
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);

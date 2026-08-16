@@ -1,9 +1,12 @@
 #include "vp/frame_axis.hpp"
 
 #include <algorithm>
+#include <cmath>
 
+#include <glm/geometric.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 
 #include <utility>
 
@@ -24,12 +27,27 @@ constexpr std::array<const char*, 3> kLabelNames = {
     "vp_frame_axis_label_y",
     "vp_frame_axis_label_z",
 };
-constexpr std::array<const char*, 3> kLabelTexts = {"X", "Y", "Z"};
 const std::array<glm::vec4, 3> kLabelColors = {
     glm::vec4{1.0f, 0.0f, 0.0f, 1.0f},
     glm::vec4{0.0f, 1.0f, 0.0f, 1.0f},
     glm::vec4{0.0f, 0.0f, 1.0f, 1.0f},
 };
+
+bool is_orthogonal_frame(const CoordinateSystem& coordinate_system) {
+    const auto& axes = coordinate_system.axes;
+    constexpr float epsilon = 1.0e-4f;
+    if (glm::dot(axes[0], axes[0]) < epsilon || glm::dot(axes[1], axes[1]) < epsilon
+        || glm::dot(axes[2], axes[2]) < epsilon)
+    {
+        return false;
+    }
+    const glm::vec3 x = glm::normalize(axes[0]);
+    const glm::vec3 y = glm::normalize(axes[1]);
+    const glm::vec3 z = glm::normalize(axes[2]);
+    return std::abs(glm::dot(x, y)) < epsilon
+        && std::abs(glm::dot(x, z)) < epsilon
+        && std::abs(glm::dot(y, z)) < epsilon;
+}
 
 bool create_pipeline(Context& context) {
     if (context.pipelines.contains(kPipelineName)) {
@@ -78,6 +96,7 @@ bool create_axis_lines(Context& context) {
 }
 
 bool create_axis_labels(Context& context, const std::filesystem::path& font_path,
+    const std::array<std::string, 3>& labels,
     std::array<glm::vec2, 3>& label_sizes)
 {
     if (font_path.empty()) {
@@ -89,7 +108,7 @@ bool create_axis_labels(Context& context, const std::filesystem::path& font_path
         font::TextRenderOptions text_options{};
         text_options.pixel_height = 32;
         text_options.color = kLabelColors[index];
-        const auto texture = renderer.render(context, kLabelTexts[index], text_options);
+        const auto texture = renderer.render(context, labels[index], text_options);
         if (!texture.valid()) {
             return false;
         }
@@ -113,20 +132,24 @@ bool create_axis_labels(Context& context, const std::filesystem::path& font_path
 
 } // namespace
 
-FrameAxisFeature::FrameAxisFeature(const Camera& scene_camera, std::filesystem::path font_file)
+FrameAxisFeature::FrameAxisFeature(const Camera& scene_camera, std::filesystem::path font_file,
+    CoordinateSystem coordinate_system)
     : camera(scene_camera)
     , font_path(std::move(font_file))
+    , coordinate_system(std::move(coordinate_system))
 {
 }
 
 void FrameAxisFeature::on_attach(Context& context, vk::Extent2D) {
-    if (!create_axis_lines(context) || !create_pipeline(context)) {
+    if (!is_orthogonal_frame(coordinate_system)
+        || !create_axis_lines(context) || !create_pipeline(context))
+    {
         return;
     }
 
     ready = context.resize_pipeline_ssbo(kPipelineName, buf::FixedColorInstanceAttrs, instances.size())
         && context.alloc_pipeline_ssbo(kPipelineName, buf::FixedColorInstanceAttrs);
-    labels_ready = ready && create_axis_labels(context, font_path, label_sizes);
+    labels_ready = ready && create_axis_labels(context, font_path, coordinate_system.labels, label_sizes);
 }
 
 void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
@@ -139,16 +162,28 @@ void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
         glm::mat4{1.0f}, glm::vec3{-0.82f * aspect, -0.78f, 0.5f});
     const glm::mat4 scale = glm::scale(glm::mat4{1.0f}, glm::vec3{0.14f});
 
-    const auto make_model = [&](float angle, const glm::vec3& rotation_axis) {
+    const auto make_model = [&](const glm::vec3& axis) {
+        const glm::vec3 direction = glm::normalize(axis);
+        const glm::vec3 local_x{1.0f, 0.0f, 0.0f};
+        const float dot = glm::dot(local_x, direction);
+        glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
+        if (dot < -0.9999f) {
+            rotation = glm::angleAxis(glm::pi<float>(), glm::vec3{0.0f, 1.0f, 0.0f});
+        }
+        else if (dot < 0.9999f) {
+            rotation = glm::angleAxis(
+                std::acos(std::clamp(dot, -1.0f, 1.0f)),
+                glm::normalize(glm::cross(local_x, direction)));
+        }
         return anchor * camera_rotation
-            * glm::rotate(glm::mat4{1.0f}, angle, rotation_axis) * scale;
+            * glm::mat4_cast(rotation) * scale;
     };
 
-    instances[0].model = make_model(0.0f, glm::vec3{0.0f, 0.0f, 1.0f});
+    instances[0].model = make_model(coordinate_system.axes[0]);
     instances[0].color = kLabelColors[0];
-    instances[1].model = make_model(glm::half_pi<float>(), glm::vec3{0.0f, 0.0f, 1.0f});
+    instances[1].model = make_model(coordinate_system.axes[1]);
     instances[1].color = kLabelColors[1];
-    instances[2].model = make_model(-glm::half_pi<float>(), glm::vec3{0.0f, 1.0f, 0.0f});
+    instances[2].model = make_model(coordinate_system.axes[2]);
     instances[2].color = kLabelColors[2];
 
     overlay_camera.view = glm::mat4{1.0f};

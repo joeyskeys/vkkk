@@ -14,6 +14,7 @@ set(HEADERS
     concepts/camera.h
     concepts/line.h
     concepts/mesh.h
+    concepts/point.h
     concepts/mesh_view.hpp
     font/font.hpp
     gui/gui.h
@@ -50,6 +51,7 @@ set(SRCS
     concepts/camera.cpp
     concepts/line.cpp
     concepts/mesh.cpp
+    concepts/point.cpp
     concepts/mesh_view.cpp
     font/font.cpp
     gui/gui.cpp

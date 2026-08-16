@@ -125,6 +125,23 @@ void LinesGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, uint32_t index_count, ui
     cmd_buf.drawIndexed(index_count == 0 ? icnt : index_count, instance_count, 0, 0, instance_offset);
 }
 
+void PointsGPU::sync(const Points& points, Context* ctx) {
+    if (!points.loaded || points.vcnt == 0) {
+        throw std::runtime_error("cannot sync unloaded or invalid point-list data");
+    }
+
+    ctx->create_vertex_buffer(points.vbuf.get(), vbuf, vbuf_memo, points.comp_size, points.vcnt);
+    vcnt = points.vcnt;
+    vert_bytes = static_cast<vk::DeviceSize>(points.comp_size) * points.vcnt * sizeof(float);
+}
+
+void PointsGPU::emit_draw_cmd(vk::CommandBuffer cmd_buf, uint32_t vertex_count,
+    uint32_t instance_count, uint32_t instance_offset) const
+{
+    cmd_buf.bindVertexBuffers(0, *vbuf, {0});
+    cmd_buf.draw(vertex_count == 0 ? vcnt : vertex_count, instance_count, 0, instance_offset);
+}
+
 static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
     vk::DebugUtilsMessageSeverityFlagBitsEXT severity,
     vk::DebugUtilsMessageTypeFlagsEXT type,
@@ -464,6 +481,8 @@ void Context::init(GLFWwindow* win,
     const vk::PhysicalDeviceFeatures supported_features = physical_device.getFeatures();
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
     wide_lines_enabled = supported_features.wideLines == vk::True;
+    large_points_enabled = supported_features.largePoints == vk::True;
+    point_size_range = physical_device.getProperties().limits.pointSizeRange;
     const auto supported_feature_chain = physical_device.getFeatures2<
         vk::PhysicalDeviceFeatures2,
         vk::PhysicalDeviceVulkan13Features,
@@ -487,6 +506,8 @@ void Context::init(GLFWwindow* win,
         sample_rate_shading_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.wideLines =
         wide_lines_enabled ? VK_TRUE : VK_FALSE;
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.largePoints =
+        large_points_enabled ? VK_TRUE : VK_FALSE;
     // Needed for draw_indirect with draw_count > 1.
     device_features.get<vk::PhysicalDeviceFeatures2>().features.multiDrawIndirect =
         supported_features.multiDrawIndirect;

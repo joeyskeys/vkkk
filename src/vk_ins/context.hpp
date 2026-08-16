@@ -24,6 +24,7 @@
 
 #include "concepts/line.h"
 #include "concepts/mesh.h"
+#include "concepts/point.h"
 #include "vk_ins/compute_shader.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 #include "vk_ins/types.h"
@@ -287,6 +288,17 @@ struct LinesGPU {
         uint32_t instance_count = 1, uint32_t instance_offset = 0) const;
 };
 
+struct PointsGPU {
+    vk::raii::Buffer                        vbuf{nullptr};
+    vk::raii::DeviceMemory                  vbuf_memo{nullptr};
+    uint32_t                                vcnt = 0;
+    vk::DeviceSize                          vert_bytes = 0;
+
+    void sync(const Points& points, class Context* ctx);
+    void emit_draw_cmd(vk::CommandBuffer cmd_buf, uint32_t vertex_count = 0,
+        uint32_t instance_count = 1, uint32_t instance_offset = 0) const;
+};
+
 struct CameraGPU {
     uint32_t                                binding;
     vk::raii::Buffer                        buf{nullptr};
@@ -450,6 +462,11 @@ public:
     bool draw_lines(vk::CommandBuffer cmd, const std::string& lines_name,
         uint32_t index_count = 0, uint32_t instance_count = 1,
         uint32_t instance_offset = 0) const;
+    // Draw named point-list data. Call bind() first with an ePointList pipeline.
+    // vertex_count 0 draws all points.
+    bool draw_points(vk::CommandBuffer cmd, const std::string& points_name,
+        uint32_t vertex_count = 0, uint32_t instance_count = 1,
+        uint32_t instance_offset = 0) const;
     // Create/resize a named indirect-command buffer (per swapchain image).
     bool create_indirect_buffer(const std::string& name, uint32_t command_capacity,
         bool indexed = true);
@@ -525,6 +542,7 @@ public:
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
     bool load_lines(const std::string& name, const Lines& lines);
+    bool load_points(const std::string& name, const Points& points);
     // Add a camera-facing textured billboard using an auto-generated indexed quad.
     bool add_billboard_text(const std::string& name, const BillboardTextSource& source,
         const BillboardTextOptions& options = {});
@@ -758,12 +776,16 @@ public:
     std::unordered_map<std::string, ComputePipeline> compute_pipelines;
     std::unordered_map<std::string, MeshGPU> meshes;
     std::unordered_map<std::string, LinesGPU> lines;
+    std::unordered_map<std::string, PointsGPU> points;
     std::unordered_map<std::string, IndirectBuffer> indirect_buffers;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
     bool sample_rate_shading_enabled = false;
     // True when VK_FEATURE_WIDE_LINES was supported and enabled at device creation.
     bool wide_lines_enabled = false;
+    // True when VkPhysicalDeviceFeatures::largePoints was supported and enabled.
+    bool large_points_enabled = false;
+    std::array<float, 2> point_size_range{1.0f, 1.0f};
 
     std::unordered_map<std::string, Texture> textures;
     std::vector<Texture> targets;

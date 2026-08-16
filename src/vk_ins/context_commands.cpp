@@ -180,6 +180,18 @@ bool Context::draw_lines(vk::CommandBuffer cmd, const std::string& lines_name,
     return true;
 }
 
+bool Context::draw_points(vk::CommandBuffer cmd, const std::string& points_name,
+    uint32_t vertex_count, uint32_t instance_count, uint32_t instance_offset) const
+{
+    const auto found = points.find(points_name);
+    if (found == points.end()) {
+        return false;
+    }
+
+    found->second.emit_draw_cmd(cmd, vertex_count, instance_count, instance_offset);
+    return true;
+}
+
 bool Context::create_indirect_buffer(const std::string& name, uint32_t command_capacity, bool indexed) {
     if (command_capacity == 0) {
         std::cout << "Indirect buffer " << name << " capacity must be non-zero" << std::endl;

@@ -524,6 +524,13 @@ bool Context::load_lines(const std::string& name, const Lines& line_data) {
     return true;
 }
 
+bool Context::load_points(const std::string& name, const Points& point_data) {
+    PointsGPU gpu{};
+    gpu.sync(point_data, this);
+    points.emplace(name, std::move(gpu));
+    return true;
+}
+
 uint32_t Context::add_render_target(vk::ImageUsageFlags usage, vk::Format format,
     uint32_t width, uint32_t height, vk::ImageLayout layout, vk::SampleCountFlagBits samples)
 {

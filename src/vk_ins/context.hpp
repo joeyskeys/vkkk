@@ -317,6 +317,24 @@ struct IndirectBuffer {
     std::vector<vk::raii::DeviceMemory> memos;
 };
 
+struct ABufferNode {
+    uint32_t vertex_id = 0;
+    uint32_t next = ~0u;
+};
+
+struct ABuffer {
+    uint32_t width = 0;
+    uint32_t height = 0;
+    uint32_t nodes_per_pixel = 0;
+    uint32_t node_capacity = 0;
+    vk::DeviceSize head_bytes = 0;
+    vk::DeviceSize node_bytes = 0;
+    std::vector<vk::raii::Buffer> head_buffers;
+    std::vector<vk::raii::DeviceMemory> head_memos;
+    std::vector<vk::raii::Buffer> node_buffers;
+    std::vector<vk::raii::DeviceMemory> node_memos;
+};
+
 enum class BillboardTextSourceType : uint8_t {
     Texture,
     RenderTarget,
@@ -482,6 +500,15 @@ public:
     bool alloc_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name);
     bool resize_pipeline_ssbo(const std::string& pipeline_name, const std::string& block_name,
         size_t new_vecsize);
+    // Per-frame SSBO linked-list A-buffer for overlap-safe point/vertex picking.
+    bool create_abuffer(const std::string& name, vk::Extent2D extent, uint32_t nodes_per_pixel);
+    bool resize_abuffer(const std::string& name, vk::Extent2D extent, uint32_t nodes_per_pixel);
+    bool clear_abuffer(const std::string& name, uint32_t frame_idx);
+    bool bind_pipeline_abuffer(const std::string& pipeline_name, const std::string& abuffer_name,
+        uint32_t head_binding, uint32_t node_binding);
+    void barrier_abuffer_for_host(vk::CommandBuffer cmd) const;
+    bool read_abuffer_pixel(const std::string& name, uint32_t frame_idx, uint32_t x, uint32_t y,
+        std::vector<uint32_t>& vertex_ids, bool& overflow) const;
     bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name,
         const std::string& graphics_block_name, const std::string& compute_pipeline_name,
         const std::string& compute_block_name);
@@ -778,6 +805,7 @@ public:
     std::unordered_map<std::string, LinesGPU> lines;
     std::unordered_map<std::string, PointsGPU> points;
     std::unordered_map<std::string, IndirectBuffer> indirect_buffers;
+    std::unordered_map<std::string, ABuffer> abuffers;
     std::vector<vk::raii::CommandBuffer> command_buffers;
     bool frame_buffer_resized = false;
     bool sample_rate_shading_enabled = false;

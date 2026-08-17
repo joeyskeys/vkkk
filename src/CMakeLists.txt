@@ -21,6 +21,7 @@ set(HEADERS
     vp/feature.hpp
     vp/frame_axis.hpp
     vp/grid.hpp
+    vp/vertex_picking.hpp
     vp/object_picking.hpp
     vp/viewport.hpp
     renderer/renderer.hpp
@@ -57,6 +58,7 @@ set(SRCS
     gui/gui.cpp
     vp/frame_axis.cpp
     vp/grid.cpp
+    vp/vertex_picking.cpp
     vp/object_picking.cpp
     renderer/renderer.cpp
     renderer/forward.cpp
@@ -70,6 +72,7 @@ set(SRCS
     vk_ins/context.cpp
     vk_ins/context_pipeline.cpp
     vk_ins/context_commands.cpp
+    vk_ins/context_abuffer.cpp
     vk_ins/context_billboard.cpp
     vk_ins/context_resources.cpp
     vk_ins/context_glfw.cpp

@@ -34,7 +34,8 @@ bool Context::create_pipeline(const std::string& name,
     const std::vector<VERT_COMP>& comps,
     bool interleaved,
     bool depth_only,
-    const std::vector<vk::Format>& color_formats)
+    const std::vector<vk::Format>& color_formats,
+    vk::Format depth_format_override)
 {
     if (pipelines.find(name) != pipelines.end()) {
         std::cout << "Pipeline " << name << " already exists" << std::endl;
@@ -308,7 +309,9 @@ bool Context::create_pipeline(const std::string& name,
         push_constant_ranges.empty() ? nullptr : push_constant_ranges.data();
     vk::raii::PipelineLayout pipeline_layout(device, pipeline_layout_info);
 
-    const vk::Format depth_format = depth_only ? find_depth_only_format() : find_depth_format();
+    const vk::Format depth_format = depth_format_override != vk::Format::eUndefined
+        ? depth_format_override
+        : (depth_only ? find_depth_only_format() : find_depth_format());
     vk::PipelineRenderingCreateInfo rendering_create_info{};
     rendering_create_info.colorAttachmentCount = static_cast<uint32_t>(resolved_color_formats.size());
     rendering_create_info.pColorAttachmentFormats =

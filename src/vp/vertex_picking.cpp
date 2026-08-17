@@ -70,7 +70,8 @@ bool VertexPickingFeature::create_pipeline(Context& context) {
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(false, false, vk::CompareOp::eAlways, false, false);
-    return context.create_pipeline(kPipelineName, pack, option, {VERTEX}, true, true);
+    return context.create_pipeline(kPipelineName, pack, option, {VERTEX}, true, true, {},
+        static_cast<vk::Format>(context.get_depth_format()));
 }
 
 bool VertexPickingFeature::resize_buffers(Context& context, vk::Extent2D extent) {
@@ -88,10 +89,15 @@ void VertexPickingFeature::on_resize(Context& context, vk::Extent2D extent) {
     ready = ready && resize_buffers(context, extent);
 }
 
-void VertexPickingFeature::set_point_list(std::string name) {
+void VertexPickingFeature::set_point_list(std::string name, glm::mat4 transform) {
     points_name = std::move(name);
+    model = transform;
     picked_ids.clear();
     overflow = false;
+}
+
+void VertexPickingFeature::set_point_transform(glm::mat4 transform) {
+    model = transform;
 }
 
 void VertexPickingFeature::clear_point_list() {
@@ -159,7 +165,9 @@ void VertexPickingFeature::on_record(Context& context, vk::raii::CommandBuffer& 
     context.begin_pass(cmd, image_index, pass);
     context.sync_ubo(kPipelineName, buf::CameraUBO, &camera.ubo_data, image_index);
     if (context.bind(cmd, kPipelineName, image_index)) {
-        const VertexPickingParams params{std::max(point_size, 1.0f)};
+        VertexPickingParams params{};
+        params.model = model;
+        params.point_size = std::max(point_size, 1.0f);
         context.push_constants(cmd, kPipelineName, buf::VertexPickingParams, &params,
             static_cast<uint32_t>(sizeof(params)));
         context.draw_points(cmd, points_name);

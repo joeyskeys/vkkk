@@ -21,6 +21,7 @@
 #include "vp/frame_axis.hpp"
 #include "vp/grid.hpp"
 #include "vp/object_picking.hpp"
+#include "vp/vertex_picking.hpp"
 #include "vp/viewport.hpp"
 
 namespace
@@ -36,6 +37,8 @@ constexpr const char* kCubeWirePipeline = "viewport_cube_wire";
 constexpr const char* kPointSphereName = "viewport_scattered_sphere";
 constexpr const char* kPointSpherePipeline = "viewport_scattered_sphere_pipeline";
 constexpr const char* kPointSizeBlock = "PointSizeUBO";
+constexpr const char* kSelectedPointIds = "SelectedPointIds";
+constexpr uint32_t kPointSphereCount = 512;
 
 struct PointSizeUBO {
     glm::vec4 value{8.0f, 0.0f, 0.0f, 0.0f};
@@ -62,6 +65,11 @@ layout(std430, binding = 2) readonly buffer FixedColorInstanceAttrs {
     FixedColorInstanceAttr attrs[];
 } instance_attrs;
 
+layout(std430, binding = 3) readonly buffer SelectedPointIds {
+    uint count;
+    uint ids[];
+} selected_ids;
+
 layout(location = 0) in vec3 in_position;
 layout(location = 0) out vec4 frag_color;
 
@@ -70,6 +78,12 @@ void main() {
     gl_Position = camera.proj * camera.view * instance.model * vec4(in_position, 1.0);
     gl_PointSize = point_size.value.x;
     frag_color = instance.color;
+    for (uint index = 0; index < selected_ids.count; ++index) {
+        if (selected_ids.ids[index] == uint(gl_VertexIndex)) {
+            frag_color = vec4(0.0, 0.25, 1.0, 1.0);
+            break;
+        }
+    }
 }
 )";
 
@@ -87,8 +101,9 @@ void main() {
 class ScatteredSpherePointsFeature final
     : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
 public:
-    explicit ScatteredSpherePointsFeature(const vkkk::Camera& camera)
+    ScatteredSpherePointsFeature(const vkkk::Camera& camera, vkkk::vp::VertexPickingFeature& picker)
         : camera(camera)
+        , picker(picker)
     {
     }
 
@@ -99,9 +114,17 @@ public:
         ready = context.resize_pipeline_ssbo(
                     kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs, 1)
             && context.alloc_pipeline_ssbo(
-                kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs);
+                kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs)
+            && context.resize_pipeline_ssbo(
+                kPointSpherePipeline, kSelectedPointIds, kPointSphereCount + 1)
+            && context.alloc_pipeline_ssbo(kPointSpherePipeline, kSelectedPointIds);
         point_size = std::clamp(point_size, context.point_size_range[0],
             context.large_points_enabled ? context.point_size_range[1] : 1.0f);
+        picker.set_point_list(kPointSphereName, instance.model);
+        picker.point_size = point_size + 6.0f;
+        picker.set_pick_callback([this](const std::vector<uint32_t>& ids, bool) {
+            selected_ids = ids;
+        });
     }
 
     void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
@@ -124,6 +147,8 @@ public:
             point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
         }
         down_was_down = down_down;
+        picker.point_size = point_size + 6.0f;
+        picker.enabled = visible;
     }
 
     void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
@@ -135,6 +160,12 @@ public:
         context.sync_ubo(kPointSpherePipeline, kPointSizeBlock, &size_data, image_index);
         context.sync_ssbo(kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs,
             &instance, image_index);
+        std::vector<uint32_t> selection_data;
+        selection_data.reserve(selected_ids.size() + 1);
+        selection_data.push_back(static_cast<uint32_t>(selected_ids.size()));
+        selection_data.insert(selection_data.end(), selected_ids.begin(), selected_ids.end());
+        context.sync_ssbo(kPointSpherePipeline, kSelectedPointIds, selection_data.data(), image_index,
+            static_cast<uint32_t>(selection_data.size() * sizeof(uint32_t)));
         if (context.bind(cmd, kPointSpherePipeline, image_index)) {
             context.draw_points(cmd, kPointSphereName);
         }
@@ -145,20 +176,19 @@ private:
         if (context.points.contains(kPointSphereName)) {
             return true;
         }
-        constexpr uint32_t point_count = 512;
         constexpr float golden_angle = 2.39996323f;
         std::vector<float> positions;
-        positions.reserve(point_count * 3);
-        for (uint32_t index = 0; index < point_count; ++index) {
+        positions.reserve(kPointSphereCount * 3);
+        for (uint32_t index = 0; index < kPointSphereCount; ++index) {
             const float y = 1.0f - 2.0f
-                * (static_cast<float>(index) + 0.5f) / static_cast<float>(point_count);
+                * (static_cast<float>(index) + 0.5f) / static_cast<float>(kPointSphereCount);
             const float radius = std::sqrt(std::max(0.0f, 1.0f - y * y));
             const float angle = golden_angle * static_cast<float>(index);
             positions.insert(positions.end(), {
                 radius * std::cos(angle), y, radius * std::sin(angle)});
         }
         vkkk::Points points({vkkk::VERTEX});
-        points.load(point_count, reinterpret_cast<const char*>(positions.data()),
+        points.load(kPointSphereCount, reinterpret_cast<const char*>(positions.data()),
             static_cast<uint32_t>(positions.size() * sizeof(float)));
         return context.load_points(kPointSphereName, points);
     }
@@ -190,11 +220,13 @@ private:
     }
 
     const vkkk::Camera& camera;
+    vkkk::vp::VertexPickingFeature& picker;
     vkkk::FixedColorInstanceAttrs instance{
         .model = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 1.5f, 0.0f}),
         .color = glm::vec4{1.0f, 0.55f, 0.1f, 1.0f},
     };
     float point_size = 8.0f;
+    std::vector<uint32_t> selected_ids;
     bool ready = false;
     bool visible = false;
     bool p_was_down = false;
@@ -506,6 +538,7 @@ int main(int argc, char** argv) {
 
     using BasicViewport = vkkk::vp::Viewport<
         vkkk::vp::ObjectPickingFeature,
+        vkkk::vp::VertexPickingFeature,
         SceneCubeFeature,
         ScatteredSpherePointsFeature,
         vkkk::vp::GridFeature,
@@ -528,8 +561,13 @@ int main(int argc, char** argv) {
         selected_object_id = object_id;
     });
 
+    const auto vertex_picking_handle = viewport.add_feature<vkkk::vp::VertexPickingFeature>(camera);
+    auto* vertex_picker = viewport.find_feature(vertex_picking_handle);
+    if (vertex_picker == nullptr) {
+        return 1;
+    }
     viewport.add_feature<SceneCubeFeature>(scene, *picker, selected_object_id);
-    viewport.add_feature<ScatteredSpherePointsFeature>(camera);
+    viewport.add_feature<ScatteredSpherePointsFeature>(camera, *vertex_picker);
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);

@@ -402,7 +402,8 @@ public:
         const std::vector<VERT_COMP>& comps,
         bool interleaved = true,
         bool depth_only = false,
-        const std::vector<vk::Format>& color_formats = {});
+        const std::vector<vk::Format>& color_formats = {},
+        vk::Format depth_format_override = vk::Format::eUndefined);
     bool create_compute_pipeline(const std::string& name, const ComputeShader& shader);
     bool load_compute_pipeline(const std::string& name, const fs::path& path);
 

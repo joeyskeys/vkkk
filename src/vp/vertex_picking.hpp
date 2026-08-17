@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include <glm/mat4x4.hpp>
+
 #include "concepts/camera.h"
 #include "vp/feature.hpp"
 
@@ -12,6 +14,7 @@ namespace vkkk::vp
 {
 
 struct VertexPickingParams {
+    glm::mat4 model{1.0f};
     float point_size = 12.0f;
 };
 
@@ -24,7 +27,8 @@ public:
     void on_update(Context& context, const Context::Frame& frame);
     void on_record(Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index);
 
-    void set_point_list(std::string points_name);
+    void set_point_list(std::string points_name, glm::mat4 model = glm::mat4{1.0f});
+    void set_point_transform(glm::mat4 model);
     void clear_point_list();
     void set_pick_callback(std::function<void(const std::vector<uint32_t>&, bool)> callback);
     const std::vector<uint32_t>& picked_vertex_ids() const { return picked_ids; }
@@ -39,6 +43,7 @@ private:
 
     const Camera& camera;
     std::string points_name;
+    glm::mat4 model{1.0f};
     std::vector<uint32_t> picked_ids;
     std::function<void(const std::vector<uint32_t>&, bool)> pick_callback;
     uint32_t nodes_per_pixel = 4;

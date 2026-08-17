@@ -6,6 +6,7 @@ layout(binding = 0) uniform CameraUBO {
 } camera;
 
 layout(push_constant) uniform VertexPickingParams {
+    mat4 model;
     float point_size;
 } params;
 
@@ -13,7 +14,7 @@ layout(location = 0) in vec3 in_position;
 layout(location = 0) flat out uint vertex_id;
 
 void main() {
-    gl_Position = camera.proj * camera.view * vec4(in_position, 1.0);
+    gl_Position = camera.proj * camera.view * params.model * vec4(in_position, 1.0);
     gl_PointSize = params.point_size;
     vertex_id = uint(gl_VertexIndex);
 }

@@ -12,6 +12,7 @@ set(HEADERS
     asset_mgr/light_mgr.h
     asset_mgr/drawable_mgr.h
     concepts/camera.h
+    concepts/curve.hpp
     concepts/line.h
     concepts/mesh.h
     concepts/point.h
@@ -50,6 +51,7 @@ set(SRCS
     asset_mgr/light_mgr.cpp
     asset_mgr/drawable_mgr.cpp
     concepts/camera.cpp
+    concepts/curve.cpp
     concepts/line.cpp
     concepts/mesh.cpp
     concepts/point.cpp

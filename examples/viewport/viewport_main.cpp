@@ -16,6 +16,7 @@
 #include "built_in_shader/fixed_color.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
+#include "concepts/curve.hpp"
 #include "font/font.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 #include "vp/frame_axis.hpp"
@@ -134,19 +135,21 @@ public:
         }
         p_was_down = p_down;
 
-        const float max_point_size = context.large_points_enabled
-            ? context.point_size_range[1] : 1.0f;
-        const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
-        if (up_down && !up_was_down) {
-            point_size = std::min(point_size + 1.0f, max_point_size);
-        }
-        up_was_down = up_down;
+        if (visible) {
+            const float max_point_size = context.large_points_enabled
+                ? context.point_size_range[1] : 1.0f;
+            const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
+            if (up_down && !up_was_down) {
+                point_size = std::min(point_size + 1.0f, max_point_size);
+            }
+            up_was_down = up_down;
 
-        const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
-        if (down_down && !down_was_down) {
-            point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
+            const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
+            if (down_down && !down_was_down) {
+                point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
+            }
+            down_was_down = down_down;
         }
-        down_was_down = down_down;
         picker.point_size = point_size + 6.0f;
         picker.enabled = visible;
     }
@@ -232,6 +235,161 @@ private:
     bool p_was_down = false;
     bool up_was_down = false;
     bool down_was_down = false;
+};
+
+class NurbsCurveFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    explicit NurbsCurveFeature(const vkkk::Camera& scene_camera)
+        : camera(scene_camera)
+        , curve(make_sample_curve())
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (!upload_lines(context) || !create_pipeline(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kPipelineName, vkkk::buf::FixedColorInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(
+                kPipelineName, vkkk::buf::FixedColorInstanceAttrs);
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool n_down = glfwGetKey(context.get_window(), GLFW_KEY_N) == GLFW_PRESS;
+        if (n_down && !n_was_down) {
+            visible = !visible;
+        }
+        n_was_down = n_down;
+
+        if (!visible) {
+            return;
+        }
+
+        const float min_line_width = context.wide_lines_enabled
+            ? context.line_width_range[0] : 1.0f;
+        const float max_line_width = context.wide_lines_enabled
+            ? context.line_width_range[1] : 1.0f;
+        const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
+        if (up_down && !up_was_down) {
+            line_width = std::min(line_width + 1.0f, max_line_width);
+        }
+        up_was_down = up_down;
+
+        const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
+        if (down_down && !down_was_down) {
+            line_width = std::max(line_width - 1.0f, min_line_width);
+        }
+        down_was_down = down_down;
+
+        const bool plus_down = glfwGetKey(context.get_window(), GLFW_KEY_EQUAL) == GLFW_PRESS
+            || glfwGetKey(context.get_window(), GLFW_KEY_KP_ADD) == GLFW_PRESS;
+        if (plus_down && !plus_was_down) {
+            const uint32_t next = std::min(segment_count * 2, kMaxSegmentCount);
+            if (next != segment_count) {
+                segment_count = next;
+                upload_lines(context);
+            }
+        }
+        plus_was_down = plus_down;
+
+        const bool minus_down = glfwGetKey(context.get_window(), GLFW_KEY_MINUS) == GLFW_PRESS
+            || glfwGetKey(context.get_window(), GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS;
+        if (minus_down && !minus_was_down) {
+            const uint32_t next = std::max(segment_count / 2, kMinSegmentCount);
+            if (next != segment_count) {
+                segment_count = next;
+                upload_lines(context);
+            }
+        }
+        minus_was_down = minus_down;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (!ready || !visible) {
+            return;
+        }
+        context.sync_ubo(kPipelineName, vkkk::buf::CameraUBO, &camera.ubo_data, image_index);
+        context.sync_ssbo(kPipelineName, vkkk::buf::FixedColorInstanceAttrs, &instance, image_index);
+        if (context.bind(cmd, kPipelineName, image_index)) {
+            cmd.setLineWidth(line_width);
+            context.draw_lines(cmd, kLinesName);
+        }
+    }
+
+private:
+    static constexpr const char* kPipelineName = "viewport_nurbs_curve";
+    static constexpr const char* kLinesName = "viewport_nurbs_curve_lines";
+    static constexpr uint32_t kMinSegmentCount = 4;
+    static constexpr uint32_t kMaxSegmentCount = 256;
+
+    static vkkk::NurbsCurve make_sample_curve() {
+        return vkkk::NurbsCurve({
+            {-2.0f, 0.2f, 0.0f},
+            {-1.2f, 1.4f, 1.0f},
+            {-0.2f, 0.3f, 0.2f},
+            {0.8f, 1.8f, -0.4f},
+            {1.6f, 0.4f, 0.8f},
+            {2.2f, 1.1f, 0.0f},
+            {2.8f, 0.3f, -0.6f},
+        }, {1.0f, 1.0f, 0.4f, 3.5f, 1.0f, 1.5f, 1.0f});
+    }
+
+    static bool create_pipeline(vkkk::Context& context) {
+        if (context.pipelines.contains(kPipelineName)) {
+            return true;
+        }
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(vkkk::fixed_color_vert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_nurbs_curve_vert")
+            || !frag_module.load(vkkk::fixed_color_frag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_nurbs_curve_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::eLineList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+            vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, false, vk::CompareOp::eLessOrEqual, false, false);
+        option.dynamic_states.push_back(vk::DynamicState::eLineWidth);
+        option.dynamic_info.dynamicStateCount = static_cast<uint32_t>(option.dynamic_states.size());
+        option.dynamic_info.pDynamicStates = option.dynamic_states.data();
+        return context.create_pipeline(kPipelineName, pack, option, {vkkk::VERTEX});
+    }
+
+    bool upload_lines(vkkk::Context& context) {
+        const vkkk::Lines lines = curve.generate_lines(segment_count);
+        if (auto found = context.lines.find(kLinesName); found != context.lines.end()) {
+            context.wait_idle();
+            found->second.sync(lines, &context);
+            return true;
+        }
+        return context.load_lines(kLinesName, lines);
+    }
+
+    const vkkk::Camera& camera;
+    vkkk::NurbsCurve curve;
+    vkkk::FixedColorInstanceAttrs instance{
+        .model = glm::mat4{1.0f},
+        .color = glm::vec4{0.2f, 0.85f, 0.95f, 1.0f},
+    };
+    uint32_t segment_count = 32;
+    float line_width = 1.0f;
+    bool ready = false;
+    bool visible = false;
+    bool n_was_down = false;
+    bool up_was_down = false;
+    bool down_was_down = false;
+    bool plus_was_down = false;
+    bool minus_was_down = false;
 };
 
 class SceneCubeFeature final
@@ -541,6 +699,7 @@ int main(int argc, char** argv) {
         vkkk::vp::VertexPickingFeature,
         SceneCubeFeature,
         ScatteredSpherePointsFeature,
+        NurbsCurveFeature,
         vkkk::vp::GridFeature,
         vkkk::vp::FrameAxisFeature,
         BillboardTextFeature>;
@@ -568,6 +727,7 @@ int main(int argc, char** argv) {
     }
     viewport.add_feature<SceneCubeFeature>(scene, *picker, selected_object_id);
     viewport.add_feature<ScatteredSpherePointsFeature>(camera, *vertex_picker);
+    viewport.add_feature<NurbsCurveFeature>(camera);
     viewport.add_feature<vkkk::vp::GridFeature>(camera);
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);

@@ -815,6 +815,7 @@ public:
     // True when VkPhysicalDeviceFeatures::largePoints was supported and enabled.
     bool large_points_enabled = false;
     std::array<float, 2> point_size_range{1.0f, 1.0f};
+    std::array<float, 2> line_width_range{1.0f, 1.0f};
 
     std::unordered_map<std::string, Texture> textures;
     std::vector<Texture> targets;

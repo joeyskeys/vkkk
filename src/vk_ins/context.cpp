@@ -483,6 +483,7 @@ void Context::init(GLFWwindow* win,
     wide_lines_enabled = supported_features.wideLines == vk::True;
     large_points_enabled = supported_features.largePoints == vk::True;
     point_size_range = physical_device.getProperties().limits.pointSizeRange;
+    line_width_range = physical_device.getProperties().limits.lineWidthRange;
     const auto supported_feature_chain = physical_device.getFeatures2<
         vk::PhysicalDeviceFeatures2,
         vk::PhysicalDeviceVulkan13Features,

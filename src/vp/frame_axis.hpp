@@ -21,7 +21,7 @@ struct CoordinateSystem {
         glm::vec3{0.0f, 1.0f, 0.0f},
         glm::vec3{0.0f, 0.0f, 1.0f},
     };
-    std::array<std::string, 3> labels = {"X", "Y", "Z"};
+    std::array<std::string, 3> labels = {"x", "y", "z"};
 };
 
 // Screen-corner orientation gizmo rendered as red, green, and blue strokes.
@@ -42,7 +42,7 @@ private:
     CoordinateSystem coordinate_system;
     CameraUBO overlay_camera{};
     std::array<FixedColorInstanceAttrs, 3> instances{};
-    std::array<glm::vec2, 3> label_sizes{};
+    std::array<float, 3> label_aspects{};
     bool ready = false;
     bool labels_ready = false;
 };

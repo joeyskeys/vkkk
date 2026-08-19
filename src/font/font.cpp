@@ -9,6 +9,7 @@
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
+#include FT_OUTLINE_H
 
 namespace vkkk::font
 {
@@ -80,6 +81,7 @@ bool valid_options(const TextRenderOptions& options) {
     return options.pixel_height > 0 && options.pixel_height <= kMaxTextureExtent
         && options.padding <= kMaxTextureExtent
         && std::isfinite(options.line_spacing) && options.line_spacing > 0.0f
+        && std::isfinite(options.embolden) && options.embolden >= 0.0f
         && std::isfinite(options.color.r) && std::isfinite(options.color.g)
         && std::isfinite(options.color.b) && std::isfinite(options.color.a)
         && options.color.r >= 0.0f && options.color.r <= 1.0f
@@ -161,8 +163,18 @@ TextTexture TextRenderer::render(Context& context, std::string_view text,
                 pen_x += static_cast<int32_t>(kerning.x);
             }
         }
-        if (FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT) != 0
-            || FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) != 0)
+        if (FT_Load_Glyph(face, glyph_index, FT_LOAD_NO_BITMAP) != 0) {
+            FT_Done_Face(face);
+            FT_Done_FreeType(library);
+            return {};
+        }
+        if (options.embolden > 0.0f && face->glyph->format == FT_GLYPH_FORMAT_OUTLINE) {
+            const FT_Pos strength = static_cast<FT_Pos>(std::lround(options.embolden * 64.0f));
+            if (strength > 0) {
+                FT_Outline_Embolden(&face->glyph->outline, strength);
+            }
+        }
+        if (FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL) != 0)
         {
             FT_Done_Face(face);
             FT_Done_FreeType(library);

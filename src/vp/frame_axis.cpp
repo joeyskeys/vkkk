@@ -97,7 +97,7 @@ bool create_axis_lines(Context& context) {
 
 bool create_axis_labels(Context& context, const std::filesystem::path& font_path,
     const std::array<std::string, 3>& labels,
-    std::array<glm::vec2, 3>& label_sizes)
+    std::array<float, 3>& label_aspects)
 {
     if (font_path.empty()) {
         return false;
@@ -107,19 +107,18 @@ bool create_axis_labels(Context& context, const std::filesystem::path& font_path
     for (size_t index = 0; index < kLabelNames.size(); ++index) {
         font::TextRenderOptions text_options{};
         text_options.pixel_height = 32;
+        text_options.padding = 2;
+        text_options.embolden = 0.8f;
         text_options.color = kLabelColors[index];
         const auto texture = renderer.render(context, labels[index], text_options);
-        if (!texture.valid()) {
+        if (!texture.valid() || texture.extent.height == 0) {
             return false;
         }
 
-        constexpr float label_height = 0.035f;
-        label_sizes[index] = glm::vec2{
-            label_height * static_cast<float>(texture.extent.width) / texture.extent.height,
-            label_height,
-        };
+        label_aspects[index] = static_cast<float>(texture.extent.width)
+            / static_cast<float>(texture.extent.height);
         BillboardTextOptions billboard_options{};
-        billboard_options.size = label_sizes[index];
+        billboard_options.size = glm::vec2{label_aspects[index], 1.0f};
         billboard_options.depth_test = false;
         if (!context.add_billboard_text(kLabelNames[index],
                 BillboardTextSource::render_target(texture.target_index), billboard_options))
@@ -128,6 +127,23 @@ bool create_axis_labels(Context& context, const std::filesystem::path& font_path
         }
     }
     return true;
+}
+
+glm::vec3 snap_overlay_to_pixels(glm::vec3 position, vk::Extent2D extent, float aspect) {
+    const float width = static_cast<float>(std::max(extent.width, 1u));
+    const float height = static_cast<float>(std::max(extent.height, 1u));
+    const float pixel_x = std::round((position.x / aspect * 0.5f + 0.5f) * width);
+    const float pixel_y = std::round((-position.y * 0.5f + 0.5f) * height);
+    position.x = (pixel_x / width * 2.0f - 1.0f) * aspect;
+    position.y = -(pixel_y / height * 2.0f - 1.0f);
+    return position;
+}
+
+glm::vec2 overlay_label_size(float aspect_ratio, vk::Extent2D extent) {
+    constexpr float kLabelPixelHeight = 14.0f;
+    const float height = static_cast<float>(std::max(extent.height, 1u));
+    const float size_y = std::round(kLabelPixelHeight) * 2.0f / height;
+    return glm::vec2{size_y * aspect_ratio, size_y};
 }
 
 } // namespace
@@ -149,7 +165,7 @@ void FrameAxisFeature::on_attach(Context& context, vk::Extent2D) {
 
     ready = context.resize_pipeline_ssbo(kPipelineName, buf::FixedColorInstanceAttrs, instances.size())
         && context.alloc_pipeline_ssbo(kPipelineName, buf::FixedColorInstanceAttrs);
-    labels_ready = ready && create_axis_labels(context, font_path, coordinate_system.labels, label_sizes);
+    labels_ready = ready && create_axis_labels(context, font_path, coordinate_system.labels, label_aspects);
 }
 
 void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
@@ -195,9 +211,11 @@ void FrameAxisFeature::on_update(Context& context, const Context::Frame&) {
 
     if (labels_ready) {
         for (size_t index = 0; index < kLabelNames.size(); ++index) {
-            const glm::vec3 position{instances[index].model
-                * glm::vec4{1.18f, 0.0f, 0.0f, 1.0f}};
-            context.set_billboard_text_transform(kLabelNames[index], position, label_sizes[index]);
+            const glm::vec3 position = snap_overlay_to_pixels(
+                glm::vec3{instances[index].model * glm::vec4{1.18f, 0.0f, 0.0f, 1.0f}},
+                extent, aspect);
+            context.set_billboard_text_transform(kLabelNames[index], position,
+                overlay_label_size(label_aspects[index], extent));
         }
     }
 }

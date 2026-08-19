@@ -509,6 +509,11 @@ void Context::init(GLFWwindow* win,
         wide_lines_enabled ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceFeatures2>().features.largePoints =
         large_points_enabled ? VK_TRUE : VK_FALSE;
+    // Vertex picking A-buffer writes storage buffers from the fragment stage.
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.fragmentStoresAndAtomics =
+        supported_features.fragmentStoresAndAtomics;
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.fillModeNonSolid =
+        supported_features.fillModeNonSolid;
     // Needed for draw_indirect with draw_count > 1.
     device_features.get<vk::PhysicalDeviceFeatures2>().features.multiDrawIndirect =
         supported_features.multiDrawIndirect;

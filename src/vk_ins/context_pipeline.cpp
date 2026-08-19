@@ -173,10 +173,7 @@ bool Context::create_pipeline(const std::string& name,
             sampler_descriptor_counts[tex_binding] = descriptor_count;
             if (textures.find(ppl_tex_name) == textures.end()) {
                 const auto tex_path_info = module.tex_img_pairs.find(tex_name);
-                if (tex_path_info == module.tex_img_pairs.end()) {
-                    std::cout << "No texture assigned for sampler " << tex_name << std::endl;
-                }
-                else {
+                if (tex_path_info != module.tex_img_pairs.end()) {
                     const auto& [path, is_cubemap] = tex_path_info->second;
                     descriptor_count = is_cubemap ? 6u : 1u;
                     if (!is_cubemap) {

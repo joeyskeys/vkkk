@@ -16,6 +16,7 @@ struct TextRenderOptions {
     glm::vec4 color{1.0f};
     uint32_t padding = 4;
     float line_spacing = 1.0f;
+    float embolden = 0.0f;
 };
 
 struct TextTexture {

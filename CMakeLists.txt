@@ -13,7 +13,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_SOURCE_DIR}/cmake)
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 # Optional vcpkg package root for dependencies installed under installed/x64-windows.
 # Set VKKK_VCPKG_INSTALLED_DIR on machines where vcpkg is installed in a different location.
@@ -63,10 +63,10 @@ find_package(shaderc REQUIRED)
 find_package(spirv_cross REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty/stb)
-include_directories(${CMAKE_SOURCE_DIR}/src)
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui)
-include_directories(${CMAKE_SOURCE_DIR}/thirdparty/imgui/backends)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/imgui/backends)
 
 if(VKKK_BUILD_PYTHON_BINDINGS)
     find_package(Python 3.8 COMPONENTS Interpreter Development.Module REQUIRED)

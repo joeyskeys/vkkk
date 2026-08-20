@@ -27,6 +27,7 @@ Mesh::Mesh(const Mesh& m)
     , indexed(m.indexed)
     , comp_size(m.comp_size)
     , vcnt(m.vcnt)
+    , strides(m.strides)
     , icnt(m.icnt)
     , loaded(m.loaded)
 {
@@ -43,6 +44,7 @@ Mesh::Mesh(Mesh&& m)
     , indexed(m.indexed)
     , comp_size(m.comp_size)
     , vcnt(m.vcnt)
+    , strides(std::move(m.strides))
     , icnt(m.icnt)
     , loaded(m.loaded)
 {
@@ -86,6 +88,9 @@ void Mesh::load(aiMesh* mesh, bool interleaved) {
                 }
 
                 case NORMAL: {
+                    if (mesh->mNormals == nullptr) {
+                        throw std::runtime_error("mesh has no normals");
+                    }
                     for (int i = 0; i < vcnt; ++i) {
                         vbuf[i * comp_size + prev    ] = mesh->mNormals[i].x;
                         vbuf[i * comp_size + prev + 1] = mesh->mNormals[i].y;

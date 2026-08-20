@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 #include <glm/mat4x4.hpp>
 
@@ -40,6 +42,8 @@ public:
         const glm::vec3&, const glm::vec3&);
 
     const Mesh* find_mesh(const std::string& name) const;
+    Mesh* find_mesh(const std::string& name);
+    std::vector<std::string> mesh_names() const;
     void sync_to_gpu(Context* ctx);
 
 private:

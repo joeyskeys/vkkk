@@ -61,7 +61,11 @@ void DrawableMgr::process_node(const std::string& name, aiNode* node, const aiSc
         aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
         Mesh m{cs};
         m.load(mesh);
-        meshes.insert_or_assign(name, std::move(m));
+        std::string mesh_name = name;
+        if (meshes.contains(mesh_name)) {
+            mesh_name = fmt::format("{}_{}", name, meshes.size());
+        }
+        meshes.insert_or_assign(mesh_name, std::move(m));
     }
 
     for (int i = 0; i < node->mNumChildren; ++i)
@@ -79,10 +83,14 @@ void DrawableMgr::load_file(const fs::path& path, const std::string& name,
     Assimp::Importer importer;
     const aiScene* scene = importer.ReadFile(path.string().c_str(),
         aiProcess_Triangulate | aiProcess_JoinIdenticalVertices |
+        aiProcess_GenSmoothNormals |
         aiProcess_OptimizeMeshes | aiProcess_OptimizeGraph);
 
-    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode)
+    if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+        std::cerr << "failed to import model: " << path << " ("
+                  << importer.GetErrorString() << ")" << std::endl;
         return;
+    }
 
     process_node(name, scene->mRootNode, scene, cs);
 }
@@ -268,6 +276,20 @@ void DrawableMgr::add_line(const std::string& name, const std::vector<VERT_COMP>
 const Mesh* DrawableMgr::find_mesh(const std::string& name) const {
     const auto found = meshes.find(name);
     return found != meshes.end() ? &found->second : nullptr;
+}
+
+Mesh* DrawableMgr::find_mesh(const std::string& name) {
+    const auto found = meshes.find(name);
+    return found != meshes.end() ? &found->second : nullptr;
+}
+
+std::vector<std::string> DrawableMgr::mesh_names() const {
+    std::vector<std::string> names;
+    names.reserve(meshes.size());
+    for (const auto& [name, _] : meshes) {
+        names.push_back(name);
+    }
+    return names;
 }
 
 void DrawableMgr::sync_to_gpu(Context* ctx) {

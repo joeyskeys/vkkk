@@ -1,5 +1,6 @@
 #include "vp/grid.hpp"
 
+#include <algorithm>
 #include <vector>
 
 #include "concepts/line.h"
@@ -13,9 +14,11 @@ namespace
 
 constexpr const char* kPipelineName = "vp_grid";
 constexpr const char* kLinesName = "vp_grid_lines";
+constexpr const char* kOriginLinesName = "vp_grid_origin";
 
-bool create_pipeline(Context& context) {
+bool create_pipeline(Context& context, bool& wide_lines) {
     if (context.pipelines.contains(kPipelineName)) {
+        wide_lines = context.wide_lines_enabled;
         return true;
     }
 
@@ -38,6 +41,13 @@ bool create_pipeline(Context& context) {
     option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
         vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
     option.setup_depth_stencil(true, false, vk::CompareOp::eLessOrEqual, false, false);
+    wide_lines = context.wide_lines_enabled;
+    if (wide_lines) {
+        option.dynamic_states.push_back(vk::DynamicState::eLineWidth);
+        option.dynamic_info.dynamicStateCount =
+            static_cast<uint32_t>(option.dynamic_states.size());
+        option.dynamic_info.pDynamicStates = option.dynamic_states.data();
+    }
     return context.create_pipeline(kPipelineName, pack, option, {VERTEX});
 }
 
@@ -90,6 +100,23 @@ bool create_grid_lines(Context& context, uint32_t cell_count, float cell_size) {
     return context.load_lines(kLinesName, grid);
 }
 
+bool create_origin_lines(Context& context, uint32_t cell_count, float cell_size) {
+    if (context.lines.contains(kOriginLinesName) || cell_count == 0 || cell_size <= 0.0f) {
+        return context.lines.contains(kOriginLinesName);
+    }
+
+    const float extent = static_cast<float>(cell_count) * cell_size * 0.5f;
+    const float vertices[] = {
+        -extent, 0.0f, 0.0f,
+        extent, 0.0f, 0.0f,
+        0.0f, 0.0f, -extent,
+        0.0f, 0.0f, extent,
+    };
+    Lines origin({VERTEX});
+    origin.load(4, reinterpret_cast<const char*>(vertices), sizeof(vertices));
+    return context.load_lines(kOriginLinesName, origin);
+}
+
 } // namespace
 
 GridFeature::GridFeature(const Camera& scene_camera, uint32_t cells, float size)
@@ -100,7 +127,10 @@ GridFeature::GridFeature(const Camera& scene_camera, uint32_t cells, float size)
 }
 
 void GridFeature::on_attach(Context& context, vk::Extent2D) {
-    if (!create_grid_lines(context, cell_count, cell_size) || !create_pipeline(context)) {
+    if (!create_grid_lines(context, cell_count, cell_size)
+        || !create_origin_lines(context, cell_count, cell_size)
+        || !create_pipeline(context, wide_lines))
+    {
         return;
     }
 
@@ -112,6 +142,8 @@ void GridFeature::on_update(Context&, const Context::Frame&) {
     camera_ubo = camera.ubo_data;
     instances[0].model = glm::mat4{1.0f};
     instances[0].color = glm::vec4{0.12f, 0.12f, 0.12f, 1.0f};
+    instances[1].model = glm::mat4{1.0f};
+    instances[1].color = glm::vec4{0.04f, 0.04f, 0.04f, 1.0f};
 }
 
 void GridFeature::on_record(Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
@@ -123,7 +155,15 @@ void GridFeature::on_record(Context& context, vk::raii::CommandBuffer& cmd, uint
     context.sync_ssbo(kPipelineName, buf::FixedColorInstanceAttrs, instances.data(), image_index,
         static_cast<uint32_t>(sizeof(instances)));
     if (context.bind(cmd, kPipelineName, image_index)) {
-        context.draw_lines(cmd, kLinesName, 0, static_cast<uint32_t>(instances.size()));
+        if (wide_lines) {
+            cmd.setLineWidth(1.0f);
+        }
+        context.draw_lines(cmd, kLinesName, 0, 1, 0);
+        if (wide_lines) {
+            cmd.setLineWidth(std::clamp(2.0f, context.line_width_range[0],
+                context.line_width_range[1]));
+        }
+        context.draw_lines(cmd, kOriginLinesName, 0, 1, 1);
     }
 }
 

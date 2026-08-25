@@ -26,8 +26,9 @@ private:
     uint32_t cell_count;
     float cell_size;
     CameraUBO camera_ubo{};
-    std::array<FixedColorInstanceAttrs, 1> instances{};
+    std::array<FixedColorInstanceAttrs, 2> instances{};
     bool ready = false;
+    bool wide_lines = false;
 };
 
 } // namespace vkkk::vp

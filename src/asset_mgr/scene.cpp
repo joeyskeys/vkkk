@@ -23,6 +23,11 @@ bool Scene::remove_object(const std::string& name) {
     return objects.erase(name) != 0;
 }
 
+SceneObject* Scene::find_object(const std::string& name) {
+    const auto found = objects.find(name);
+    return found == objects.end() ? nullptr : &found->second;
+}
+
 const SceneObject* Scene::find_object(const std::string& name) const {
     const auto found = objects.find(name);
     return found == objects.end() ? nullptr : &found->second;

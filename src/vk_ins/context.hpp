@@ -599,6 +599,9 @@ public:
             vk::BufferUsageFlagBits::eIndexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
     }
 
+    void copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const;
+    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
+
     // Accessors and configuration
     GLFWwindow* get_window() const { return window; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
@@ -689,8 +692,6 @@ private:
         vk::BufferUsageFlags usage,
         vk::MemoryPropertyFlags properties) const;
 
-    void copy_buffer(vk::raii::Buffer& src, vk::raii::Buffer& dst, vk::DeviceSize size) const;
-    std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
     vk::raii::CommandBuffer begin_single_commands(const vk::raii::CommandPool& pool) const;
     void end_single_commands(vk::raii::CommandBuffer&& cmd_buf, const vk::raii::Queue& submit_queue) const;
 

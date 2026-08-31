@@ -569,6 +569,7 @@ public:
 
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
+    bool update_mesh(const std::string& name, const Mesh& mesh);
     bool load_lines(const std::string& name, const Lines& lines);
     bool load_points(const std::string& name, const Points& points);
     // Add a camera-facing textured billboard using an auto-generated indexed quad.

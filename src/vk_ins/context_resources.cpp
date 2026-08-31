@@ -517,6 +517,29 @@ bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
     return true;
 }
 
+bool Context::update_mesh(const std::string& name, const Mesh& mesh) {
+    auto found = meshes.find(name);
+    if (found == meshes.end() || mesh.vbuf == nullptr || mesh.vcnt == 0) {
+        return false;
+    }
+
+    const vk::DeviceSize vert_bytes =
+        static_cast<vk::DeviceSize>(mesh.comp_size) * mesh.vcnt * sizeof(float);
+    wait_idle();
+    if (found->second.vert_bytes == vert_bytes
+        && vert_bytes > 0
+        && vert_bytes <= std::numeric_limits<uint32_t>::max())
+    {
+        auto [staging_buf, staging_memo] = load_into_staging_buffer(
+            mesh.vbuf, static_cast<uint32_t>(vert_bytes));
+        copy_buffer(staging_buf, found->second.vbuf, vert_bytes);
+        return true;
+    }
+
+    found->second.sync(mesh, this);
+    return true;
+}
+
 bool Context::load_lines(const std::string& name, const Lines& line_data) {
     LinesGPU gpu{};
     gpu.sync(line_data, this);

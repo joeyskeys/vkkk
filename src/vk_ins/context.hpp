@@ -274,6 +274,21 @@ struct MeshGPU {
         uint32_t index_count = 0) const;
 };
 
+struct DeformableMeshGPU : MeshGPU {
+    MeshGPU rest_mesh;
+};
+
+// CUDA device view of a Vulkan buffer. device_ptr is a CUdeviceptr.
+struct CudaDeviceBuffer {
+    uint64_t device_ptr = 0;
+    vk::DeviceSize bytes = 0;
+};
+
+struct CudaInteropState;
+struct CudaInteropDeleter {
+    void operator()(CudaInteropState* state) const;
+};
+
 struct LinesGPU {
     vk::raii::Buffer                        vbuf{nullptr};
     vk::raii::DeviceMemory                  vbuf_memo{nullptr};
@@ -570,6 +585,13 @@ public:
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
     bool update_mesh(const std::string& name, const Mesh& mesh);
+    // CUDA-Vulkan interop: map mesh vertex memory into the current CUDA context.
+    bool mesh_cuda_vertex_ptr(const std::string& name, CudaDeviceBuffer& view);
+    bool mesh_cuda_rest_ptr(const std::string& name, CudaDeviceBuffer& view);
+    // Device-to-device write into the draw vertex buffer.
+    bool write_mesh_vertices(const std::string& name, vk::raii::Buffer& src, vk::DeviceSize bytes);
+    bool write_mesh_vertices_from_cuda(const std::string& name, uint64_t src_device_ptr, vk::DeviceSize bytes);
+    bool copy_mesh_rest_to_draw(const std::string& name);
     bool load_lines(const std::string& name, const Lines& lines);
     bool load_points(const std::string& name, const Points& points);
     // Add a camera-facing textured billboard using an auto-generated indexed quad.
@@ -589,7 +611,8 @@ public:
     {
         create_input_attr_buffer(
             src, buf, memo, comp_size * sizeof(float), vcnt,
-            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer);
+            vk::BufferUsageFlagBits::eVertexBuffer | vk::BufferUsageFlagBits::eStorageBuffer,
+            true);
     }
 
     void create_index_buffer(const uint32_t* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
@@ -691,13 +714,15 @@ private:
 
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> create_buffer(vk::DeviceSize size,
         vk::BufferUsageFlags usage,
-        vk::MemoryPropertyFlags properties) const;
+        vk::MemoryPropertyFlags properties,
+        bool exportable = false) const;
 
     vk::raii::CommandBuffer begin_single_commands(const vk::raii::CommandPool& pool) const;
     void end_single_commands(vk::raii::CommandBuffer&& cmd_buf, const vk::raii::Queue& submit_queue) const;
 
     void create_input_attr_buffer(const float* src, vk::raii::Buffer& buf, vk::raii::DeviceMemory& memo,
-        size_t elem_stride_bytes, size_t elem_cnt, vk::BufferUsageFlags usage) const
+        size_t elem_stride_bytes, size_t elem_cnt, vk::BufferUsageFlags usage,
+        bool exportable = false) const
     {
         vk::DeviceSize buf_size = elem_stride_bytes * elem_cnt;
         auto [staging_buf, staging_memo] = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferSrc,
@@ -706,7 +731,7 @@ private:
         std::memcpy(data, src, static_cast<size_t>(buf_size));
         staging_memo.unmapMemory();
         std::tie(buf, memo) = create_buffer(buf_size, vk::BufferUsageFlagBits::eTransferDst | usage,
-            vk::MemoryPropertyFlagBits::eDeviceLocal);
+            vk::MemoryPropertyFlagBits::eDeviceLocal, exportable);
         copy_buffer(staging_buf, buf, buf_size);
     }
 
@@ -801,10 +826,18 @@ private:
     };
     std::unordered_map<std::string, BillboardText> billboard_texts;
 
+    bool map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key, CudaDeviceBuffer& view);
+    MeshGPU* find_draw_mesh(const std::string& name);
+    DeformableMeshGPU* find_deformable_mesh(const std::string& name);
+
+    bool external_memory_export_available = false;
+    std::unique_ptr<CudaInteropState, CudaInteropDeleter> cuda_interop;
+
 public:
     std::unordered_map<std::string, Pipeline> pipelines;
     std::unordered_map<std::string, ComputePipeline> compute_pipelines;
     std::unordered_map<std::string, MeshGPU> meshes;
+    std::unordered_map<std::string, DeformableMeshGPU> deformable_meshes;
     std::unordered_map<std::string, LinesGPU> lines;
     std::unordered_map<std::string, PointsGPU> points;
     std::unordered_map<std::string, IndirectBuffer> indirect_buffers;

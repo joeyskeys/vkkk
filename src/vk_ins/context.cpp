@@ -321,17 +321,40 @@ uint32_t Context::find_memory_type(uint32_t type_filter, vk::MemoryPropertyFlags
 
 std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Context::create_buffer(vk::DeviceSize size,
     vk::BufferUsageFlags usage,
-    vk::MemoryPropertyFlags properties) const
+    vk::MemoryPropertyFlags properties,
+    bool exportable) const
 {
+    const bool export_memory = exportable && external_memory_export_available;
+#ifdef _WIN32
+    const vk::ExternalMemoryHandleTypeFlagBits handle_type =
+        vk::ExternalMemoryHandleTypeFlagBits::eOpaqueWin32;
+#else
+    const vk::ExternalMemoryHandleTypeFlagBits handle_type =
+        vk::ExternalMemoryHandleTypeFlagBits::eOpaqueFd;
+#endif
+
     vk::BufferCreateInfo buffer_create_info{};
     buffer_create_info.size = size;
     buffer_create_info.usage = usage;
     buffer_create_info.sharingMode = vk::SharingMode::eExclusive;
+    vk::ExternalMemoryBufferCreateInfo external_buffer_info{};
+    if (export_memory) {
+        external_buffer_info.handleTypes = handle_type;
+        buffer_create_info.pNext = &external_buffer_info;
+    }
     vk::raii::Buffer buffer = vk::raii::Buffer(device, buffer_create_info);
     vk::MemoryRequirements mem_reqs = buffer.getMemoryRequirements();
     vk::MemoryAllocateInfo alloc_info{};
     alloc_info.allocationSize = mem_reqs.size;
     alloc_info.memoryTypeIndex = find_memory_type(mem_reqs.memoryTypeBits, properties);
+    vk::ExportMemoryAllocateInfo export_info{};
+    vk::MemoryDedicatedAllocateInfo dedicated_info{};
+    if (export_memory) {
+        export_info.handleTypes = handle_type;
+        dedicated_info.buffer = *buffer;
+        dedicated_info.pNext = &export_info;
+        alloc_info.pNext = &dedicated_info;
+    }
     vk::raii::DeviceMemory memo = vk::raii::DeviceMemory(device, alloc_info);
     buffer.bindMemory(*memo, 0);
     return std::make_pair(std::move(buffer), std::move(memo));
@@ -471,6 +494,20 @@ void Context::init(GLFWwindow* win,
         throw std::runtime_error("no suitable Vulkan 1.3 device with dynamic rendering support");
     }
     physical_device = *dev_iter;
+
+#ifdef _WIN32
+    const char* external_memory_ext = "VK_KHR_external_memory_win32";
+#else
+    const char* external_memory_ext = "VK_KHR_external_memory_fd";
+#endif
+    const auto device_extensions = physical_device.enumerateDeviceExtensionProperties();
+    if (std::ranges::any_of(device_extensions, [external_memory_ext](const auto& available) {
+            return std::strcmp(available.extensionName, external_memory_ext) == 0;
+        }))
+    {
+        required_device_extensions.push_back(external_memory_ext);
+        external_memory_export_available = true;
+    }
 
     queue_idx = find_graphics_queue_family_index();
     if (queue_idx == ~0u) {

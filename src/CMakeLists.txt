@@ -77,6 +77,7 @@ set(SRCS
     vk_ins/context_abuffer.cpp
     vk_ins/context_billboard.cpp
     vk_ins/context_resources.cpp
+    vk_ins/context_cuda.cpp
     vk_ins/context_glfw.cpp
     vk_ins/context_utils.cpp)
 

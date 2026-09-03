@@ -44,6 +44,8 @@ public:
     const Mesh* find_mesh(const std::string& name) const;
     Mesh* find_mesh(const std::string& name);
     std::vector<std::string> mesh_names() const;
+    bool remove_mesh(const std::string& name);
+    void clear_meshes();
     void sync_to_gpu(Context* ctx);
 
 private:

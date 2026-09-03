@@ -292,6 +292,14 @@ std::vector<std::string> DrawableMgr::mesh_names() const {
     return names;
 }
 
+bool DrawableMgr::remove_mesh(const std::string& name) {
+    return meshes.erase(name) != 0;
+}
+
+void DrawableMgr::clear_meshes() {
+    meshes.clear();
+}
+
 void DrawableMgr::sync_to_gpu(Context* ctx) {
     for (auto& [name, mesh] : meshes) {
         ctx->load_mesh(name, mesh);

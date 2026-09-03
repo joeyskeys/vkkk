@@ -585,6 +585,8 @@ public:
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
     bool update_mesh(const std::string& name, const Mesh& mesh);
+    bool remove_mesh(const std::string& name);
+    void clear_meshes();
     // CUDA-Vulkan interop: map mesh vertex memory into the current CUDA context.
     bool mesh_cuda_vertex_ptr(const std::string& name, CudaDeviceBuffer& view);
     bool mesh_cuda_rest_ptr(const std::string& name, CudaDeviceBuffer& view);
@@ -827,6 +829,7 @@ private:
     std::unordered_map<std::string, BillboardText> billboard_texts;
 
     bool map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key, CudaDeviceBuffer& view);
+    void unmap_mesh_cuda(const std::string& name);
     MeshGPU* find_draw_mesh(const std::string& name);
     DeformableMeshGPU* find_deformable_mesh(const std::string& name);
 

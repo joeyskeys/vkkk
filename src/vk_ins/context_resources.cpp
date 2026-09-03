@@ -4,6 +4,7 @@
 #include <iostream>
 #include <limits>
 #include <stdexcept>
+#include <string>
 #include <vector>
 
 #include <OpenImageIO/imagebuf.h>
@@ -515,6 +516,39 @@ bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
     gpu.sync(mesh, this);
     meshes.emplace(name, std::move(gpu));
     return true;
+}
+
+bool Context::remove_mesh(const std::string& name) {
+    const bool have_draw = meshes.contains(name);
+    const bool have_deformable = deformable_meshes.contains(name);
+    if (!have_draw && !have_deformable) {
+        return false;
+    }
+    wait_idle();
+    unmap_mesh_cuda(name);
+    meshes.erase(name);
+    deformable_meshes.erase(name);
+    return true;
+}
+
+void Context::clear_meshes() {
+    if (meshes.empty() && deformable_meshes.empty()) {
+        return;
+    }
+    wait_idle();
+    std::vector<std::string> names;
+    names.reserve(meshes.size() + deformable_meshes.size());
+    for (const auto& [name, _] : meshes) {
+        names.push_back(name);
+    }
+    for (const auto& [name, _] : deformable_meshes) {
+        names.push_back(name);
+    }
+    for (const auto& name : names) {
+        unmap_mesh_cuda(name);
+    }
+    meshes.clear();
+    deformable_meshes.clear();
 }
 
 bool Context::update_mesh(const std::string& name, const Mesh& mesh) {

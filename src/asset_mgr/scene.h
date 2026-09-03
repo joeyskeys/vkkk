@@ -27,6 +27,7 @@ public:
 
     bool add_object(std::string name, std::string mesh_name, glm::mat4 model = glm::mat4{1.0f});
     bool remove_object(const std::string& name);
+    void clear_objects();
     SceneObject* find_object(const std::string& name);
     const SceneObject* find_object(const std::string& name) const;
 

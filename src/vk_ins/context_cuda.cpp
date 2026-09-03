@@ -235,6 +235,25 @@ DeformableMeshGPU* Context::find_deformable_mesh(const std::string& name) {
     return nullptr;
 }
 
+void Context::unmap_mesh_cuda(const std::string& name) {
+    if (!cuda_interop) {
+        return;
+    }
+    auto unmap = [this](const std::string& key) {
+        auto found = cuda_interop->maps.find(key);
+        if (found == cuda_interop->maps.end()) {
+            return;
+        }
+        if (found->second.external_memory != nullptr && cuda_interop->cuDestroyExternalMemory != nullptr) {
+            cuda_interop->cuDestroyExternalMemory(found->second.external_memory);
+        }
+        cuda_interop->maps.erase(found);
+    };
+    unmap(name);
+    unmap(name + ".draw");
+    unmap(name + ".rest");
+}
+
 bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key,
     CudaDeviceBuffer& view)
 {

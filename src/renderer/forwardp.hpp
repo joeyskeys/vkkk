@@ -14,7 +14,7 @@
 namespace vkkk
 {
 
-class Camera;
+struct Camera;
 class Scene;
 
 class ForwardPRenderer final : public Renderer {

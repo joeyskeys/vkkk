@@ -14,7 +14,7 @@ namespace vkkk
 
 class DrawableMgr;
 class LightMgr;
-class Camera;
+struct Camera;
 
 struct SceneObject {
     std::string mesh_name;

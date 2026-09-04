@@ -50,7 +50,7 @@ constexpr uint32_t max_frames_in_flight = 2;
 
 }
 
-class Camera;
+struct Camera;
 
 // We have a design division here. ubo is actually bound to pipeline, the GPU part.
 // But the CPU part is actually not, it can be included here as a singleton here, or

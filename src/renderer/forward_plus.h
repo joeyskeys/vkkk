@@ -20,7 +20,7 @@ namespace fs = std::filesystem;
 namespace vkkk
 {
 
-class Camera;
+struct Camera;
 class Scene;
 
 struct ForwardPlusDrawItem {

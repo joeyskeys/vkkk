@@ -15,6 +15,7 @@
 #include "built_in_shader/face_normal.h"
 #include "built_in_shader/line_gen.h"
 #include "concepts/camera.h"
+#include "gui/glfw_backend.hpp"
 #include "gui/gui.h"
 #include "renderer/forwardp.hpp"
 #include "vk_ins/context.hpp"
@@ -91,11 +92,10 @@ struct WireInstance {
 } // namespace
 
 int main() {
+    vkkk::GlfwBackend window(width, height, "Wireframe Cornell (Mesh Shader)", true);
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(width, height, "Wireframe Cornell (Mesh Shader)", true);
-    const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan",
-        vk::ApiVersion13, true, {}, glfw_extensions);
+        vk::ApiVersion13, true, {});
 
     vkkk::Scene scene;
     scene.camera = &camera;
@@ -226,9 +226,9 @@ int main() {
         throw std::runtime_error("failed to allocate wireframe/face-normal instance attributes");
     }
 
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetMouseButtonCallback(window, mouse_btn_callback);
-    glfwSetCursorPosCallback(window, mouse_pos_callback);
+    glfwSetKeyCallback(window.glfw_window(), key_callback);
+    glfwSetMouseButtonCallback(window.glfw_window(), mouse_btn_callback);
+    glfwSetCursorPosCallback(window.glfw_window(), mouse_pos_callback);
 
     vkkk::ImGuiHud hud;
     if (!hud.init(&ctx)) {
@@ -395,8 +395,8 @@ int main() {
 
     using Clock = std::chrono::steady_clock;
     auto next_frame_tick = Clock::now();
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    while (!window.should_close()) {
+        window.poll_events();
         const auto frame_begin = Clock::now();
         vkkk::Context::Frame frame{};
         if (!ctx.begin_frame(frame)) {
@@ -426,7 +426,5 @@ int main() {
 
     hud.shutdown();
     ctx.wait_idle();
-    glfwDestroyWindow(window);
-    glfwTerminate();
     return 0;
 }

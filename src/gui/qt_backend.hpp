@@ -1,0 +1,56 @@
+#pragma once
+
+#include <string>
+
+#include <QDockWidget>
+#include <QLabel>
+#include <QMainWindow>
+#include <QWidget>
+#include <QWindow>
+
+#include "gui/window_backend.hpp"
+
+namespace vkkk
+{
+
+class QtVulkanWindow;
+class QtMainWindow;
+
+// Qt window/surface backend. GUI chrome is Qt widgets; no ImGui.
+class QtBackend : public WindowBackend {
+public:
+    QtBackend(int width, int height, const char* title);
+    ~QtBackend() override;
+
+    QtBackend(const QtBackend&) = delete;
+    QtBackend& operator=(const QtBackend&) = delete;
+
+    QMainWindow* main_window() const;
+    QWindow* vulkan_window() const;
+    QWidget* hud_panel() const;
+    void set_status(const std::string& text);
+
+    std::vector<const char*> instance_extensions(bool enable_validation) const override;
+    VkSurfaceKHR create_surface(VkInstance instance) override;
+    VkExtent2D framebuffer_size() const override;
+    VkExtent2D window_size() const override;
+    void wait_until_visible() override;
+    bool should_close() const override;
+    void poll_events() override;
+    void set_resize_flag(bool* resized) override;
+    void* native_handle() const override;
+    void cursor_position(double& x, double& y) const override;
+    bool mouse_pressed(int button) const override;
+
+private:
+    class QApplication* owned_app = nullptr;
+    QtMainWindow* main = nullptr;
+    QtVulkanWindow* surface_window = nullptr;
+    QWidget* container = nullptr;
+    QDockWidget* hud_dock = nullptr;
+    QLabel* status_label = nullptr;
+};
+
+static_assert(WindowBackendType<QtBackend>);
+
+} // namespace vkkk

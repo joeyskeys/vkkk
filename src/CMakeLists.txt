@@ -19,6 +19,8 @@ set(HEADERS
     concepts/mesh_view.hpp
     font/font.hpp
     gui/gui.h
+    gui/window_backend.hpp
+    gui/glfw_backend.hpp
     vp/feature.hpp
     vp/frame_axis.hpp
     vp/grid.hpp
@@ -58,6 +60,7 @@ set(SRCS
     concepts/mesh_view.cpp
     font/font.cpp
     gui/gui.cpp
+    gui/glfw_backend.cpp
     vp/frame_axis.cpp
     vp/grid.cpp
     vp/vertex_picking.cpp
@@ -78,7 +81,6 @@ set(SRCS
     vk_ins/context_billboard.cpp
     vk_ins/context_resources.cpp
     vk_ins/context_cuda.cpp
-    vk_ins/context_glfw.cpp
     vk_ins/context_utils.cpp)
 
 add_library(vkkk ${HEADERS} ${SRCS})
@@ -91,6 +93,12 @@ target_link_libraries(vkkk
         assimp::assimp
         Freetype::Freetype
         ${SPIRV_CROSS_LIBRARIES})
+
+if(VKKK_USE_QT6)
+    target_sources(vkkk PRIVATE gui/qt_backend.hpp gui/qt_backend.cpp)
+    target_link_libraries(vkkk PUBLIC Qt6::Widgets Qt6::Gui)
+    target_compile_definitions(vkkk PUBLIC VKKK_HAS_QT6=1)
+endif()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_link_libraries(vkkk PRIVATE ${SHADERC_DEBUG_LIBRARIES})

@@ -7,6 +7,7 @@
 #include <backends/imgui_impl_vulkan.h>
 
 #include "gui/gui.h"
+#include "gui/glfw_backend.hpp"
 #include "vk_ins/context.hpp"
 
 namespace vkkk
@@ -17,7 +18,12 @@ bool ImGuiHud::init(Context* ctx) {
         return true;
     }
 
-    if (ctx == nullptr || ctx->get_window() == nullptr) {
+    if (ctx == nullptr || ctx->window() == nullptr) {
+        return false;
+    }
+
+    const auto* glfw = dynamic_cast<GlfwBackend*>(ctx->window());
+    if (glfw == nullptr || glfw->glfw_window() == nullptr) {
         return false;
     }
 
@@ -52,7 +58,7 @@ bool ImGuiHud::init(Context* ctx) {
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
 
-    ImGui_ImplGlfw_InitForVulkan(ctx_->get_window(), false);
+    ImGui_ImplGlfw_InitForVulkan(glfw->glfw_window(), false);
 
     ImGui_ImplVulkan_InitInfo init_info{};
     init_info.ApiVersion = VK_API_VERSION_1_3;

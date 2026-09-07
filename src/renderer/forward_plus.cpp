@@ -123,12 +123,10 @@ bool ForwardPlusRenderer::initialize(Context* context) {
         return false;
     }
 
-    if (ctx->get_window()) {
-        int w = 0;
-        int h = 0;
-        glfwGetFramebufferSize(ctx->get_window(), &w, &h);
-        width = static_cast<uint32_t>(std::max(w, 1));
-        height = static_cast<uint32_t>(std::max(h, 1));
+    if (ctx->window() != nullptr) {
+        const auto framebuffer = ctx->window()->framebuffer_size();
+        width = std::max(framebuffer.width, 1u);
+        height = std::max(framebuffer.height, 1u);
     }
 
     missing_shaders_.clear();

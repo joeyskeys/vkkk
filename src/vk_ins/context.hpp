@@ -14,8 +14,7 @@
 
 #include <vulkan/vulkan_raii.hpp>
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
+#include "gui/window_backend.hpp"
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -397,9 +396,7 @@ public:
     // Initialization, window, and swapchain
     Context(bool enable_debug_m = true);
 
-    static std::vector<const char*> get_glfw_instance_extensions(bool enable_validation = true);
-    GLFWwindow* init_glfw(int width, int height, const char* title = default_app_name, bool resizable = false);
-    void init(GLFWwindow* win,
+    void init(WindowBackend& backend,
         const char* app_name = default_app_name,
         uint32_t app_version = default_app_version,
         const char* engine_name = default_engine_name,
@@ -629,7 +626,7 @@ public:
     std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> load_into_staging_buffer(void* data, uint32_t size) const;
 
     // Accessors and configuration
-    GLFWwindow* get_window() const { return window; }
+    WindowBackend* window() const { return window_backend; }
     VkInstance get_vk_instance() const { return static_cast<VkInstance>(*instance); }
     VkPhysicalDevice get_vk_physical_device() const { return static_cast<VkPhysicalDevice>(*physical_device); }
     VkDevice get_vk_device() const { return static_cast<VkDevice>(*device); }
@@ -686,7 +683,7 @@ private:
     static vk::PresentModeKHR choose_present_mode(const std::vector<vk::PresentModeKHR>& present_modes);
     static vk::Extent2D choose_swap_extent(
         const vk::SurfaceCapabilitiesKHR& surface_capabilities,
-        GLFWwindow* window);
+        const VkExtent2D& framebuffer_extent);
     uint32_t find_graphics_queue_family_index() const;
     uint32_t find_compute_queue_family_index(uint32_t preferred_graphics_index) const;
     static vk::DescriptorType to_vk_descriptor_type(ComputeDescriptorKind kind);
@@ -797,7 +794,7 @@ private:
     std::vector<vk::Fence> images_in_flight;
 
     uint32_t current_frame = 0;
-    GLFWwindow* window = nullptr;
+    WindowBackend* window_backend = nullptr;
     UpdateCallback update_cbk_;
     ResizeCallback resize_cbk_;
     std::chrono::steady_clock::time_point last_frame_time_ = std::chrono::steady_clock::now();

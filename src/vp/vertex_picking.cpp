@@ -6,8 +6,6 @@
 #include <filesystem>
 #include <utility>
 
-#include <GLFW/glfw3.h>
-
 #include "built_in_shader/common.h"
 #include "vk_ins/shader_module_pack.hpp"
 
@@ -114,7 +112,8 @@ void VertexPickingFeature::set_pick_callback(
 
 void VertexPickingFeature::on_update(Context& context, const Context::Frame& frame) {
     current_serial = frame.serial;
-    if (!ready || context.get_window() == nullptr) {
+    auto* window = context.window();
+    if (!ready || window == nullptr) {
         return;
     }
 
@@ -128,21 +127,18 @@ void VertexPickingFeature::on_update(Context& context, const Context::Frame& fra
         pick_pending = false;
     }
 
-    const bool left_down = glfwGetMouseButton(context.get_window(), GLFW_MOUSE_BUTTON_LEFT)
-        == GLFW_PRESS;
+    const bool left_down = window->mouse_pressed(0);
     if (left_down && !mouse_down && !points_name.empty()) {
         double cursor_x = 0.0;
         double cursor_y = 0.0;
-        glfwGetCursorPos(context.get_window(), &cursor_x, &cursor_y);
-        int window_width = 0;
-        int window_height = 0;
-        glfwGetWindowSize(context.get_window(), &window_width, &window_height);
+        window->cursor_position(cursor_x, cursor_y);
+        const auto window_extent = window->window_size();
         const auto extent = context.extent();
-        if (window_width > 0 && window_height > 0 && extent.width > 0 && extent.height > 0) {
+        if (window_extent.width > 0 && window_extent.height > 0 && extent.width > 0 && extent.height > 0) {
             pending_x = std::min(static_cast<uint32_t>(std::floor(
-                cursor_x * static_cast<double>(extent.width) / window_width)), extent.width - 1);
+                cursor_x * static_cast<double>(extent.width) / window_extent.width)), extent.width - 1);
             pending_y = std::min(static_cast<uint32_t>(std::floor(
-                cursor_y * static_cast<double>(extent.height) / window_height)), extent.height - 1);
+                cursor_y * static_cast<double>(extent.height) / window_extent.height)), extent.height - 1);
             pending_serial = frame.serial;
             pick_pending = true;
         }

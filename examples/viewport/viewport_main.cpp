@@ -18,6 +18,7 @@
 #include "concepts/camera.h"
 #include "concepts/curve.hpp"
 #include "font/font.hpp"
+#include "gui/glfw_backend.hpp"
 #include "vk_ins/shader_module_pack.hpp"
 #include "vp/frame_axis.hpp"
 #include "vp/grid.hpp"
@@ -129,7 +130,7 @@ public:
     }
 
     void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
-        const bool p_down = glfwGetKey(context.get_window(), GLFW_KEY_P) == GLFW_PRESS;
+        const bool p_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_P) == GLFW_PRESS;
         if (p_down && !p_was_down) {
             visible = !visible;
         }
@@ -138,13 +139,13 @@ public:
         if (visible) {
             const float max_point_size = context.large_points_enabled
                 ? context.point_size_range[1] : 1.0f;
-            const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
+            const bool up_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_UP) == GLFW_PRESS;
             if (up_down && !up_was_down) {
                 point_size = std::min(point_size + 1.0f, max_point_size);
             }
             up_was_down = up_down;
 
-            const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
+            const bool down_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_DOWN) == GLFW_PRESS;
             if (down_down && !down_was_down) {
                 point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
             }
@@ -257,7 +258,7 @@ public:
     }
 
     void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
-        const bool n_down = glfwGetKey(context.get_window(), GLFW_KEY_N) == GLFW_PRESS;
+        const bool n_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_N) == GLFW_PRESS;
         if (n_down && !n_was_down) {
             visible = !visible;
         }
@@ -271,20 +272,20 @@ public:
             ? context.line_width_range[0] : 1.0f;
         const float max_line_width = context.wide_lines_enabled
             ? context.line_width_range[1] : 1.0f;
-        const bool up_down = glfwGetKey(context.get_window(), GLFW_KEY_UP) == GLFW_PRESS;
+        const bool up_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_UP) == GLFW_PRESS;
         if (up_down && !up_was_down) {
             line_width = std::min(line_width + 1.0f, max_line_width);
         }
         up_was_down = up_down;
 
-        const bool down_down = glfwGetKey(context.get_window(), GLFW_KEY_DOWN) == GLFW_PRESS;
+        const bool down_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_DOWN) == GLFW_PRESS;
         if (down_down && !down_was_down) {
             line_width = std::max(line_width - 1.0f, min_line_width);
         }
         down_was_down = down_down;
 
-        const bool plus_down = glfwGetKey(context.get_window(), GLFW_KEY_EQUAL) == GLFW_PRESS
-            || glfwGetKey(context.get_window(), GLFW_KEY_KP_ADD) == GLFW_PRESS;
+        const bool plus_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_EQUAL) == GLFW_PRESS
+            || glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_KP_ADD) == GLFW_PRESS;
         if (plus_down && !plus_was_down) {
             const uint32_t next = std::min(segment_count * 2, kMaxSegmentCount);
             if (next != segment_count) {
@@ -294,8 +295,8 @@ public:
         }
         plus_was_down = plus_down;
 
-        const bool minus_down = glfwGetKey(context.get_window(), GLFW_KEY_MINUS) == GLFW_PRESS
-            || glfwGetKey(context.get_window(), GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS;
+        const bool minus_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_MINUS) == GLFW_PRESS
+            || glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_KP_SUBTRACT) == GLFW_PRESS;
         if (minus_down && !minus_was_down) {
             const uint32_t next = std::max(segment_count / 2, kMinSegmentCount);
             if (next != segment_count) {
@@ -416,7 +417,7 @@ public:
     }
 
     void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
-        const bool c_down = glfwGetKey(context.get_window(), GLFW_KEY_C) == GLFW_PRESS;
+        const bool c_down = glfwGetKey(vkkk::glfw_window(context), GLFW_KEY_C) == GLFW_PRESS;
         if (c_down && !c_was_down) {
             if (scene.find_object(kCubeObjectName) != nullptr) {
                 scene.remove_object(kCubeObjectName);
@@ -668,11 +669,10 @@ void scroll_callback(GLFWwindow*, double, double yoffset) {
 } // namespace
 
 int main(int argc, char** argv) {
+    vkkk::GlfwBackend window(kWidth, kHeight, "vkkk Viewport", true);
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(kWidth, kHeight, "vkkk Viewport", true);
-    const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
     ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan",
-        vk::ApiVersion13, true, {}, glfw_extensions);
+        vk::ApiVersion13, true, {});
 
     vkkk::Camera camera{
         glm::vec3{3.0f, 3.0f, 3.0f},
@@ -692,7 +692,7 @@ int main(int argc, char** argv) {
 
     ViewportControls viewport_controls(camera);
     controls = &viewport_controls;
-    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetScrollCallback(window.glfw_window(), scroll_callback);
 
     using BasicViewport = vkkk::vp::Viewport<
         vkkk::vp::ObjectPickingFeature,
@@ -732,15 +732,15 @@ int main(int argc, char** argv) {
     viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
     viewport.add_feature<BillboardTextFeature>(camera, font_path);
 
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    while (!window.should_close()) {
+        window.poll_events();
 
         vkkk::Context::Frame frame{};
         if (!viewport.begin_frame(frame)) {
             continue;
         }
 
-        viewport_controls.update(window);
+        viewport_controls.update(window.glfw_window());
         const auto extent = viewport.extent();
         camera.ratio = static_cast<float>(extent.width)
             / static_cast<float>(extent.height == 0 ? 1 : extent.height);
@@ -753,7 +753,5 @@ int main(int argc, char** argv) {
 
     ctx.wait_idle();
     controls = nullptr;
-    glfwDestroyWindow(window);
-    glfwTerminate();
     return 0;
 }

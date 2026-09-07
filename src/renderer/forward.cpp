@@ -18,12 +18,10 @@ bool ForwardRenderer::initialize(Context* context) {
         return false;
     }
 
-    if (ctx->get_window()) {
-        int framebuffer_width = 0;
-        int framebuffer_height = 0;
-        glfwGetFramebufferSize(ctx->get_window(), &framebuffer_width, &framebuffer_height);
-        width = static_cast<uint32_t>(std::max(framebuffer_width, 1));
-        height = static_cast<uint32_t>(std::max(framebuffer_height, 1));
+    if (ctx->window() != nullptr) {
+        const auto framebuffer = ctx->window()->framebuffer_size();
+        width = std::max(framebuffer.width, 1u);
+        height = std::max(framebuffer.height, 1u);
     }
 
     shadowResolve.shadow_map_size_bias = glm::vec4(

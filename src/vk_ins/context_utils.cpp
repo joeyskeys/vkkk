@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <ranges>
 #include <vector>
@@ -59,17 +60,16 @@ vk::PresentModeKHR Context::choose_present_mode(const std::vector<vk::PresentMod
     return has_mailbox ? vk::PresentModeKHR::eMailbox : vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D Context::choose_swap_extent(const vk::SurfaceCapabilitiesKHR& surface_capabilities, GLFWwindow* window) {
+vk::Extent2D Context::choose_swap_extent(const vk::SurfaceCapabilitiesKHR& surface_capabilities,
+    const VkExtent2D& framebuffer_extent)
+{
     if (surface_capabilities.currentExtent.width != UINT32_MAX) {
         return surface_capabilities.currentExtent;
     }
-    int framebuffer_width = 0;
-    int framebuffer_height = 0;
-    glfwGetFramebufferSize(window, &framebuffer_width, &framebuffer_height);
     return vk::Extent2D{
-        std::clamp<uint32_t>(static_cast<uint32_t>(framebuffer_width),
+        std::clamp(framebuffer_extent.width,
             surface_capabilities.minImageExtent.width, surface_capabilities.maxImageExtent.width),
-        std::clamp<uint32_t>(static_cast<uint32_t>(framebuffer_height),
+        std::clamp(framebuffer_extent.height,
             surface_capabilities.minImageExtent.height, surface_capabilities.maxImageExtent.height)
     };
 }

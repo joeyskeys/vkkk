@@ -16,6 +16,7 @@
 #include "asset_mgr/scene.h"
 #include "built_in_shader/phong.h"
 #include "concepts/camera.h"
+#include "gui/glfw_backend.hpp"
 #include "gui/gui.h"
 #include "vk_ins/context.hpp"
 
@@ -85,10 +86,9 @@ glm::vec4 phong_ambient(const glm::vec3& color) {
 } // namespace
 
 int main() {
+    vkkk::GlfwBackend window(WIDTH, HEIGHT, "Forward+ Cornell (Instanced)", true);
     vkkk::Context ctx;
-    GLFWwindow* window = ctx.init_glfw(WIDTH, HEIGHT, "Forward+ Cornell (Instanced)", true);
-    const auto glfw_extensions = vkkk::Context::get_glfw_instance_extensions();
-    ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {}, glfw_extensions);
+    ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan", vk::ApiVersion13, true, {});
 
     vkkk::Scene scene;
     scene.camera = &cam;
@@ -218,9 +218,9 @@ int main() {
     light_storage.pt_lights.push_back(point_light);
     scene.light_mgr->register_pipeline("phong_mat", light_storage);
 
-    glfwSetKeyCallback(window, key_callback);
-    glfwSetMouseButtonCallback(window, mouse_btn_callback);
-    glfwSetCursorPosCallback(window, mouse_pos_callback);
+    glfwSetKeyCallback(window.glfw_window(), key_callback);
+    glfwSetMouseButtonCallback(window.glfw_window(), mouse_btn_callback);
+    glfwSetCursorPosCallback(window.glfw_window(), mouse_pos_callback);
 
     vkkk::ImGuiHud hud;
     if (!hud.init(&ctx)) {
@@ -271,8 +271,8 @@ int main() {
 
     using Clock = std::chrono::steady_clock;
     auto next_frame_tick = Clock::now();
-    while (!glfwWindowShouldClose(window)) {
-        glfwPollEvents();
+    while (!window.should_close()) {
+        window.poll_events();
         const auto frame_begin = Clock::now();
         vkkk::Context::Frame frame{};
         if (!ctx.begin_frame(frame)) {
@@ -302,7 +302,5 @@ int main() {
 
     hud.shutdown();
     ctx.wait_idle();
-    glfwDestroyWindow(window);
-    glfwTerminate();
     return 0;
 }

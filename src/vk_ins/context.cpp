@@ -274,7 +274,10 @@ void Context::create_depth_resources() {
 void Context::create_swapchain() {
     // create the swapchain
     vk::SurfaceCapabilitiesKHR surface_capabilities = physical_device.getSurfaceCapabilitiesKHR(*surface);
-    swapchain_extent = choose_swap_extent(surface_capabilities, window);
+    const VkExtent2D framebuffer_extent = window_backend != nullptr
+        ? window_backend->framebuffer_size()
+        : VkExtent2D{swapchain_extent.width, swapchain_extent.height};
+    swapchain_extent = choose_swap_extent(surface_capabilities, framebuffer_extent);
     uint32_t min_image_count = choose_min_image_count(surface_capabilities);
 
     std::vector<vk::SurfaceFormatKHR> surface_formats = physical_device.getSurfaceFormatsKHR(*surface);
@@ -306,6 +309,52 @@ void Context::create_imageviews() {
     swapchain_image_views.reserve(swapchain_images.size());
     for (const auto& image : swapchain_images) {
         swapchain_image_views.emplace_back(create_vk_imageview(image, swapchain_surface_format.format));
+    }
+}
+
+void Context::recreate_swapchain() {
+    if (window_backend != nullptr) {
+        window_backend->wait_until_visible();
+    }
+    device.waitIdle();
+
+    swapchain_image_views.clear();
+    depth_view = nullptr;
+    depth_image = nullptr;
+    depth_memo = nullptr;
+    // Keep custom render targets / depth attachments (shadow maps, HDR, etc.).
+    // Swapchain-sized ones are resized below; fixed-size ones (e.g. shadow) survive as-is.
+    swapchain = nullptr;
+
+    create_swapchain();
+    create_imageviews();
+    create_depth_resources();
+    images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);
+    render_finished_semaphores.clear();
+    render_finished_semaphores.reserve(swapchain_images.size());
+    for (size_t i = 0; i < swapchain_images.size(); ++i) {
+        render_finished_semaphores.emplace_back(device, vk::SemaphoreCreateInfo{});
+    }
+
+    vk::CommandBufferAllocateInfo cmd_buf_alloc_info{};
+    cmd_buf_alloc_info.commandPool = command_pool;
+    cmd_buf_alloc_info.level = vk::CommandBufferLevel::ePrimary;
+    cmd_buf_alloc_info.commandBufferCount = static_cast<uint32_t>(swapchain_images.size());
+    command_buffers = vk::raii::CommandBuffers(device, cmd_buf_alloc_info);
+
+    for (uint32_t i = 0; i < static_cast<uint32_t>(targets.size()); ++i) {
+        if (targets[i].matchSwapchain) {
+            resize_render_target(i, swapchain_extent.width, swapchain_extent.height);
+        }
+    }
+    for (uint32_t i = 0; i < static_cast<uint32_t>(depth_attachments.size()); ++i) {
+        if (depth_attachments[i].matchSwapchain) {
+            resize_depth_attachment(i, swapchain_extent.width, swapchain_extent.height);
+        }
+    }
+
+    if (resize_cbk_) {
+        resize_cbk_(swapchain_extent.width, swapchain_extent.height);
     }
 }
 
@@ -406,7 +455,7 @@ std::pair<vk::raii::Buffer, vk::raii::DeviceMemory> Context::load_into_staging_b
     return std::make_pair(std::move(staging_buf), std::move(staging_memo));
 }
 
-void Context::init(GLFWwindow* win,
+void Context::init(WindowBackend& backend,
     const char* app_name,
     uint32_t app_version,
     const char* engine_name,
@@ -415,7 +464,8 @@ void Context::init(GLFWwindow* win,
     const std::vector<const char*>& extra_validation_layers,
     const std::vector<const char*>& extra_extensions)
 {
-    window = win;
+    window_backend = &backend;
+    window_backend->set_resize_flag(&frame_buffer_resized);
 
     // init vulkan
     vk::ApplicationInfo app_info{app_name, app_version, engine_name, VK_MAKE_VERSION(1, 0, 0), api_version};
@@ -436,7 +486,15 @@ void Context::init(GLFWwindow* win,
         }
     }
 
-    std::vector<const char*> instance_extensions = extra_extensions;
+    std::vector<const char*> instance_extensions = window_backend->instance_extensions(enable_validation_layers);
+    for (const char* extra : extra_extensions) {
+        const bool already_present = std::ranges::any_of(instance_extensions, [extra](const char* existing) {
+            return std::strcmp(existing, extra) == 0;
+        });
+        if (!already_present) {
+            instance_extensions.push_back(extra);
+        }
+    }
     auto extension_props = context.enumerateInstanceExtensionProperties();
     for (const auto* extension : instance_extensions) {
         if (!std::ranges::any_of(extension_props, [extension](const auto& extension_prop) {
@@ -475,8 +533,8 @@ void Context::init(GLFWwindow* win,
     }
 
     // create surface
-    VkSurfaceKHR raw_surface = VK_NULL_HANDLE;
-    if (glfwCreateWindowSurface(static_cast<VkInstance>(*instance), window, nullptr, &raw_surface) != VK_SUCCESS) {
+    VkSurfaceKHR raw_surface = window_backend->create_surface(static_cast<VkInstance>(*instance));
+    if (raw_surface == VK_NULL_HANDLE) {
         throw std::runtime_error("failed to create window surface");
     }
     surface = vk::raii::SurfaceKHR(instance, raw_surface);

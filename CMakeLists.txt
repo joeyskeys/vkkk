@@ -31,6 +31,7 @@ if(VKKK_VCPKG_INSTALLED_DIR)
 endif()
 
 option(VKKK_BUILD_PYTHON_BINDINGS "Build Python bindings (nanobind module)" ON)
+option(VKKK_USE_QT6 "Build the Qt6 window backend" OFF)
 
 # Optional Python location for nanobind bindings.
 # For Conda, set this to your environment prefix (or rely on CONDA_PREFIX default).
@@ -62,6 +63,12 @@ set(SPIRV_CROSS_ROOT ${VKKK_VCPKG_INSTALLED_DIR})
 find_package(shaderc REQUIRED)
 find_package(spirv_cross REQUIRED)
 find_package(glm CONFIG REQUIRED)
+
+if(VKKK_USE_QT6)
+    find_package(Qt6 REQUIRED COMPONENTS Widgets Gui)
+    set(CMAKE_AUTOMOC ON)
+    message(STATUS "vkkk: Qt6 ${Qt6_VERSION} window backend enabled")
+endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)

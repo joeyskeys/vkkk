@@ -1,7 +1,9 @@
 #include "gui/qt_backend.hpp"
 
 #include <algorithm>
+#include <cstdint>
 #include <stdexcept>
+#include <unordered_set>
 #include <utility>
 
 #include <QApplication>
@@ -10,6 +12,7 @@
 #include <QCursor>
 #include <QDockWidget>
 #include <QGuiApplication>
+#include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QResizeEvent>
@@ -46,12 +49,87 @@ VkExtent2D clamp_extent(int width, int height) {
     };
 }
 
+int qt_from_key(Key key) {
+    const auto value = static_cast<uint16_t>(key);
+    if (value >= static_cast<uint16_t>(Key::A) && value <= static_cast<uint16_t>(Key::Z)) {
+        return Qt::Key_A + (value - static_cast<uint16_t>(Key::A));
+    }
+    if (value >= static_cast<uint16_t>(Key::Digit0) && value <= static_cast<uint16_t>(Key::Digit9)) {
+        return Qt::Key_0 + (value - static_cast<uint16_t>(Key::Digit0));
+    }
+    if (value >= static_cast<uint16_t>(Key::F1) && value <= static_cast<uint16_t>(Key::F12)) {
+        return Qt::Key_F1 + (value - static_cast<uint16_t>(Key::F1));
+    }
+    if (value >= static_cast<uint16_t>(Key::Numpad0) && value <= static_cast<uint16_t>(Key::Numpad9)) {
+        return Qt::Key_0 + (value - static_cast<uint16_t>(Key::Numpad0));
+    }
+    switch (key) {
+    case Key::Space: return Qt::Key_Space;
+    case Key::Escape: return Qt::Key_Escape;
+    case Key::Enter: return Qt::Key_Return;
+    case Key::Tab: return Qt::Key_Tab;
+    case Key::Backspace: return Qt::Key_Backspace;
+    case Key::Insert: return Qt::Key_Insert;
+    case Key::Delete: return Qt::Key_Delete;
+    case Key::Right: return Qt::Key_Right;
+    case Key::Left: return Qt::Key_Left;
+    case Key::Down: return Qt::Key_Down;
+    case Key::Up: return Qt::Key_Up;
+    case Key::PageUp: return Qt::Key_PageUp;
+    case Key::PageDown: return Qt::Key_PageDown;
+    case Key::Home: return Qt::Key_Home;
+    case Key::End: return Qt::Key_End;
+    case Key::CapsLock: return Qt::Key_CapsLock;
+    case Key::LeftShift:
+    case Key::RightShift: return Qt::Key_Shift;
+    case Key::LeftCtrl:
+    case Key::RightCtrl: return Qt::Key_Control;
+    case Key::LeftAlt:
+    case Key::RightAlt: return Qt::Key_Alt;
+    case Key::LeftSuper:
+    case Key::RightSuper: return Qt::Key_Meta;
+    case Key::Minus: return Qt::Key_Minus;
+    case Key::Equal: return Qt::Key_Equal;
+    case Key::Comma: return Qt::Key_Comma;
+    case Key::Period: return Qt::Key_Period;
+    case Key::Slash: return Qt::Key_Slash;
+    case Key::Semicolon: return Qt::Key_Semicolon;
+    case Key::Apostrophe: return Qt::Key_Apostrophe;
+    case Key::Grave: return Qt::Key_QuoteLeft;
+    case Key::LeftBracket: return Qt::Key_BracketLeft;
+    case Key::RightBracket: return Qt::Key_BracketRight;
+    case Key::Backslash: return Qt::Key_Backslash;
+    case Key::NumpadEnter: return Qt::Key_Enter;
+    case Key::NumpadAdd: return Qt::Key_Plus;
+    case Key::NumpadSubtract: return Qt::Key_Minus;
+    default: return 0;
+    }
+}
+
+uint32_t mods_from_qt(Qt::KeyboardModifiers qt_mods) {
+    uint32_t mods = input_mod::none;
+    if (qt_mods.testFlag(Qt::ShiftModifier)) {
+        mods |= input_mod::shift;
+    }
+    if (qt_mods.testFlag(Qt::ControlModifier)) {
+        mods |= input_mod::ctrl;
+    }
+    if (qt_mods.testFlag(Qt::AltModifier)) {
+        mods |= input_mod::alt;
+    }
+    if (qt_mods.testFlag(Qt::MetaModifier)) {
+        mods |= input_mod::super;
+    }
+    return mods;
+}
+
 } // namespace
 
 class QtVulkanWindow final : public QWindow {
 public:
     bool* resize_flag = nullptr;
     bool buttons[3] = {};
+    std::unordered_set<int> keys;
 
     explicit QtVulkanWindow() {
         setSurfaceType(QSurface::VulkanSurface);
@@ -79,6 +157,16 @@ protected:
     void mouseReleaseEvent(QMouseEvent* event) override {
         set_button(event->button(), false);
         QWindow::mouseReleaseEvent(event);
+    }
+
+    void keyPressEvent(QKeyEvent* event) override {
+        keys.insert(event->key());
+        QWindow::keyPressEvent(event);
+    }
+
+    void keyReleaseEvent(QKeyEvent* event) override {
+        keys.erase(event->key());
+        QWindow::keyReleaseEvent(event);
     }
 
 private:
@@ -266,20 +354,37 @@ void* QtBackend::native_handle() const {
     return surface_window != nullptr ? reinterpret_cast<void*>(surface_window->winId()) : nullptr;
 }
 
-void QtBackend::cursor_position(double& x, double& y) const {
+InputPointer QtBackend::pointer() const {
+    InputPointer state;
     if (surface_window != nullptr) {
-        surface_window->cursor_position(x, y);
-        return;
+        surface_window->cursor_position(state.x, state.y);
     }
-    x = 0.0;
-    y = 0.0;
+    state.window_size = window_size();
+    state.framebuffer_size = framebuffer_size();
+    return state;
 }
 
-bool QtBackend::mouse_pressed(int button) const {
-    if (surface_window == nullptr || button < 0 || button > 2) {
+bool QtBackend::mouse_down(MouseButton button) const {
+    if (surface_window == nullptr) {
         return false;
     }
-    return surface_window->buttons[button];
+    const auto index = static_cast<uint8_t>(button);
+    if (index > 2) {
+        return false;
+    }
+    return surface_window->buttons[index];
+}
+
+bool QtBackend::key_down(Key key) const {
+    if (surface_window == nullptr) {
+        return false;
+    }
+    const int qt_key = qt_from_key(key);
+    return qt_key != 0 && surface_window->keys.contains(qt_key);
+}
+
+uint32_t QtBackend::modifiers() const {
+    return mods_from_qt(QGuiApplication::queryKeyboardModifiers());
 }
 
 } // namespace vkkk

@@ -143,18 +143,9 @@ void ObjectPickingFeature::on_update(Context& context, const Context::Frame& fra
         pick_pending = false;
     }
 
-    const bool left_down = window->mouse_pressed(0);
+    const bool left_down = window->mouse_down(MouseButton::Left);
     if (left_down && !mouse_down) {
-        double cursor_x = 0.0;
-        double cursor_y = 0.0;
-        window->cursor_position(cursor_x, cursor_y);
-        const auto window_extent = window->window_size();
-        const auto extent = context.extent();
-        if (window_extent.width > 0 && window_extent.height > 0 && extent.width > 0 && extent.height > 0) {
-            pending_x = std::min(static_cast<uint32_t>(std::floor(
-                cursor_x * static_cast<double>(extent.width) / window_extent.width)), extent.width - 1);
-            pending_y = std::min(static_cast<uint32_t>(std::floor(
-                cursor_y * static_cast<double>(extent.height) / window_extent.height)), extent.height - 1);
+        if (window->pointer().to_pixel(context.extent(), pending_x, pending_y)) {
             pending_serial = frame.serial;
             pick_pending = true;
         }

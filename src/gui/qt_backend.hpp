@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <type_traits>
+#include <vector>
 
 #include <QDockWidget>
 #include <QLabel>
@@ -39,8 +41,10 @@ public:
     void poll_events() override;
     void set_resize_flag(bool* resized) override;
     void* native_handle() const override;
-    void cursor_position(double& x, double& y) const override;
-    bool mouse_pressed(int button) const override;
+    InputPointer pointer() const override;
+    bool mouse_down(MouseButton button) const override;
+    bool key_down(Key key) const override;
+    uint32_t modifiers() const override;
 
 private:
     class QApplication* owned_app = nullptr;
@@ -52,5 +56,6 @@ private:
 };
 
 static_assert(WindowBackendType<QtBackend>);
+static_assert(!std::is_abstract_v<QtBackend>);
 
 } // namespace vkkk

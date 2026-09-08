@@ -19,6 +19,7 @@ set(HEADERS
     concepts/mesh_view.hpp
     font/font.hpp
     gui/gui.h
+    gui/input.hpp
     gui/window_backend.hpp
     gui/glfw_backend.hpp
     vp/feature.hpp

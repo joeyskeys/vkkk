@@ -1,5 +1,6 @@
 #pragma once
 
+#include <type_traits>
 #include <vector>
 
 #define GLFW_INCLUDE_VULKAN
@@ -33,8 +34,10 @@ public:
     void poll_events() override;
     void set_resize_flag(bool* resized) override;
     void* native_handle() const override;
-    void cursor_position(double& x, double& y) const override;
-    bool mouse_pressed(int button) const override;
+    InputPointer pointer() const override;
+    bool mouse_down(MouseButton button) const override;
+    bool key_down(Key key) const override;
+    uint32_t modifiers() const override;
 
 private:
     static void framebuffer_size_callback(GLFWwindow* window, int width, int height);
@@ -46,6 +49,14 @@ private:
 
 GLFWwindow* glfw_window(const Context& ctx);
 
+Key key_from_glfw(int glfw_key);
+int glfw_from_key(Key key);
+MouseButton mouse_from_glfw(int glfw_button);
+int glfw_from_mouse(MouseButton button);
+InputAction action_from_glfw(int glfw_action);
+uint32_t mods_from_glfw(int glfw_mods);
+
 static_assert(WindowBackendType<GlfwBackend>);
+static_assert(!std::is_abstract_v<GlfwBackend>);
 
 } // namespace vkkk

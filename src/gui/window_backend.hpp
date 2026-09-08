@@ -5,6 +5,8 @@
 
 #include <vulkan/vulkan.h>
 
+#include "gui/input.hpp"
+
 namespace vkkk
 {
 
@@ -23,9 +25,18 @@ public:
     virtual void poll_events() = 0;
     virtual void set_resize_flag(bool* resized) = 0;
     virtual void* native_handle() const = 0;
-    virtual void cursor_position(double& x, double& y) const = 0;
-    // 0 = left, 1 = right, 2 = middle
-    virtual bool mouse_pressed(int button) const = 0;
+
+    virtual InputPointer pointer() const = 0;
+    virtual bool mouse_down(MouseButton button) const = 0;
+    virtual bool key_down(Key key) const = 0;
+    virtual uint32_t modifiers() const = 0;
+
+    bool map_cursor(double x, double y, VkExtent2D target, uint32_t& px, uint32_t& py) const {
+        InputPointer current = pointer();
+        current.x = x;
+        current.y = y;
+        return current.to_pixel(target, px, py);
+    }
 };
 
 template <typename T>

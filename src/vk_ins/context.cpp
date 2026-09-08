@@ -314,7 +314,13 @@ void Context::create_imageviews() {
 
 void Context::recreate_swapchain() {
     if (window_backend != nullptr) {
+        if (window_backend->should_close()) {
+            return;
+        }
         window_backend->wait_until_visible();
+        if (window_backend->should_close()) {
+            return;
+        }
     }
     device.waitIdle();
 
@@ -326,7 +332,12 @@ void Context::recreate_swapchain() {
     // Swapchain-sized ones are resized below; fixed-size ones (e.g. shadow) survive as-is.
     swapchain = nullptr;
 
-    create_swapchain();
+    try {
+        create_swapchain();
+    }
+    catch (const vk::SurfaceLostKHRError&) {
+        return;
+    }
     create_imageviews();
     create_depth_resources();
     images_in_flight.assign(swapchain_images.size(), VK_NULL_HANDLE);

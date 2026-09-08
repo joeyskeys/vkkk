@@ -106,7 +106,7 @@ VkExtent2D GlfwBackend::window_size() const {
 
 void GlfwBackend::wait_until_visible() {
     VkExtent2D size = framebuffer_size();
-    while (size.width == 0 || size.height == 0) {
+    while ((size.width == 0 || size.height == 0) && !should_close()) {
         glfwWaitEvents();
         size = framebuffer_size();
     }

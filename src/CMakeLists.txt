@@ -20,7 +20,6 @@ set(HEADERS
     font/font.hpp
     gui/gui.h
     gui/window_backend.hpp
-    gui/glfw_backend.hpp
     vp/feature.hpp
     vp/frame_axis.hpp
     vp/grid.hpp
@@ -43,12 +42,6 @@ set(HEADERS
     vk_ins/context.hpp)
 
 set(SRCS
-    ../thirdparty/imgui/imgui.cpp
-    ../thirdparty/imgui/imgui_draw.cpp
-    ../thirdparty/imgui/imgui_tables.cpp
-    ../thirdparty/imgui/imgui_widgets.cpp
-    ../thirdparty/imgui/backends/imgui_impl_glfw.cpp
-    ../thirdparty/imgui/backends/imgui_impl_vulkan.cpp
     asset_mgr/scene.cpp
     asset_mgr/light_mgr.cpp
     asset_mgr/drawable_mgr.cpp
@@ -59,8 +52,6 @@ set(SRCS
     concepts/point.cpp
     concepts/mesh_view.cpp
     font/font.cpp
-    gui/gui.cpp
-    gui/glfw_backend.cpp
     vp/frame_axis.cpp
     vp/grid.cpp
     vp/vertex_picking.cpp
@@ -87,16 +78,30 @@ add_library(vkkk ${HEADERS} ${SRCS})
 target_link_libraries(vkkk
     PUBLIC
         Vulkan::Vulkan
-        glfw
         fmt::fmt
         OpenImageIO::OpenImageIO
         assimp::assimp
         Freetype::Freetype
         ${SPIRV_CROSS_LIBRARIES})
 
-if(VKKK_USE_QT6)
+if(VKKK_HAS_GLFW)
+    target_sources(vkkk PRIVATE
+        gui/glfw_backend.hpp
+        gui/glfw_backend.cpp
+        gui/gui.cpp
+        ../thirdparty/imgui/imgui.cpp
+        ../thirdparty/imgui/imgui_draw.cpp
+        ../thirdparty/imgui/imgui_tables.cpp
+        ../thirdparty/imgui/imgui_widgets.cpp
+        ../thirdparty/imgui/backends/imgui_impl_glfw.cpp
+        ../thirdparty/imgui/backends/imgui_impl_vulkan.cpp)
+    target_link_libraries(vkkk PUBLIC glfw)
+    target_compile_definitions(vkkk PUBLIC VKKK_HAS_GLFW=1)
+endif()
+
+if(VKKK_HAS_QT6)
     target_sources(vkkk PRIVATE gui/qt_backend.hpp gui/qt_backend.cpp)
-    target_link_libraries(vkkk PUBLIC Qt6::Widgets Qt6::Gui)
+    target_link_libraries(vkkk PUBLIC Qt6::Core Qt6::Gui Qt6::Widgets)
     target_compile_definitions(vkkk PUBLIC VKKK_HAS_QT6=1)
 endif()
 

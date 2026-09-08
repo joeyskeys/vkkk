@@ -41,6 +41,8 @@ public:
     void* native_handle() const override;
     void cursor_position(double& x, double& y) const override;
     bool mouse_pressed(int button) const override;
+    bool key_pressed(int key) const;
+    float take_scroll_delta();
 
 private:
     class QApplication* owned_app = nullptr;

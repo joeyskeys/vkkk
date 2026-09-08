@@ -12,6 +12,11 @@ project(vkkk)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(MSVC)
+    # MSVC reports __cplusplus as 199711L unless this is set. Qt6 checks that
+    # macro and rejects the compiler even when /std:c++20 is already on.
+    add_compile_options(/Zc:__cplusplus)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
@@ -31,7 +36,6 @@ if(VKKK_VCPKG_INSTALLED_DIR)
 endif()
 
 option(VKKK_BUILD_PYTHON_BINDINGS "Build Python bindings (nanobind module)" ON)
-option(VKKK_USE_QT6 "Build the Qt6 window backend" OFF)
 
 # Optional Python location for nanobind bindings.
 # For Conda, set this to your environment prefix (or rely on CONDA_PREFIX default).
@@ -50,7 +54,7 @@ if(VKKK_PYTHON_EXECUTABLE)
 endif()
 
 find_package(Vulkan REQUIRED)
-find_package(glfw3 CONFIG REQUIRED)
+find_package(glfw3 CONFIG QUIET)
 find_package(fmt CONFIG REQUIRED)
 find_package(OpenImageIO CONFIG REQUIRED)
 find_package(assimp CONFIG REQUIRED)
@@ -64,10 +68,40 @@ find_package(shaderc REQUIRED)
 find_package(spirv_cross REQUIRED)
 find_package(glm CONFIG REQUIRED)
 
-if(VKKK_USE_QT6)
-    find_package(Qt6 REQUIRED COMPONENTS Widgets Gui)
+set(VKKK_HAS_GLFW OFF)
+if(glfw3_FOUND)
+    set(VKKK_HAS_GLFW ON)
+    message(STATUS "vkkk: GLFW window backend enabled")
+else()
+    message(STATUS "vkkk: GLFW not found; GlfwBackend disabled")
+endif()
+
+# When the current build type has no matching imported config (common with
+# Qt kits that ship only Release, or no RelWithDebInfo), fall back instead of
+# dropping the .lib from the link line.
+set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG DEBUG RELEASE)
+set(CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELWITHDEBINFO RELEASE)
+set(CMAKE_MAP_IMPORTED_CONFIG_MINSIZEREL MINSIZEREL RELEASE)
+
+find_package(Qt6 QUIET COMPONENTS Core Gui Widgets)
+set(VKKK_HAS_QT6 OFF)
+if(TARGET Qt6::Core AND TARGET Qt6::Gui AND TARGET Qt6::Widgets)
+    set(VKKK_HAS_QT6 ON)
     set(CMAKE_AUTOMOC ON)
     message(STATUS "vkkk: Qt6 ${Qt6_VERSION} window backend enabled")
+    if(Qt6Core_INCLUDE_DIRS)
+        # vcpkg include/ is prepended globally and can shadow a custom Qt6_DIR.
+        include_directories(BEFORE SYSTEM
+            ${Qt6Core_INCLUDE_DIRS}
+            ${Qt6Gui_INCLUDE_DIRS}
+            ${Qt6Widgets_INCLUDE_DIRS})
+    endif()
+else()
+    message(STATUS "vkkk: Qt6 not found; QtBackend disabled")
+endif()
+
+if(NOT VKKK_HAS_GLFW AND NOT VKKK_HAS_QT6)
+    message(WARNING "vkkk: no window backend found (install GLFW and/or Qt6)")
 endif()
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb)

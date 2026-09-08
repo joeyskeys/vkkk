@@ -1,0 +1,742 @@
+#include <algorithm>
+#include <cmath>
+#include <filesystem>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <glm/geometric.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
+
+#include "asset_mgr/drawable_mgr.h"
+#include "asset_mgr/scene.h"
+#include "built_in_shader/fixed_color.h"
+#include "built_in_shader/phong.h"
+#include "concepts/camera.h"
+#include "concepts/curve.hpp"
+#include "font/font.hpp"
+#include "gui/qt_backend.hpp"
+#include "vk_ins/shader_module_pack.hpp"
+#include "vp/frame_axis.hpp"
+#include "vp/grid.hpp"
+#include "vp/object_picking.hpp"
+#include "vp/vertex_picking.hpp"
+#include "vp/viewport.hpp"
+
+namespace
+{
+
+constexpr uint32_t kWidth = 1200;
+constexpr uint32_t kHeight = 800;
+constexpr const char* kCubeObjectName = "viewport_center_cube_object";
+constexpr const char* kCubeMeshName = "viewport_center_cube";
+constexpr uint32_t kCubeObjectId = 1;
+constexpr const char* kCubePhongPipeline = "viewport_cube_phong";
+constexpr const char* kCubeWirePipeline = "viewport_cube_wire";
+constexpr const char* kPointSphereName = "viewport_scattered_sphere";
+constexpr const char* kPointSpherePipeline = "viewport_scattered_sphere_pipeline";
+constexpr const char* kPointSizeBlock = "PointSizeUBO";
+constexpr const char* kSelectedPointIds = "SelectedPointIds";
+constexpr uint32_t kPointSphereCount = 512;
+
+struct PointSizeUBO {
+    glm::vec4 value{8.0f, 0.0f, 0.0f, 0.0f};
+};
+
+constexpr char kPointSphereVert[] = R"(
+#version 460
+
+layout(binding = 0) uniform CameraUBO {
+    mat4 view;
+    mat4 proj;
+} camera;
+
+layout(binding = 1) uniform PointSizeUBO {
+    vec4 value;
+} point_size;
+
+struct FixedColorInstanceAttr {
+    mat4 model;
+    vec4 color;
+};
+
+layout(std430, binding = 2) readonly buffer FixedColorInstanceAttrs {
+    FixedColorInstanceAttr attrs[];
+} instance_attrs;
+
+layout(std430, binding = 3) readonly buffer SelectedPointIds {
+    uint count;
+    uint ids[];
+} selected_ids;
+
+layout(location = 0) in vec3 in_position;
+layout(location = 0) out vec4 frag_color;
+
+void main() {
+    const FixedColorInstanceAttr instance = instance_attrs.attrs[gl_InstanceIndex];
+    gl_Position = camera.proj * camera.view * instance.model * vec4(in_position, 1.0);
+    gl_PointSize = point_size.value.x;
+    frag_color = instance.color;
+    for (uint index = 0; index < selected_ids.count; ++index) {
+        if (selected_ids.ids[index] == uint(gl_VertexIndex)) {
+            frag_color = vec4(0.0, 0.25, 1.0, 1.0);
+            break;
+        }
+    }
+}
+)";
+
+constexpr char kPointSphereFrag[] = R"(
+#version 460
+
+layout(location = 0) in vec4 frag_color;
+layout(location = 0) out vec4 out_color;
+
+void main() {
+    out_color = frag_color;
+}
+)";
+
+bool key_down(const vkkk::Context& context, int key) {
+    const auto* backend = dynamic_cast<const vkkk::QtBackend*>(context.window());
+    return backend != nullptr && backend->key_pressed(key);
+}
+
+class ScatteredSpherePointsFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    ScatteredSpherePointsFeature(const vkkk::Camera& camera, vkkk::vp::VertexPickingFeature& picker)
+        : camera(camera)
+        , picker(picker)
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (!create_points(context) || !create_pipeline(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(
+                kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs)
+            && context.resize_pipeline_ssbo(
+                kPointSpherePipeline, kSelectedPointIds, kPointSphereCount + 1)
+            && context.alloc_pipeline_ssbo(kPointSpherePipeline, kSelectedPointIds);
+        point_size = std::clamp(point_size, context.point_size_range[0],
+            context.large_points_enabled ? context.point_size_range[1] : 1.0f);
+        picker.set_point_list(kPointSphereName, instance.model);
+        picker.point_size = point_size + 6.0f;
+        picker.set_pick_callback([this](const std::vector<uint32_t>& ids, bool) {
+            selected_ids = ids;
+        });
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool p_down = key_down(context, Qt::Key_P);
+        if (p_down && !p_was_down) {
+            visible = !visible;
+        }
+        p_was_down = p_down;
+
+        if (visible) {
+            const float max_point_size = context.large_points_enabled
+                ? context.point_size_range[1] : 1.0f;
+            const bool up_down = key_down(context, Qt::Key_Up);
+            if (up_down && !up_was_down) {
+                point_size = std::min(point_size + 1.0f, max_point_size);
+            }
+            up_was_down = up_down;
+
+            const bool down_down = key_down(context, Qt::Key_Down);
+            if (down_down && !down_was_down) {
+                point_size = std::max(point_size - 1.0f, context.point_size_range[0]);
+            }
+            down_was_down = down_down;
+        }
+        picker.point_size = point_size + 6.0f;
+        picker.enabled = visible;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (!ready || !visible) {
+            return;
+        }
+        const PointSizeUBO size_data{glm::vec4{point_size, 0.0f, 0.0f, 0.0f}};
+        context.sync_ubo(kPointSpherePipeline, vkkk::buf::CameraUBO, &camera.ubo_data, image_index);
+        context.sync_ubo(kPointSpherePipeline, kPointSizeBlock, &size_data, image_index);
+        context.sync_ssbo(kPointSpherePipeline, vkkk::buf::FixedColorInstanceAttrs,
+            &instance, image_index);
+        std::vector<uint32_t> selection_data;
+        selection_data.reserve(selected_ids.size() + 1);
+        selection_data.push_back(static_cast<uint32_t>(selected_ids.size()));
+        selection_data.insert(selection_data.end(), selected_ids.begin(), selected_ids.end());
+        context.sync_ssbo(kPointSpherePipeline, kSelectedPointIds, selection_data.data(), image_index,
+            static_cast<uint32_t>(selection_data.size() * sizeof(uint32_t)));
+        if (context.bind(cmd, kPointSpherePipeline, image_index)) {
+            context.draw_points(cmd, kPointSphereName);
+        }
+    }
+
+private:
+    static bool create_points(vkkk::Context& context) {
+        if (context.points.contains(kPointSphereName)) {
+            return true;
+        }
+        constexpr float golden_angle = 2.39996323f;
+        std::vector<float> positions;
+        positions.reserve(kPointSphereCount * 3);
+        for (uint32_t index = 0; index < kPointSphereCount; ++index) {
+            const float y = 1.0f - 2.0f
+                * (static_cast<float>(index) + 0.5f) / static_cast<float>(kPointSphereCount);
+            const float radius = std::sqrt(std::max(0.0f, 1.0f - y * y));
+            const float angle = golden_angle * static_cast<float>(index);
+            positions.insert(positions.end(), {
+                radius * std::cos(angle), y, radius * std::sin(angle)});
+        }
+        vkkk::Points points({vkkk::VERTEX});
+        points.load(kPointSphereCount, reinterpret_cast<const char*>(positions.data()),
+            static_cast<uint32_t>(positions.size() * sizeof(float)));
+        return context.load_points(kPointSphereName, points);
+    }
+
+    static bool create_pipeline(vkkk::Context& context) {
+        if (context.pipelines.contains(kPointSpherePipeline)) {
+            return true;
+        }
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(kPointSphereVert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_scattered_sphere_vert")
+            || !frag_module.load(kPointSphereFrag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_scattered_sphere_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::ePointList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+            vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, true, vk::CompareOp::eLessOrEqual, false, false);
+        return context.create_pipeline(kPointSpherePipeline, pack, option, {vkkk::VERTEX});
+    }
+
+    const vkkk::Camera& camera;
+    vkkk::vp::VertexPickingFeature& picker;
+    vkkk::FixedColorInstanceAttrs instance{
+        .model = glm::translate(glm::mat4{1.0f}, glm::vec3{0.0f, 1.5f, 0.0f}),
+        .color = glm::vec4{1.0f, 0.55f, 0.1f, 1.0f},
+    };
+    float point_size = 8.0f;
+    std::vector<uint32_t> selected_ids;
+    bool ready = false;
+    bool visible = false;
+    bool p_was_down = false;
+    bool up_was_down = false;
+    bool down_was_down = false;
+};
+
+class NurbsCurveFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    explicit NurbsCurveFeature(const vkkk::Camera& scene_camera)
+        : camera(scene_camera)
+        , curve(make_sample_curve())
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (!upload_lines(context) || !create_pipeline(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kPipelineName, vkkk::buf::FixedColorInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(
+                kPipelineName, vkkk::buf::FixedColorInstanceAttrs);
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool n_down = key_down(context, Qt::Key_N);
+        if (n_down && !n_was_down) {
+            visible = !visible;
+        }
+        n_was_down = n_down;
+
+        if (!visible) {
+            return;
+        }
+
+        const float min_line_width = context.wide_lines_enabled
+            ? context.line_width_range[0] : 1.0f;
+        const float max_line_width = context.wide_lines_enabled
+            ? context.line_width_range[1] : 1.0f;
+        const bool up_down = key_down(context, Qt::Key_Up);
+        if (up_down && !up_was_down) {
+            line_width = std::min(line_width + 1.0f, max_line_width);
+        }
+        up_was_down = up_down;
+
+        const bool down_down = key_down(context, Qt::Key_Down);
+        if (down_down && !down_was_down) {
+            line_width = std::max(line_width - 1.0f, min_line_width);
+        }
+        down_was_down = down_down;
+
+        const bool plus_down = key_down(context, Qt::Key_Equal)
+            || key_down(context, Qt::Key_Plus);
+        if (plus_down && !plus_was_down) {
+            const uint32_t next = std::min(segment_count * 2, kMaxSegmentCount);
+            if (next != segment_count) {
+                segment_count = next;
+                upload_lines(context);
+            }
+        }
+        plus_was_down = plus_down;
+
+        const bool minus_down = key_down(context, Qt::Key_Minus)
+            || key_down(context, Qt::Key_Underscore);
+        if (minus_down && !minus_was_down) {
+            const uint32_t next = std::max(segment_count / 2, kMinSegmentCount);
+            if (next != segment_count) {
+                segment_count = next;
+                upload_lines(context);
+            }
+        }
+        minus_was_down = minus_down;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (!ready || !visible) {
+            return;
+        }
+        context.sync_ubo(kPipelineName, vkkk::buf::CameraUBO, &camera.ubo_data, image_index);
+        context.sync_ssbo(kPipelineName, vkkk::buf::FixedColorInstanceAttrs, &instance, image_index);
+        if (context.bind(cmd, kPipelineName, image_index)) {
+            cmd.setLineWidth(line_width);
+            context.draw_lines(cmd, kLinesName);
+        }
+    }
+
+private:
+    static constexpr const char* kPipelineName = "viewport_nurbs_curve";
+    static constexpr const char* kLinesName = "viewport_nurbs_curve_lines";
+    static constexpr uint32_t kMinSegmentCount = 4;
+    static constexpr uint32_t kMaxSegmentCount = 256;
+
+    static vkkk::NurbsCurve make_sample_curve() {
+        return vkkk::NurbsCurve({
+            {-2.0f, 0.2f, 0.0f},
+            {-1.2f, 1.4f, 1.0f},
+            {-0.2f, 0.3f, 0.2f},
+            {0.8f, 1.8f, -0.4f},
+            {1.6f, 0.4f, 0.8f},
+            {2.2f, 1.1f, 0.0f},
+            {2.8f, 0.3f, -0.6f},
+        }, {1.0f, 1.0f, 0.4f, 3.5f, 1.0f, 1.5f, 1.0f});
+    }
+
+    static bool create_pipeline(vkkk::Context& context) {
+        if (context.pipelines.contains(kPipelineName)) {
+            return true;
+        }
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(vkkk::fixed_color_vert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_nurbs_curve_vert")
+            || !frag_module.load(vkkk::fixed_color_frag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_nurbs_curve_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::eLineList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, vk::PolygonMode::eFill, 1.0f,
+            vk::CullModeFlagBits::eNone, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, false, vk::CompareOp::eLessOrEqual, false, false);
+        option.dynamic_states.push_back(vk::DynamicState::eLineWidth);
+        option.dynamic_info.dynamicStateCount = static_cast<uint32_t>(option.dynamic_states.size());
+        option.dynamic_info.pDynamicStates = option.dynamic_states.data();
+        return context.create_pipeline(kPipelineName, pack, option, {vkkk::VERTEX});
+    }
+
+    bool upload_lines(vkkk::Context& context) {
+        const vkkk::Lines lines = curve.generate_lines(segment_count);
+        if (auto found = context.lines.find(kLinesName); found != context.lines.end()) {
+            context.wait_idle();
+            found->second.sync(lines, &context);
+            return true;
+        }
+        return context.load_lines(kLinesName, lines);
+    }
+
+    const vkkk::Camera& camera;
+    vkkk::NurbsCurve curve;
+    vkkk::FixedColorInstanceAttrs instance{
+        .model = glm::mat4{1.0f},
+        .color = glm::vec4{0.2f, 0.85f, 0.95f, 1.0f},
+    };
+    uint32_t segment_count = 32;
+    float line_width = 1.0f;
+    bool ready = false;
+    bool visible = false;
+    bool n_was_down = false;
+    bool up_was_down = false;
+    bool down_was_down = false;
+    bool plus_was_down = false;
+    bool minus_was_down = false;
+};
+
+class SceneCubeFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    SceneCubeFeature(vkkk::Scene& scene, vkkk::vp::ObjectPickingFeature& picker,
+        uint32_t& selected_object_id)
+        : scene(scene)
+        , picker(picker)
+        , selected_object_id(selected_object_id)
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (scene.camera == nullptr || !create_pipelines(context)) {
+            return;
+        }
+        ready = context.resize_pipeline_ssbo(
+                    kCubePhongPipeline, vkkk::buf::PhongInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(kCubePhongPipeline, vkkk::buf::PhongInstanceAttrs)
+            && context.resize_pipeline_ssbo(
+                kCubeWirePipeline, vkkk::buf::PhongInstanceAttrs, 1)
+            && context.alloc_pipeline_ssbo(kCubeWirePipeline, vkkk::buf::PhongInstanceAttrs);
+    }
+
+    void on_update(vkkk::Context& context, const vkkk::Context::Frame&) {
+        const bool c_down = key_down(context, Qt::Key_C);
+        if (c_down && !c_was_down) {
+            if (scene.find_object(kCubeObjectName) != nullptr) {
+                scene.remove_object(kCubeObjectName);
+                picker.clear_objects();
+                if (selected_object_id == kCubeObjectId) {
+                    selected_object_id = 0;
+                }
+            }
+            else {
+                scene.add_object(kCubeObjectName, kCubeMeshName);
+                picker.add_object(kCubeMeshName, kCubeObjectId);
+            }
+        }
+        c_was_down = c_down;
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        const auto* cube = scene.find_object(kCubeObjectName);
+        if (!ready || cube == nullptr || scene.camera == nullptr) {
+            return;
+        }
+
+        auto shaded = shaded_attrs;
+        shaded.model = cube->model;
+        sync_draw_data(context, kCubePhongPipeline, image_index, shaded);
+        if (context.bind(cmd, kCubePhongPipeline, image_index)) {
+            context.draw(cmd, kCubePhongPipeline, cube->mesh_name, 1);
+        }
+
+        if (selected_object_id == kCubeObjectId) {
+            auto wire = wire_attrs;
+            wire.model = cube->model;
+            sync_draw_data(context, kCubeWirePipeline, image_index, wire);
+            if (context.bind(cmd, kCubeWirePipeline, image_index)) {
+                context.draw(cmd, kCubeWirePipeline, cube->mesh_name, 1);
+            }
+        }
+    }
+
+private:
+    static bool create_pipeline(vkkk::Context& context, const char* pipeline_name,
+        vk::PolygonMode polygon_mode, bool depth_write)
+    {
+        if (context.pipelines.contains(pipeline_name)) {
+            return true;
+        }
+
+        vkkk::ShaderModule vert_module;
+        vkkk::ShaderModule frag_module;
+        if (!vert_module.load(vkkk::phong_vert, vk::ShaderStageFlagBits::eVertex,
+                "viewport_cube_phong_vert")
+            || !frag_module.load(vkkk::phong_frag, vk::ShaderStageFlagBits::eFragment,
+                "viewport_cube_phong_frag"))
+        {
+            return false;
+        }
+        vkkk::ShaderModulePack pack;
+        if (!pack.add_shader_module(vert_module) || !pack.add_shader_module(frag_module)) {
+            return false;
+        }
+
+        vkkk::PipelineOption option;
+        option.setup_input_assembly(vk::PrimitiveTopology::eTriangleList, false);
+        option.setup_multisampling(false, vk::SampleCountFlagBits::e1);
+        option.setup_rasterizer(false, false, polygon_mode, 1.0f,
+            vk::CullModeFlagBits::eBack, vk::FrontFace::eCounterClockwise, false);
+        option.setup_depth_stencil(true, depth_write, vk::CompareOp::eLessOrEqual, false, false);
+        return context.create_pipeline(
+            pipeline_name, pack, option, {vkkk::VERTEX, vkkk::NORMAL});
+    }
+
+    void sync_draw_data(vkkk::Context& context, const char* pipeline_name,
+        uint32_t image_index, const vkkk::PhongInstanceAttrs& attrs)
+    {
+        vkkk::PointLightUBO light{};
+        light.vec = glm::vec4{2.0f, 3.0f, 2.0f, 1.0f};
+        light.color = glm::vec4{1.0f};
+        context.sync_ubo(
+            pipeline_name, vkkk::buf::CameraUBO, &scene.camera->ubo_data, image_index);
+        context.sync_ubo(pipeline_name, vkkk::buf::PointLightUBO, &light, image_index);
+        context.sync_ssbo(pipeline_name, vkkk::buf::PhongInstanceAttrs, &attrs, image_index);
+    }
+
+    bool create_pipelines(vkkk::Context& context) {
+        return create_pipeline(context, kCubePhongPipeline, vk::PolygonMode::eFill, true)
+            && create_pipeline(context, kCubeWirePipeline, vk::PolygonMode::eLine, false);
+    }
+
+    vkkk::Scene& scene;
+    vkkk::vp::ObjectPickingFeature& picker;
+    uint32_t& selected_object_id;
+    vkkk::PhongInstanceAttrs shaded_attrs{
+        .model = glm::mat4{1.0f},
+        .ambient = glm::vec4{0.05f, 0.08f, 0.14f, 1.0f},
+        .diffuse = glm::vec4{0.25f, 0.55f, 0.9f, 1.0f},
+        .specular = glm::vec4{0.7f, 0.7f, 0.7f, 1.0f},
+        .shininess = 32.0f,
+    };
+    vkkk::PhongInstanceAttrs wire_attrs{
+        .model = glm::mat4{1.0f},
+        .ambient = glm::vec4{0.02f, 0.02f, 0.02f, 1.0f},
+        .diffuse = glm::vec4{0.03f, 0.03f, 0.03f, 1.0f},
+        .specular = glm::vec4{0.0f},
+        .shininess = 1.0f,
+    };
+    bool ready = false;
+    bool c_was_down = false;
+};
+
+class BillboardTextFeature final
+    : public vkkk::vp::ViewportFeature<vkkk::vp::ViewportPhase::Scene> {
+public:
+    BillboardTextFeature(const vkkk::Camera& scene_camera, std::filesystem::path path)
+        : camera(scene_camera)
+        , font_path(std::move(path))
+    {
+    }
+
+    void on_attach(vkkk::Context& context, vk::Extent2D) {
+        if (font_path.empty()) {
+            return;
+        }
+
+        constexpr const char* billboard_name = "vp_example_label";
+        vkkk::font::TextRenderer renderer(font_path);
+        vkkk::font::TextRenderOptions text_options{};
+        text_options.pixel_height = 64;
+        text_options.color = glm::vec4{0.05f, 0.05f, 0.05f, 1.0f};
+        const auto text_texture = renderer.render(context, "vkkk", text_options);
+        if (!text_texture.valid()) {
+            return;
+        }
+
+        vkkk::BillboardTextOptions options{};
+        options.position = glm::vec3{0.0f, 1.0f, 0.0f};
+        options.size = glm::vec2{1.5f,
+            1.5f * static_cast<float>(text_texture.extent.height) / text_texture.extent.width};
+        options.depth_test = false;
+        ready = context.add_billboard_text(
+            billboard_name, vkkk::BillboardTextSource::render_target(text_texture.target_index), options);
+    }
+
+    void on_record(vkkk::Context& context, vk::raii::CommandBuffer& cmd, uint32_t image_index) {
+        if (ready) {
+            context.draw_billboard_text(cmd, "vp_example_label", camera.ubo_data, image_index);
+        }
+    }
+
+private:
+    const vkkk::Camera& camera;
+    std::filesystem::path font_path;
+    bool ready = false;
+};
+
+class ViewportControls {
+public:
+    explicit ViewportControls(vkkk::Camera& camera)
+        : camera(camera)
+    {
+    }
+
+    void update(vkkk::QtBackend& window) {
+        const bool middle_down = window.mouse_down(vkkk::MouseButton::Middle);
+        if (!middle_down) {
+            dragging = false;
+        }
+        else {
+            const auto pointer = window.pointer();
+            if (!dragging) {
+                previous_x = pointer.x;
+                previous_y = pointer.y;
+                dragging = true;
+            }
+            else {
+                const float delta_x = static_cast<float>(pointer.x - previous_x);
+                const float delta_y = static_cast<float>(pointer.y - previous_y);
+                previous_x = pointer.x;
+                previous_y = pointer.y;
+
+                if ((window.modifiers() & vkkk::input_mod::shift) != 0) {
+                    pan(delta_x, delta_y);
+                }
+                else {
+                    rotate(delta_x, delta_y);
+                }
+            }
+        }
+
+        const float scroll = window.take_scroll_delta();
+        if (scroll != 0.0f) {
+            zoom(scroll);
+        }
+    }
+
+private:
+    void rotate(float delta_x, float delta_y) {
+        const glm::vec3 world_up{0.0f, 1.0f, 0.0f};
+        const glm::vec3 offset = camera.pos - target;
+        const glm::vec3 right = glm::normalize(glm::cross(camera.front, world_up));
+        const glm::quat yaw = glm::angleAxis(-delta_x * 0.005f, world_up);
+        const glm::quat pitch = glm::angleAxis(-delta_y * 0.005f, right);
+
+        camera.pos = target + pitch * yaw * offset;
+        camera.front = glm::normalize(target - camera.pos);
+        camera.up = world_up;
+    }
+
+    void pan(float delta_x, float delta_y) {
+        const float distance = glm::length(camera.pos - target);
+        const glm::vec3 right = glm::normalize(glm::cross(camera.front, camera.up));
+        const glm::vec3 up = glm::normalize(glm::cross(right, camera.front));
+        const glm::vec3 translation = (-right * delta_x + up * delta_y) * distance * 0.002f;
+        camera.pos += translation;
+        target += translation;
+    }
+
+    void zoom(float amount) {
+        const glm::vec3 offset = camera.pos - target;
+        const float distance = glm::length(offset);
+        const float new_distance = std::max(0.1f, distance * (1.0f - amount * 0.1f));
+        camera.pos = target + glm::normalize(offset) * new_distance;
+        camera.front = glm::normalize(target - camera.pos);
+    }
+
+    vkkk::Camera& camera;
+    glm::vec3 target{0.0f};
+    bool dragging = false;
+    double previous_x = 0.0;
+    double previous_y = 0.0;
+};
+
+} // namespace
+
+int main(int argc, char** argv) {
+    vkkk::QtBackend window(kWidth, kHeight, "vkkk Qt Viewport");
+    window.set_status(
+        "MMB rotate\nShift+MMB pan\nWheel zoom\nC cube\nP points\nN NURBS\n"
+        "Arrows size\n+/- segments");
+    vkkk::Context ctx;
+    ctx.init(window, "vkkk", VK_MAKE_VERSION(1, 0, 0), "vulkan",
+        vk::ApiVersion13, true, {});
+
+    vkkk::Camera camera{
+        glm::vec3{3.0f, 3.0f, 3.0f},
+        glm::normalize(glm::vec3{-1.0f, -1.0f, -1.0f}),
+        glm::vec3{0.0f, 1.0f, 0.0f},
+        45.0f,
+        kWidth / static_cast<float>(kHeight),
+        0.1f,
+        100.0f,
+    };
+    camera.update_ubo_data();
+    vkkk::Scene scene;
+    scene.camera = &camera;
+    scene.drawable_mgr->add_cube(kCubeMeshName, {vkkk::VERTEX, vkkk::NORMAL}, 1.0f);
+    scene.drawable_mgr->sync_to_gpu(&ctx);
+    scene.add_object(kCubeObjectName, kCubeMeshName);
+
+    ViewportControls viewport_controls(camera);
+
+    using BasicViewport = vkkk::vp::Viewport<
+        vkkk::vp::ObjectPickingFeature,
+        vkkk::vp::VertexPickingFeature,
+        SceneCubeFeature,
+        ScatteredSpherePointsFeature,
+        NurbsCurveFeature,
+        vkkk::vp::GridFeature,
+        vkkk::vp::FrameAxisFeature,
+        BillboardTextFeature>;
+    BasicViewport viewport(ctx);
+    const std::filesystem::path bundled_font_path =
+        std::filesystem::path{VKKK_SOURCE_DIR} / "resource/font/Roboto-Light.ttf";
+    const std::filesystem::path font_path =
+        argc > 1 ? std::filesystem::path{argv[1]} : bundled_font_path;
+    uint32_t selected_object_id = 0;
+    const auto picking_handle = viewport.add_feature<vkkk::vp::ObjectPickingFeature>(camera);
+    auto* picker = viewport.find_feature(picking_handle);
+    if (picker == nullptr) {
+        return 1;
+    }
+    picker->add_object(kCubeMeshName, kCubeObjectId);
+    picker->set_pick_callback([&selected_object_id](uint32_t object_id) {
+        selected_object_id = object_id;
+    });
+
+    const auto vertex_picking_handle = viewport.add_feature<vkkk::vp::VertexPickingFeature>(camera);
+    auto* vertex_picker = viewport.find_feature(vertex_picking_handle);
+    if (vertex_picker == nullptr) {
+        return 1;
+    }
+    viewport.add_feature<SceneCubeFeature>(scene, *picker, selected_object_id);
+    viewport.add_feature<ScatteredSpherePointsFeature>(camera, *vertex_picker);
+    viewport.add_feature<NurbsCurveFeature>(camera);
+    viewport.add_feature<vkkk::vp::GridFeature>(camera);
+    viewport.add_feature<vkkk::vp::FrameAxisFeature>(camera, font_path);
+    viewport.add_feature<BillboardTextFeature>(camera, font_path);
+
+    while (!window.should_close()) {
+        window.poll_events();
+
+        vkkk::Context::Frame frame{};
+        if (!viewport.begin_frame(frame)) {
+            continue;
+        }
+
+        viewport_controls.update(window);
+        const auto extent = viewport.extent();
+        camera.ratio = static_cast<float>(extent.width)
+            / static_cast<float>(extent.height == 0 ? 1 : extent.height);
+        camera.update_ubo_data();
+
+        viewport.update(frame);
+        viewport.record_frame(frame);
+        viewport.end_frame(frame);
+    }
+
+    ctx.wait_idle();
+    return 0;
+}

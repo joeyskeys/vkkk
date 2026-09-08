@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <stdexcept>
-#include <unordered_set>
 #include <utility>
 
 #include <QApplication>
@@ -11,12 +10,15 @@
 #include <QCoreApplication>
 #include <QCursor>
 #include <QDockWidget>
+#include <QEvent>
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMouseEvent>
 #include <QResizeEvent>
+#include <QSet>
 #include <QString>
+#include <QWheelEvent>
 #include <QWidget>
 #include <QVBoxLayout>
 
@@ -129,7 +131,8 @@ class QtVulkanWindow final : public QWindow {
 public:
     bool* resize_flag = nullptr;
     bool buttons[3] = {};
-    std::unordered_set<int> keys;
+    QSet<int> keys;
+    float scroll_delta = 0.0f;
 
     explicit QtVulkanWindow() {
         setSurfaceType(QSurface::VulkanSurface);
@@ -139,6 +142,18 @@ public:
         const QPoint pos = mapFromGlobal(QCursor::pos());
         x = static_cast<double>(pos.x());
         y = static_cast<double>(pos.y());
+    }
+
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
+            const auto* key_event = static_cast<QKeyEvent*>(event);
+            set_key(key_event->key(), event->type() == QEvent::KeyPress);
+        }
+        else if (event->type() == QEvent::Wheel) {
+            const auto* wheel = static_cast<QWheelEvent*>(event);
+            scroll_delta += static_cast<float>(wheel->angleDelta().y()) / 120.0f;
+        }
+        return QWindow::eventFilter(watched, event);
     }
 
 protected:
@@ -160,13 +175,18 @@ protected:
     }
 
     void keyPressEvent(QKeyEvent* event) override {
-        keys.insert(event->key());
+        set_key(event->key(), true);
         QWindow::keyPressEvent(event);
     }
 
     void keyReleaseEvent(QKeyEvent* event) override {
-        keys.erase(event->key());
+        set_key(event->key(), false);
         QWindow::keyReleaseEvent(event);
+    }
+
+    void wheelEvent(QWheelEvent* event) override {
+        scroll_delta += static_cast<float>(event->angleDelta().y()) / 120.0f;
+        QWindow::wheelEvent(event);
     }
 
 private:
@@ -179,6 +199,15 @@ private:
         }
         else if (button == Qt::MiddleButton) {
             buttons[2] = pressed;
+        }
+    }
+
+    void set_key(int key, bool pressed) {
+        if (pressed) {
+            keys.insert(key);
+        }
+        else {
+            keys.remove(key);
         }
     }
 };
@@ -212,7 +241,9 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 
     container = QWidget::createWindowContainer(surface_window, main);
     container->setFocusPolicy(Qt::StrongFocus);
+    container->installEventFilter(surface_window);
     main->setCentralWidget(container);
+    container->setFocus();
 
     hud_dock = new QDockWidget("HUD", main);
     hud_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -327,7 +358,7 @@ VkExtent2D QtBackend::window_size() const {
 }
 
 void QtBackend::wait_until_visible() {
-    while (true) {
+    while (!should_close()) {
         const VkExtent2D size = framebuffer_size();
         if (size.width > 0 && size.height > 0) {
             return;
@@ -385,6 +416,19 @@ bool QtBackend::key_down(Key key) const {
 
 uint32_t QtBackend::modifiers() const {
     return mods_from_qt(QGuiApplication::queryKeyboardModifiers());
+}
+
+bool QtBackend::key_pressed(int key) const {
+    return surface_window != nullptr && surface_window->keys.contains(key);
+}
+
+float QtBackend::take_scroll_delta() {
+    if (surface_window == nullptr) {
+        return 0.0f;
+    }
+    const float delta = surface_window->scroll_delta;
+    surface_window->scroll_delta = 0.0f;
+    return delta;
 }
 
 } // namespace vkkk

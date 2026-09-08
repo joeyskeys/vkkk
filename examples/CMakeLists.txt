@@ -1,34 +1,49 @@
-add_executable(vkrendererforward rendering_feature/renderer_main_forward.cpp)
-target_link_libraries(vkrendererforward
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+if(VKKK_HAS_GLFW)
+    add_executable(vkrendererforward rendering_feature/renderer_main_forward.cpp)
+    target_link_libraries(vkrendererforward
+        PRIVATE
+            vkkk
+            OpenImageIO::OpenImageIO)
 
-add_executable(vkrendererfp rendering_feature/renderer_main_fp.cpp)
-target_link_libraries(vkrendererfp
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+    add_executable(vkrendererfp rendering_feature/renderer_main_fp.cpp)
+    target_link_libraries(vkrendererfp
+        PRIVATE
+            vkkk
+            OpenImageIO::OpenImageIO)
 
-add_executable(vkrendererforwardplus rendering_feature/renderer_main_forwardplus.cpp)
-target_link_libraries(vkrendererforwardplus
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+    add_executable(vkrendererforwardplus rendering_feature/renderer_main_forwardplus.cpp)
+    target_link_libraries(vkrendererforwardplus
+        PRIVATE
+            vkkk
+            OpenImageIO::OpenImageIO)
 
-add_executable(vkrendererwireframe rendering_feature/renderer_main_wireframe.cpp)
-target_link_libraries(vkrendererwireframe
-    PRIVATE
-        vkkk
-        OpenImageIO::OpenImageIO)
+    add_executable(vkrendererwireframe rendering_feature/renderer_main_wireframe.cpp)
+    target_link_libraries(vkrendererwireframe
+        PRIVATE
+            vkkk
+            OpenImageIO::OpenImageIO)
 
-add_executable(vp_viewport viewport/viewport_main.cpp)
-target_link_libraries(vp_viewport
-    PRIVATE
-        vkkk)
-target_compile_definitions(vp_viewport
-    PRIVATE
-        VKKK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+    add_executable(vp_viewport viewport/viewport_main.cpp)
+    target_link_libraries(vp_viewport
+        PRIVATE
+            vkkk)
+    target_compile_definitions(vp_viewport
+        PRIVATE
+            VKKK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+endif()
+
+if(VKKK_HAS_QT6)
+    add_executable(qt_viewport qt_backend/qt_viewport.cpp)
+    target_link_libraries(qt_viewport
+        PRIVATE
+            vkkk
+            Qt6::Core
+            Qt6::Gui
+            Qt6::Widgets)
+    target_compile_definitions(qt_viewport
+        PRIVATE
+            VKKK_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
+endif()
 
 # add_executable(api_usage_example api_usage/api_usage_example.cpp)
 # target_link_libraries(api_usage_example

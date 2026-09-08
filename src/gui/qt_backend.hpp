@@ -45,6 +45,8 @@ public:
     bool mouse_down(MouseButton button) const override;
     bool key_down(Key key) const override;
     uint32_t modifiers() const override;
+    bool key_pressed(int key) const;
+    float take_scroll_delta();
 
 private:
     class QApplication* owned_app = nullptr;

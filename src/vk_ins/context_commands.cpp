@@ -738,6 +738,9 @@ bool Context::begin_frame(Frame& frame) {
         recreate_swapchain();
         return false;
     }
+    catch (const vk::SurfaceLostKHRError&) {
+        return false;
+    }
     if (result == vk::Result::eErrorOutOfDateKHR) {
         frame_buffer_resized = false;
         recreate_swapchain();
@@ -821,7 +824,10 @@ void Context::end_frame(const Frame& frame) {
     catch (const vk::OutOfDateKHRError&) {
         recreate = true;
     }
-    if (recreate) {
+    catch (const vk::SurfaceLostKHRError&) {
+        recreate = false;
+    }
+    if (recreate && (window_backend == nullptr || !window_backend->should_close())) {
         frame_buffer_resized = false;
         recreate_swapchain();
     }

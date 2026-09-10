@@ -581,12 +581,19 @@ public:
 
     // Mesh resources
     bool load_mesh(const std::string& name, const Mesh& mesh);
+    bool make_mesh_deformable(const std::string& name, const Mesh& mesh);
     bool update_mesh(const std::string& name, const Mesh& mesh);
     bool remove_mesh(const std::string& name);
     void clear_meshes();
     // CUDA-Vulkan interop: map mesh vertex memory into the current CUDA context.
     bool mesh_cuda_vertex_ptr(const std::string& name, CudaDeviceBuffer& view);
     bool mesh_cuda_rest_ptr(const std::string& name, CudaDeviceBuffer& view);
+    // Convert ORL point output (four doubles per vertex) into the mesh's
+    // interleaved float position component without a CPU readback.
+    bool write_mesh_positions_from_cuda(const std::string& name, uint64_t src_device_ptr,
+        vk::DeviceSize src_bytes, uint32_t vertex_count, uint32_t vertex_stride,
+        uint32_t vertex_offset,
+        const double* world_to_object);
     // Device-to-device write into the draw vertex buffer.
     bool write_mesh_vertices(const std::string& name, vk::raii::Buffer& src, vk::DeviceSize bytes);
     bool write_mesh_vertices_from_cuda(const std::string& name, uint64_t src_device_ptr, vk::DeviceSize bytes);
@@ -828,6 +835,7 @@ private:
     bool map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key, CudaDeviceBuffer& view);
     void unmap_mesh_cuda(const std::string& name);
     MeshGPU* find_draw_mesh(const std::string& name);
+    const MeshGPU* find_draw_mesh(const std::string& name) const;
     DeformableMeshGPU* find_deformable_mesh(const std::string& name);
 
     bool external_memory_export_available = false;

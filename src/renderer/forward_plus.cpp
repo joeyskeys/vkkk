@@ -311,8 +311,18 @@ void ForwardPlusRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& vi
             continue;
         }
         const std::string& pipeline_name = item->pipeline_name.empty() ? fallback_pipeline : item->pipeline_name;
-        const auto mesh_found = ctx->meshes.find(item->mesh_name);
-        if (mesh_found == ctx->meshes.end()) {
+        const MeshGPU* mesh = nullptr;
+        if (const auto deformable = ctx->deformable_meshes.find(item->mesh_name);
+            deformable != ctx->deformable_meshes.end())
+        {
+            mesh = &deformable->second;
+        }
+        else if (const auto regular = ctx->meshes.find(item->mesh_name);
+            regular != ctx->meshes.end())
+        {
+            mesh = &regular->second;
+        }
+        if (mesh == nullptr) {
             continue;
         }
         const auto pipeline_found = ctx->pipelines.find(pipeline_name);
@@ -326,7 +336,7 @@ void ForwardPlusRenderer::draw_batch(vk::CommandBuffer cmd, const RenderView& vi
         if (view.swapchain_image_idx < pipeline.descriptor_sets.size()) {
             desc_set = &*pipeline.descriptor_sets[view.swapchain_image_idx];
         }
-        mesh_found->second.emit_draw_cmd(cmd, *pipeline.vk_pipeline_layout, desc_set);
+        mesh->emit_draw_cmd(cmd, *pipeline.vk_pipeline_layout, desc_set);
     }
 }
 

@@ -108,6 +108,22 @@ int qt_from_key(Key key) {
     }
 }
 
+int qt_keypad_identity(int key) {
+    switch (key) {
+    case Qt::Key_Insert: return Qt::Key_0;
+    case Qt::Key_End: return Qt::Key_1;
+    case Qt::Key_Down: return Qt::Key_2;
+    case Qt::Key_PageDown: return Qt::Key_3;
+    case Qt::Key_Left: return Qt::Key_4;
+    case Qt::Key_Clear: return Qt::Key_5;
+    case Qt::Key_Right: return Qt::Key_6;
+    case Qt::Key_Home: return Qt::Key_7;
+    case Qt::Key_Up: return Qt::Key_8;
+    case Qt::Key_PageUp: return Qt::Key_9;
+    default: return key;
+    }
+}
+
 uint32_t mods_from_qt(Qt::KeyboardModifiers qt_mods) {
     uint32_t mods = input_mod::none;
     if (qt_mods.testFlag(Qt::ShiftModifier)) {
@@ -132,6 +148,7 @@ public:
     bool* resize_flag = nullptr;
     bool buttons[3] = {};
     QSet<int> keys;
+    QSet<int> keypad_keys;
     float scroll_delta = 0.0f;
 
     explicit QtVulkanWindow() {
@@ -147,7 +164,8 @@ public:
     bool eventFilter(QObject* watched, QEvent* event) override {
         if (event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) {
             const auto* key_event = static_cast<QKeyEvent*>(event);
-            set_key(key_event->key(), event->type() == QEvent::KeyPress);
+            set_key(key_event->key(), event->type() == QEvent::KeyPress,
+                key_event->modifiers());
         }
         else if (event->type() == QEvent::Wheel) {
             const auto* wheel = static_cast<QWheelEvent*>(event);
@@ -175,12 +193,12 @@ protected:
     }
 
     void keyPressEvent(QKeyEvent* event) override {
-        set_key(event->key(), true);
+        set_key(event->key(), true, event->modifiers());
         QWindow::keyPressEvent(event);
     }
 
     void keyReleaseEvent(QKeyEvent* event) override {
-        set_key(event->key(), false);
+        set_key(event->key(), false, event->modifiers());
         QWindow::keyReleaseEvent(event);
     }
 
@@ -202,12 +220,14 @@ private:
         }
     }
 
-    void set_key(int key, bool pressed) {
+    void set_key(int key, bool pressed, Qt::KeyboardModifiers modifiers) {
+        const bool keypad = modifiers.testFlag(Qt::KeypadModifier);
+        const int identity = keypad ? qt_keypad_identity(key) : key;
         if (pressed) {
-            keys.insert(key);
+            (keypad ? keypad_keys : keys).insert(identity);
         }
         else {
-            keys.remove(key);
+            (keypad ? keypad_keys : keys).remove(identity);
         }
     }
 };
@@ -411,7 +431,21 @@ bool QtBackend::key_down(Key key) const {
         return false;
     }
     const int qt_key = qt_from_key(key);
-    return qt_key != 0 && surface_window->keys.contains(qt_key);
+    if (qt_key == 0) {
+        return false;
+    }
+    const auto value = static_cast<uint16_t>(key);
+    if (value >= static_cast<uint16_t>(Key::Numpad0)
+        && value <= static_cast<uint16_t>(Key::Numpad9))
+    {
+        return surface_window->keypad_keys.contains(qt_key);
+    }
+    if (key == Key::NumpadEnter || key == Key::NumpadAdd
+        || key == Key::NumpadSubtract)
+    {
+        return surface_window->keypad_keys.contains(qt_key);
+    }
+    return surface_window->keys.contains(qt_key);
 }
 
 uint32_t QtBackend::modifiers() const {

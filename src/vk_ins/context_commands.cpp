@@ -51,11 +51,11 @@ bool Context::draw_mesh_instanced(vk::CommandBuffer cmd, const std::string& mesh
     vk::PipelineLayout pipeline_layout, uint32_t instance_count, uint32_t ssbo_offset,
     const vk::DescriptorSet* desc_set, uint32_t index_count) const
 {
-    const auto mesh_found = meshes.find(mesh_name);
-    if (mesh_found == meshes.end()) {
+    const MeshGPU* mesh_found = find_draw_mesh(mesh_name);
+    if (mesh_found == nullptr) {
         return false;
     }
-    mesh_found->second.emit_draw_cmd_instanced(
+    mesh_found->emit_draw_cmd_instanced(
         cmd, pipeline_layout, instance_count, ssbo_offset, desc_set, index_count);
     return true;
 }
@@ -158,12 +158,12 @@ bool Context::draw(vk::CommandBuffer cmd, const std::string& pipeline_name, cons
 bool Context::draw_indexed(vk::CommandBuffer cmd, const std::string& mesh_name,
     uint32_t index_count, uint32_t instance_count, uint32_t instance_offset) const
 {
-    const auto found = meshes.find(mesh_name);
-    if (found == meshes.end() || index_count == 0) {
+    const MeshGPU* found = find_draw_mesh(mesh_name);
+    if (found == nullptr || index_count == 0) {
         return false;
     }
 
-    found->second.emit_draw_cmd_instanced(cmd, vk::PipelineLayout{}, instance_count,
+    found->emit_draw_cmd_instanced(cmd, vk::PipelineLayout{}, instance_count,
         instance_offset, nullptr, index_count);
     return true;
 }
@@ -288,12 +288,11 @@ bool Context::draw_indirect(vk::CommandBuffer cmd, const std::string& mesh_name,
     const std::string& indirect_name, uint32_t frame_idx, uint32_t draw_count,
     uint32_t first_draw) const
 {
-    const auto mesh_it = meshes.find(mesh_name);
+    const MeshGPU* mesh = find_draw_mesh(mesh_name);
     const auto indirect_it = indirect_buffers.find(indirect_name);
-    if (mesh_it == meshes.end() || indirect_it == indirect_buffers.end()) {
+    if (mesh == nullptr || indirect_it == indirect_buffers.end()) {
         return false;
     }
-    const auto& mesh = mesh_it->second;
     const auto& buf = indirect_it->second;
     if (frame_idx >= buf.gpu_bufs.size() || first_draw >= buf.command_capacity) {
         return false;
@@ -306,9 +305,9 @@ bool Context::draw_indirect(vk::CommandBuffer cmd, const std::string& mesh_name,
 
     const vk::DeviceSize offset =
         static_cast<vk::DeviceSize>(first_draw) * buf.command_stride;
-    cmd.bindVertexBuffers(0, *mesh.vbuf, {0});
+    cmd.bindVertexBuffers(0, *mesh->vbuf, {0});
     if (buf.indexed) {
-        cmd.bindIndexBuffer(*mesh.ibuf, 0, vk::IndexType::eUint32);
+        cmd.bindIndexBuffer(*mesh->ibuf, 0, vk::IndexType::eUint32);
         cmd.drawIndexedIndirect(*buf.gpu_bufs[frame_idx], offset, count, buf.command_stride);
     }
     else {

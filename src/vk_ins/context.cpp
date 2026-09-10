@@ -555,20 +555,55 @@ void Context::init(WindowBackend& backend,
         required_device_extensions.push_back(vk::EXTMeshShaderExtensionName);
     }
 
-    std::vector<vk::raii::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
-    auto const dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
-        return is_device_suitable(device, surface, required_device_extensions);
-    });
-    if (dev_iter == devices.end()) {
-        throw std::runtime_error("no suitable Vulkan 1.3 device with dynamic rendering support");
-    }
-    physical_device = *dev_iter;
-
 #ifdef _WIN32
     const char* external_memory_ext = "VK_KHR_external_memory_win32";
 #else
     const char* external_memory_ext = "VK_KHR_external_memory_fd";
 #endif
+    std::vector<vk::raii::PhysicalDevice> devices = instance.enumeratePhysicalDevices();
+    const auto supports_external_memory = [&](const auto& device) {
+        const auto extensions = device.enumerateDeviceExtensionProperties();
+        return std::ranges::any_of(extensions, [external_memory_ext](const auto& available) {
+            return std::strcmp(available.extensionName, external_memory_ext) == 0;
+        });
+    };
+    auto dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
+        if (device.getProperties().deviceType != vk::PhysicalDeviceType::eDiscreteGpu
+            || !supports_external_memory(device))
+        {
+            return false;
+        }
+        auto candidate_extensions = required_device_extensions;
+        candidate_extensions.push_back(external_memory_ext);
+        return is_device_suitable(device, surface, candidate_extensions);
+    });
+    if (dev_iter == devices.end()) {
+        dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
+            if (!supports_external_memory(device)) {
+                return false;
+            }
+            auto candidate_extensions = required_device_extensions;
+            candidate_extensions.push_back(external_memory_ext);
+            return is_device_suitable(device, surface, candidate_extensions);
+        });
+    }
+    if (dev_iter == devices.end()) {
+        dev_iter = std::ranges::find_if(devices, [&](const auto& device) {
+            return is_device_suitable(device, surface, required_device_extensions);
+        });
+    }
+    if (dev_iter == devices.end()) {
+        throw std::runtime_error("no suitable Vulkan 1.3 device with dynamic rendering support");
+    }
+    physical_device = *dev_iter;
+    const auto selected_properties = physical_device.getProperties();
+    std::cerr << "vkkk CUDA interop: selected Vulkan device '"
+        << selected_properties.deviceName
+        << "' vendor=0x" << std::hex << selected_properties.vendorID
+        << " device=0x" << selected_properties.deviceID << std::dec
+        << " external-memory="
+        << (supports_external_memory(physical_device) ? "yes" : "no") << "\n";
+
     const auto device_extensions = physical_device.enumerateDeviceExtensionProperties();
     if (std::ranges::any_of(device_extensions, [external_memory_ext](const auto& available) {
             return std::strcmp(available.extensionName, external_memory_ext) == 0;

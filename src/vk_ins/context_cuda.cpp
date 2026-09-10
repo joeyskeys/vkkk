@@ -1,4 +1,6 @@
 #include <cstring>
+#include <iostream>
+#include <string>
 #include <unordered_map>
 
 #include "vk_ins/context.hpp"
@@ -33,12 +35,24 @@ namespace
 #endif
 
 using CUresult = int;
+using CUdevice = int;
+using CUcontext = void*;
 using CUdeviceptr = unsigned long long;
 using CUexternalMemory = void*;
+using CUmodule = void*;
+using CUfunction = void*;
+using CUstream = void*;
 
 constexpr int kCudaSuccess = 0;
 constexpr unsigned int kCudaExternalMemoryOpaqueFd = 1;
 constexpr unsigned int kCudaExternalMemoryOpaqueWin32 = 2;
+// Vulkan vertex allocations are created with VkMemoryDedicatedAllocateInfo.
+constexpr unsigned int kCudaExternalMemoryDedicated = 0x1;
+constexpr unsigned int kCudaJitInfoLogBuffer = 3;
+constexpr unsigned int kCudaJitInfoLogBufferSizeBytes = 4;
+constexpr unsigned int kCudaJitErrorLogBuffer = 5;
+constexpr unsigned int kCudaJitErrorLogBufferSizeBytes = 6;
+constexpr unsigned int kCudaJitLogVerbose = 12;
 
 struct CudaExternalMemoryHandleDesc {
     unsigned int type = 0;
@@ -69,6 +83,115 @@ using CuExternalMemoryGetMappedBufferFn =
     CUresult(VKKK_CUDAAPI*)(CUdeviceptr*, CUexternalMemory, const CudaExternalMemoryBufferDesc*);
 using CuDestroyExternalMemoryFn = CUresult(VKKK_CUDAAPI*)(CUexternalMemory);
 using CuMemcpyDtoDFn = CUresult(VKKK_CUDAAPI*)(CUdeviceptr, CUdeviceptr, size_t);
+using CuModuleLoadDataExFn =
+    CUresult(VKKK_CUDAAPI*)(CUmodule*, const void*, unsigned int, unsigned int*, void**);
+using CuModuleGetFunctionFn =
+    CUresult(VKKK_CUDAAPI*)(CUfunction*, CUmodule, const char*);
+using CuModuleUnloadFn = CUresult(VKKK_CUDAAPI*)(CUmodule);
+using CuLaunchKernelFn = CUresult(VKKK_CUDAAPI*)(
+    CUfunction, unsigned int, unsigned int, unsigned int, unsigned int, unsigned int,
+    unsigned int, unsigned int, CUstream, void**, void**);
+using CuCtxSynchronizeFn = CUresult(VKKK_CUDAAPI*)(void);
+using CuDeviceGetFn = CUresult(VKKK_CUDAAPI*)(CUdevice*, int);
+using CuDeviceGetNameFn = CUresult(VKKK_CUDAAPI*)(char*, int, CUdevice);
+using CuCtxSetCurrentFn = CUresult(VKKK_CUDAAPI*)(CUcontext);
+using CuDevicePrimaryCtxRetainFn = CUresult(VKKK_CUDAAPI*)(CUcontext*, CUdevice);
+using CuDevicePrimaryCtxReleaseFn = CUresult(VKKK_CUDAAPI*)(CUdevice);
+using CuGetErrorNameFn = CUresult(VKKK_CUDAAPI*)(CUresult, const char**);
+using CuGetErrorStringFn = CUresult(VKKK_CUDAAPI*)(CUresult, const char**);
+
+constexpr const char* kPositionScatterPtx = R"ptx(
+.version 6.0
+.target sm_52
+.address_size 64
+
+.visible .entry orl_scatter_point_positions(
+    .param .u64 p_points,
+    .param .u64 p_vertices,
+    .param .f64 m0,
+    .param .f64 m1,
+    .param .f64 m2,
+    .param .f64 m3,
+    .param .f64 m4,
+    .param .f64 m5,
+    .param .f64 m6,
+    .param .f64 m7,
+    .param .f64 m8,
+    .param .f64 m9,
+    .param .f64 m10,
+    .param .f64 m11,
+    .param .u32 p_count,
+    .param .u32 p_stride,
+    .param .u32 p_offset
+)
+{
+    .reg .pred %p;
+    .reg .b32 %r<8>;
+    .reg .b64 %rd<8>;
+    .reg .f64 %fd<16>;
+    .reg .f32 %f<4>;
+
+    ld.param.u64 %rd0, [p_points];
+    ld.param.u64 %rd1, [p_vertices];
+    ld.param.f64 %fd4, [m0];
+    ld.param.f64 %fd5, [m1];
+    ld.param.f64 %fd6, [m2];
+    ld.param.f64 %fd7, [m3];
+    ld.param.f64 %fd8, [m4];
+    ld.param.f64 %fd9, [m5];
+    ld.param.f64 %fd10, [m6];
+    ld.param.f64 %fd11, [m7];
+    ld.param.f64 %fd12, [m8];
+    ld.param.f64 %fd13, [m9];
+    ld.param.f64 %fd14, [m10];
+    ld.param.f64 %fd15, [m11];
+    ld.param.u32 %r1, [p_count];
+    ld.param.u32 %r2, [p_stride];
+    ld.param.u32 %r3, [p_offset];
+
+    mov.u32 %r0, %tid.x;
+    mov.u32 %r5, %ctaid.x;
+    mov.u32 %r6, %ntid.x;
+    mad.lo.u32 %r0, %r5, %r6, %r0;
+    setp.ge.u32 %p, %r0, %r1;
+    @%p bra DONE;
+
+    mul.wide.u32 %rd2, %r0, 32;
+    add.u64 %rd2, %rd0, %rd2;
+    ld.global.f64 %fd0, [%rd2];
+    ld.global.f64 %fd1, [%rd2+8];
+    ld.global.f64 %fd2, [%rd2+16];
+
+    mul.f64 %fd3, %fd4, %fd0;
+    fma.rn.f64 %fd3, %fd5, %fd1, %fd3;
+    fma.rn.f64 %fd3, %fd6, %fd2, %fd3;
+    add.f64 %fd3, %fd3, %fd7;
+    cvt.rn.f32.f64 %f0, %fd3;
+
+    mul.f64 %fd3, %fd8, %fd0;
+    fma.rn.f64 %fd3, %fd9, %fd1, %fd3;
+    fma.rn.f64 %fd3, %fd10, %fd2, %fd3;
+    add.f64 %fd3, %fd3, %fd11;
+    cvt.rn.f32.f64 %f1, %fd3;
+
+    mul.f64 %fd3, %fd12, %fd0;
+    fma.rn.f64 %fd3, %fd13, %fd1, %fd3;
+    fma.rn.f64 %fd3, %fd14, %fd2, %fd3;
+    add.f64 %fd3, %fd3, %fd15;
+    cvt.rn.f32.f64 %f2, %fd3;
+
+    mul.lo.u32 %r4, %r0, %r2;
+    add.u32 %r4, %r4, %r3;
+    mul.wide.u32 %rd3, %r4, 4;
+    add.u64 %rd3, %rd1, %rd3;
+    st.global.f32 [%rd3], %f0;
+    st.global.f32 [%rd3+4], %f1;
+    st.global.f32 [%rd3+8], %f2;
+
+DONE:
+    ret;
+}
+)ptx";
 
 } // namespace
 
@@ -86,16 +209,46 @@ struct CudaInteropState {
     CuExternalMemoryGetMappedBufferFn cuExternalMemoryGetMappedBuffer = nullptr;
     CuDestroyExternalMemoryFn cuDestroyExternalMemory = nullptr;
     CuMemcpyDtoDFn cuMemcpyDtoD = nullptr;
+    CuModuleLoadDataExFn cuModuleLoadDataEx = nullptr;
+    CuModuleGetFunctionFn cuModuleGetFunction = nullptr;
+    CuModuleUnloadFn cuModuleUnload = nullptr;
+    CuLaunchKernelFn cuLaunchKernel = nullptr;
+    CuCtxSynchronizeFn cuCtxSynchronize = nullptr;
+    CuDeviceGetFn cuDeviceGet = nullptr;
+    CuDeviceGetNameFn cuDeviceGetName = nullptr;
+    CuCtxSetCurrentFn cuCtxSetCurrent = nullptr;
+    CuDevicePrimaryCtxRetainFn cuDevicePrimaryCtxRetain = nullptr;
+    CuDevicePrimaryCtxReleaseFn cuDevicePrimaryCtxRelease = nullptr;
+    CuGetErrorNameFn cuGetErrorName = nullptr;
+    CuGetErrorStringFn cuGetErrorString = nullptr;
+    CUmodule position_module = nullptr;
+    CUfunction position_kernel = nullptr;
+    CUdevice cuda_device = 0;
+    CUcontext cuda_context = nullptr;
+    bool primary_context_retained = false;
     bool loaded = false;
     std::unordered_map<std::string, CudaMappedBuffer> maps;
 
     ~CudaInteropState() {
+        if (cuda_context != nullptr && cuCtxSetCurrent != nullptr) {
+            cuCtxSetCurrent(cuda_context);
+        }
+        if (position_module != nullptr && cuModuleUnload != nullptr) {
+            cuModuleUnload(position_module);
+        }
+        position_module = nullptr;
+        position_kernel = nullptr;
         for (auto& [_, mapped] : maps) {
             if (mapped.external_memory != nullptr && cuDestroyExternalMemory != nullptr) {
                 cuDestroyExternalMemory(mapped.external_memory);
             }
         }
         maps.clear();
+        if (primary_context_retained && cuDevicePrimaryCtxRelease != nullptr) {
+            cuDevicePrimaryCtxRelease(cuda_device);
+        }
+        primary_context_retained = false;
+        cuda_context = nullptr;
 #ifdef _WIN32
         if (library != nullptr) {
             FreeLibrary(static_cast<HMODULE>(library));
@@ -129,9 +282,11 @@ bool load_cuda_symbol(void* library, T& function, const char* name) {
     return true;
 }
 
+bool activate_cuda_context(CudaInteropState& state);
+
 bool ensure_cuda_loaded(CudaInteropState& state) {
     if (state.loaded) {
-        return true;
+        return activate_cuda_context(state);
     }
 #ifdef _WIN32
     state.library = LoadLibraryA("nvcuda.dll");
@@ -149,24 +304,89 @@ bool ensure_cuda_loaded(CudaInteropState& state) {
         || !load_cuda_symbol(state.library, state.cuExternalMemoryGetMappedBuffer,
             "cuExternalMemoryGetMappedBuffer")
         || !load_cuda_symbol(state.library, state.cuDestroyExternalMemory, "cuDestroyExternalMemory")
-        || !load_cuda_symbol(state.library, state.cuMemcpyDtoD, "cuMemcpyDtoD_v2"))
+        || !load_cuda_symbol(state.library, state.cuMemcpyDtoD, "cuMemcpyDtoD_v2")
+        || !load_cuda_symbol(state.library, state.cuModuleLoadDataEx, "cuModuleLoadDataEx")
+        || !load_cuda_symbol(state.library, state.cuModuleGetFunction, "cuModuleGetFunction")
+        || !load_cuda_symbol(state.library, state.cuModuleUnload, "cuModuleUnload")
+        || !load_cuda_symbol(state.library, state.cuLaunchKernel, "cuLaunchKernel")
+        || !load_cuda_symbol(state.library, state.cuCtxSynchronize, "cuCtxSynchronize")
+        || !load_cuda_symbol(state.library, state.cuDeviceGet, "cuDeviceGet")
+        || !load_cuda_symbol(state.library, state.cuCtxSetCurrent, "cuCtxSetCurrent")
+        || !load_cuda_symbol(state.library, state.cuDevicePrimaryCtxRetain,
+            "cuDevicePrimaryCtxRetain")
+        || !load_cuda_symbol(state.library, state.cuDevicePrimaryCtxRelease,
+            "cuDevicePrimaryCtxRelease"))
     {
         return false;
     }
+    (void)load_cuda_symbol(state.library, state.cuGetErrorName, "cuGetErrorName");
+    (void)load_cuda_symbol(state.library, state.cuGetErrorString, "cuGetErrorString");
+    (void)load_cuda_symbol(state.library, state.cuDeviceGetName, "cuDeviceGetName");
     if (state.cuInit(0) != kCudaSuccess) {
         return false;
+    }
+    if (state.cuDeviceGet(&state.cuda_device, 0) != kCudaSuccess
+        || state.cuDevicePrimaryCtxRetain(&state.cuda_context, state.cuda_device)
+            != kCudaSuccess
+        || state.cuda_context == nullptr)
+    {
+        return false;
+    }
+    state.primary_context_retained = true;
+    if (!activate_cuda_context(state)) {
+        state.cuDevicePrimaryCtxRelease(state.cuda_device);
+        state.primary_context_retained = false;
+        state.cuda_context = nullptr;
+        return false;
+    }
+    char device_name[256] = {};
+    if (state.cuDeviceGetName != nullptr
+        && state.cuDeviceGetName(device_name, static_cast<int>(sizeof(device_name)),
+            state.cuda_device) == kCudaSuccess)
+    {
+        std::cerr << "vkkk CUDA interop: using CUDA device " << state.cuda_device
+            << " '" << device_name << "'\n";
     }
     state.loaded = true;
     return true;
 }
 
+bool activate_cuda_context(CudaInteropState& state) {
+    return state.cuda_context != nullptr && state.cuCtxSetCurrent != nullptr
+        && state.cuCtxSetCurrent(state.cuda_context) == kCudaSuccess;
+}
+
+std::string cuda_result_text(const CudaInteropState& state, CUresult result) {
+    std::string text = "rc=" + std::to_string(result);
+    const char* name = nullptr;
+    const char* description = nullptr;
+    if (state.cuGetErrorName != nullptr
+        && state.cuGetErrorName(result, &name) == kCudaSuccess && name != nullptr)
+    {
+        text += " ";
+        text += name;
+    }
+    if (state.cuGetErrorString != nullptr
+        && state.cuGetErrorString(result, &description) == kCudaSuccess
+        && description != nullptr)
+    {
+        text += " (";
+        text += description;
+        text += ")";
+    }
+    return text;
+}
+
 bool export_memory_handle(const vk::raii::Device& device, const vk::raii::DeviceMemory& memo,
-    vk::DeviceSize alloc_bytes, CudaExternalMemoryHandleDesc& desc)
+    vk::DeviceSize alloc_bytes, CudaExternalMemoryHandleDesc& desc, int* result_out)
 {
 #ifdef _WIN32
     auto get_handle = reinterpret_cast<PFN_vkGetMemoryWin32HandleKHR>(
         device.getProcAddr("vkGetMemoryWin32HandleKHR"));
     if (get_handle == nullptr) {
+        if (result_out != nullptr) {
+            *result_out = -1;
+        }
         return false;
     }
     VkMemoryGetWin32HandleInfoKHR info{};
@@ -174,7 +394,11 @@ bool export_memory_handle(const vk::raii::Device& device, const vk::raii::Device
     info.memory = *memo;
     info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
     HANDLE handle = nullptr;
-    if (get_handle(static_cast<VkDevice>(*device), &info, &handle) != VK_SUCCESS || handle == nullptr) {
+    const VkResult result = get_handle(static_cast<VkDevice>(*device), &info, &handle);
+    if (result_out != nullptr) {
+        *result_out = static_cast<int>(result);
+    }
+    if (result != VK_SUCCESS || handle == nullptr) {
         return false;
     }
     desc.type = kCudaExternalMemoryOpaqueWin32;
@@ -185,6 +409,9 @@ bool export_memory_handle(const vk::raii::Device& device, const vk::raii::Device
 #else
     auto get_fd = reinterpret_cast<PFN_vkGetMemoryFdKHR>(device.getProcAddr("vkGetMemoryFdKHR"));
     if (get_fd == nullptr) {
+        if (result_out != nullptr) {
+            *result_out = -1;
+        }
         return false;
     }
     VkMemoryGetFdInfoKHR info{};
@@ -192,7 +419,11 @@ bool export_memory_handle(const vk::raii::Device& device, const vk::raii::Device
     info.memory = *memo;
     info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     int fd = -1;
-    if (get_fd(static_cast<VkDevice>(*device), &info, &fd) != VK_SUCCESS || fd < 0) {
+    const VkResult result = get_fd(static_cast<VkDevice>(*device), &info, &fd);
+    if (result_out != nullptr) {
+        *result_out = static_cast<int>(result);
+    }
+    if (result != VK_SUCCESS || fd < 0) {
         return false;
     }
     desc.type = kCudaExternalMemoryOpaqueFd;
@@ -216,9 +447,85 @@ void close_exported_handle(CudaExternalMemoryHandleDesc& desc) {
 #endif
 }
 
+bool ensure_position_kernel(CudaInteropState& state) {
+    if (!activate_cuda_context(state)) {
+        std::cerr << "vkkk CUDA interop: failed to activate CUDA context for position kernel\n";
+        return false;
+    }
+    if (state.position_module != nullptr && state.position_kernel != nullptr) {
+        return true;
+    }
+
+    CUmodule module = nullptr;
+    char info_log[4096] = {};
+    char error_log[4096] = {};
+    unsigned int info_log_size = sizeof(info_log);
+    unsigned int error_log_size = sizeof(error_log);
+    unsigned int verbose = 1;
+    unsigned int jit_options[] = {
+        kCudaJitInfoLogBuffer,
+        kCudaJitInfoLogBufferSizeBytes,
+        kCudaJitErrorLogBuffer,
+        kCudaJitErrorLogBufferSizeBytes,
+        kCudaJitLogVerbose,
+    };
+    void* jit_option_values[] = {
+        info_log,
+        &info_log_size,
+        error_log,
+        &error_log_size,
+        &verbose,
+    };
+    const CUresult load_rc = state.cuModuleLoadDataEx(
+        &module, kPositionScatterPtx,
+        static_cast<unsigned int>(sizeof(jit_options) / sizeof(jit_options[0])),
+        jit_options, jit_option_values);
+    if (load_rc != kCudaSuccess || module == nullptr)
+    {
+        std::cerr << "vkkk CUDA interop: failed to load position PTX ("
+            << cuda_result_text(state, load_rc) << ")\n";
+        if (error_log[0] != '\0') {
+            std::cerr << "vkkk CUDA interop: position PTX compiler error:\n"
+                << error_log << '\n';
+        }
+        if (info_log[0] != '\0') {
+            std::cerr << "vkkk CUDA interop: position PTX compiler info:\n"
+                << info_log << '\n';
+        }
+        return false;
+    }
+    if (info_log[0] != '\0') {
+        std::cerr << "vkkk CUDA interop: position PTX compiler info:\n"
+            << info_log << '\n';
+    }
+    CUfunction function = nullptr;
+    const CUresult function_rc =
+        state.cuModuleGetFunction(&function, module, "orl_scatter_point_positions");
+    if (function_rc != kCudaSuccess || function == nullptr)
+    {
+        std::cerr << "vkkk CUDA interop: position PTX entry point is unavailable ("
+            << cuda_result_text(state, function_rc) << ")\n";
+        state.cuModuleUnload(module);
+        return false;
+    }
+    state.position_module = module;
+    state.position_kernel = function;
+    return true;
+}
+
 } // namespace
 
 MeshGPU* Context::find_draw_mesh(const std::string& name) {
+    if (auto found = deformable_meshes.find(name); found != deformable_meshes.end()) {
+        return &found->second;
+    }
+    if (auto found = meshes.find(name); found != meshes.end()) {
+        return &found->second;
+    }
+    return nullptr;
+}
+
+const MeshGPU* Context::find_draw_mesh(const std::string& name) const {
     if (auto found = deformable_meshes.find(name); found != deformable_meshes.end()) {
         return &found->second;
     }
@@ -239,6 +546,7 @@ void Context::unmap_mesh_cuda(const std::string& name) {
     if (!cuda_interop) {
         return;
     }
+    activate_cuda_context(*cuda_interop);
     auto unmap = [this](const std::string& key) {
         auto found = cuda_interop->maps.find(key);
         if (found == cuda_interop->maps.end()) {
@@ -261,12 +569,18 @@ bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& 
     if (!external_memory_export_available || *mesh.vbuf == VK_NULL_HANDLE
         || *mesh.vbuf_memo == VK_NULL_HANDLE || mesh.vert_bytes == 0)
     {
+        std::cerr << "vkkk CUDA interop: mesh buffer is not exportable"
+            << " (export=" << external_memory_export_available
+            << ", buffer=" << static_cast<VkBuffer>(*mesh.vbuf)
+            << ", memory=" << static_cast<VkDeviceMemory>(*mesh.vbuf_memo)
+            << ", bytes=" << mesh.vert_bytes << ")\n";
         return false;
     }
     if (!cuda_interop) {
         cuda_interop.reset(new CudaInteropState());
     }
     if (!ensure_cuda_loaded(*cuda_interop)) {
+        std::cerr << "vkkk CUDA interop: CUDA driver/context initialization failed\n";
         return false;
     }
 
@@ -283,24 +597,42 @@ bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& 
     }
 
     const vk::MemoryRequirements mem_reqs = mesh.vbuf.getMemoryRequirements();
+    std::cerr << "vkkk CUDA interop: mapping '" << map_key
+        << "' Vulkan buffer=" << static_cast<VkBuffer>(*mesh.vbuf)
+        << " memory=" << static_cast<VkDeviceMemory>(*mesh.vbuf_memo)
+        << " vertex-bytes=" << mesh.vert_bytes
+        << " allocation-bytes=" << mem_reqs.size << "\n";
     CudaExternalMemoryHandleDesc handle_desc{};
-    if (!export_memory_handle(device, mesh.vbuf_memo, mem_reqs.size, handle_desc)) {
+    int export_result = -1;
+    if (!export_memory_handle(device, mesh.vbuf_memo, mem_reqs.size, handle_desc, &export_result)) {
+        std::cerr << "vkkk CUDA interop: Vulkan memory handle export failed for '"
+            << map_key << "' (VkResult=" << export_result << ")\n";
         return false;
     }
+    handle_desc.flags |= kCudaExternalMemoryDedicated;
+    std::cerr << "vkkk CUDA interop: exported '" << map_key
+        << "' handle-type=" << handle_desc.type
+        << " flags=" << handle_desc.flags
+        << " size=" << handle_desc.size << "\n";
 
     CUexternalMemory ext_mem = nullptr;
     const CUresult import_rc = cuda_interop->cuImportExternalMemory(&ext_mem, &handle_desc);
     close_exported_handle(handle_desc);
     if (import_rc != kCudaSuccess || ext_mem == nullptr) {
+        std::cerr << "vkkk CUDA interop: CUDA external-memory import failed for '"
+            << map_key << "' (" << cuda_result_text(*cuda_interop, import_rc) << ")\n";
         return false;
     }
 
     CudaExternalMemoryBufferDesc buffer_desc{};
     buffer_desc.size = mem_reqs.size;
     CUdeviceptr device_ptr = 0;
-    if (cuda_interop->cuExternalMemoryGetMappedBuffer(&device_ptr, ext_mem, &buffer_desc) != kCudaSuccess
-        || device_ptr == 0)
+    const CUresult map_rc =
+        cuda_interop->cuExternalMemoryGetMappedBuffer(&device_ptr, ext_mem, &buffer_desc);
+    if (map_rc != kCudaSuccess || device_ptr == 0)
     {
+        std::cerr << "vkkk CUDA interop: CUDA external-memory mapping failed for '"
+            << map_key << "' (" << cuda_result_text(*cuda_interop, map_rc) << ")\n";
         cuda_interop->cuDestroyExternalMemory(ext_mem);
         return false;
     }
@@ -346,13 +678,98 @@ bool Context::write_mesh_vertices_from_cuda(const std::string& name, uint64_t sr
     if (src_device_ptr == 0) {
         return false;
     }
+    wait_idle();
     CudaDeviceBuffer dest{};
     if (!mesh_cuda_vertex_ptr(name, dest) || bytes == 0 || bytes > dest.bytes) {
         return false;
     }
-    return cuda_interop
-        && cuda_interop->cuMemcpyDtoD(dest.device_ptr, src_device_ptr, static_cast<size_t>(bytes))
-            == kCudaSuccess;
+    if (!cuda_interop
+        || cuda_interop->cuMemcpyDtoD(dest.device_ptr, src_device_ptr,
+            static_cast<size_t>(bytes)) != kCudaSuccess)
+    {
+        return false;
+    }
+    return cuda_interop->cuCtxSynchronize() == kCudaSuccess;
+}
+
+bool Context::write_mesh_positions_from_cuda(const std::string& name, uint64_t src_device_ptr,
+    vk::DeviceSize src_bytes, uint32_t vertex_count, uint32_t vertex_stride,
+    uint32_t vertex_offset, const double* world_to_object)
+{
+    const MeshGPU* mesh = find_draw_mesh(name);
+    if (mesh == nullptr || src_device_ptr == 0 || vertex_count == 0
+        || vertex_count > mesh->vcnt || vertex_stride == 0
+        || vertex_offset > vertex_stride || vertex_stride - vertex_offset < 3
+        || world_to_object == nullptr)
+    {
+        std::cerr << "vkkk CUDA interop: invalid position-write arguments for '" << name
+            << "'\n";
+        return false;
+    }
+
+    const auto required_bytes =
+        static_cast<vk::DeviceSize>(vertex_count) * vertex_stride * sizeof(float);
+    const auto source_bytes =
+        static_cast<vk::DeviceSize>(vertex_count) * sizeof(double) * 4;
+    if (required_bytes > mesh->vert_bytes || src_bytes < source_bytes) {
+        std::cerr << "vkkk CUDA interop: position-write buffer size mismatch for '" << name
+            << "' (src=" << src_bytes << ", required-src=" << source_bytes
+            << ", dst=" << mesh->vert_bytes << ", required-dst=" << required_bytes << ")\n";
+        return false;
+    }
+
+    // The Vulkan queue may still read this shared vertex allocation from the
+    // previous frame. The interop path has no external semaphore yet, so make
+    // the ownership transition explicit before CUDA writes it.
+    wait_idle();
+
+    CudaDeviceBuffer destination{};
+    if (!mesh_cuda_vertex_ptr(name, destination) || destination.device_ptr == 0
+        || required_bytes > destination.bytes || !cuda_interop
+        || !ensure_position_kernel(*cuda_interop))
+    {
+        std::cerr << "vkkk CUDA interop: failed to prepare draw buffer for '" << name
+            << "' (mapped-bytes=" << destination.bytes
+            << ", required-bytes=" << required_bytes << ")\n";
+        return false;
+    }
+
+    uint64_t points = src_device_ptr;
+    uint64_t vertices = destination.device_ptr;
+    double matrix[12] = {
+        world_to_object[0], world_to_object[4], world_to_object[8], world_to_object[12],
+        world_to_object[1], world_to_object[5], world_to_object[9], world_to_object[13],
+        world_to_object[2], world_to_object[6], world_to_object[10], world_to_object[14],
+    };
+    uint32_t count = vertex_count;
+    uint32_t stride = vertex_stride;
+    uint32_t offset = vertex_offset;
+    void* parameters[] = {
+        &points, &vertices,
+        &matrix[0], &matrix[1], &matrix[2], &matrix[3],
+        &matrix[4], &matrix[5], &matrix[6], &matrix[7],
+        &matrix[8], &matrix[9], &matrix[10], &matrix[11],
+        &count, &stride, &offset,
+    };
+    const unsigned int block_size = 128;
+    const unsigned int block_count =
+        (vertex_count + block_size - 1) / block_size;
+    const CUresult launch_rc = cuda_interop->cuLaunchKernel(
+            cuda_interop->position_kernel,
+            block_count, 1, 1, block_size, 1, 1, 0, nullptr, parameters, nullptr);
+    if (launch_rc != kCudaSuccess)
+    {
+        std::cerr << "vkkk CUDA interop: position conversion kernel launch failed for '"
+            << name << "' (" << cuda_result_text(*cuda_interop, launch_rc) << ")\n";
+        return false;
+    }
+    const CUresult sync_rc = cuda_interop->cuCtxSynchronize();
+    if (sync_rc != kCudaSuccess) {
+        std::cerr << "vkkk CUDA interop: position conversion synchronization failed for '"
+            << name << "' (rc=" << sync_rc << ")\n";
+        return false;
+    }
+    return true;
 }
 
 bool Context::copy_mesh_rest_to_draw(const std::string& name) {

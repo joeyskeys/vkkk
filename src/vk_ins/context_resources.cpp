@@ -352,14 +352,13 @@ bool Context::bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, con
         return false;
     }
 
-    const auto mesh_it = meshes.find(mesh_name);
-    if (mesh_it == meshes.end()) {
+    const MeshGPU* mesh = find_draw_mesh(mesh_name);
+    if (mesh == nullptr) {
         return false;
     }
 
     auto& pipeline = pipeline_it->second;
-    const auto& mesh = mesh_it->second;
-    if (!*mesh.vbuf || !*mesh.ibuf || mesh.vert_bytes == 0 || mesh.index_bytes == 0
+    if (!*mesh->vbuf || !*mesh->ibuf || mesh->vert_bytes == 0 || mesh->index_bytes == 0
         || pipeline.descriptor_sets.empty())
     {
         return false;
@@ -387,8 +386,8 @@ bool Context::bind_pipeline_ssbo_from_mesh(const std::string& pipeline_name, con
         return true;
     };
 
-    return bind_mesh_buffer(buf::Vertices, mesh.vbuf, mesh.vert_bytes)
-        && bind_mesh_buffer(buf::Indices, mesh.ibuf, mesh.index_bytes);
+    return bind_mesh_buffer(buf::Vertices, mesh->vbuf, mesh->vert_bytes)
+        && bind_mesh_buffer(buf::Indices, mesh->ibuf, mesh->index_bytes);
 }
 
 bool Context::alloc_compute_ssbo(const std::string& full_name) {
@@ -512,9 +511,43 @@ const SSBO& Context::require_compute_ssbo(const std::string& full_name) const {
 }
 
 bool Context::load_mesh(const std::string& name, const Mesh& mesh) {
+    if (auto deformable = deformable_meshes.find(name);
+        deformable != deformable_meshes.end())
+    {
+        wait_idle();
+        unmap_mesh_cuda(name);
+        deformable->second.sync(mesh, this);
+        deformable->second.rest_mesh.sync(mesh, this);
+        return true;
+    }
+    if (auto found = meshes.find(name); found != meshes.end()) {
+        wait_idle();
+        unmap_mesh_cuda(name);
+        found->second.sync(mesh, this);
+        return true;
+    }
     MeshGPU gpu{};
     gpu.sync(mesh, this);
     meshes.emplace(name, std::move(gpu));
+    return true;
+}
+
+bool Context::make_mesh_deformable(const std::string& name, const Mesh& mesh) {
+    if (deformable_meshes.contains(name)) {
+        return true;
+    }
+    if (!meshes.contains(name) || mesh.vbuf == nullptr || mesh.vcnt == 0) {
+        return false;
+    }
+
+    wait_idle();
+    unmap_mesh_cuda(name);
+
+    DeformableMeshGPU gpu{};
+    gpu.sync(mesh, this);
+    gpu.rest_mesh.sync(mesh, this);
+    meshes.erase(name);
+    deformable_meshes.emplace(name, std::move(gpu));
     return true;
 }
 
@@ -552,25 +585,34 @@ void Context::clear_meshes() {
 }
 
 bool Context::update_mesh(const std::string& name, const Mesh& mesh) {
-    auto found = meshes.find(name);
-    if (found == meshes.end() || mesh.vbuf == nullptr || mesh.vcnt == 0) {
+    MeshGPU* found = find_draw_mesh(name);
+    if (found == nullptr || mesh.vbuf == nullptr || mesh.vcnt == 0) {
         return false;
     }
 
     const vk::DeviceSize vert_bytes =
         static_cast<vk::DeviceSize>(mesh.comp_size) * mesh.vcnt * sizeof(float);
     wait_idle();
-    if (found->second.vert_bytes == vert_bytes
+    if (found->vert_bytes == vert_bytes
         && vert_bytes > 0
         && vert_bytes <= std::numeric_limits<uint32_t>::max())
     {
         auto [staging_buf, staging_memo] = load_into_staging_buffer(
             mesh.vbuf, static_cast<uint32_t>(vert_bytes));
-        copy_buffer(staging_buf, found->second.vbuf, vert_bytes);
+        copy_buffer(staging_buf, found->vbuf, vert_bytes);
         return true;
     }
 
-    found->second.sync(mesh, this);
+    unmap_mesh_cuda(name);
+    if (auto deformable = deformable_meshes.find(name);
+        deformable != deformable_meshes.end())
+    {
+        deformable->second.sync(mesh, this);
+        deformable->second.rest_mesh.sync(mesh, this);
+    }
+    else {
+        found->sync(mesh, this);
+    }
     return true;
 }
 

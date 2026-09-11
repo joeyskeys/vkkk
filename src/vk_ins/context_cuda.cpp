@@ -1,4 +1,5 @@
 #include <cstring>
+#include <cstdint>
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -35,6 +36,7 @@ namespace
 #endif
 
 using CUresult = int;
+using CUjitOption = int;
 using CUdevice = int;
 using CUcontext = void*;
 using CUdeviceptr = unsigned long long;
@@ -48,11 +50,11 @@ constexpr unsigned int kCudaExternalMemoryOpaqueFd = 1;
 constexpr unsigned int kCudaExternalMemoryOpaqueWin32 = 2;
 // Vulkan vertex allocations are created with VkMemoryDedicatedAllocateInfo.
 constexpr unsigned int kCudaExternalMemoryDedicated = 0x1;
-constexpr unsigned int kCudaJitInfoLogBuffer = 3;
-constexpr unsigned int kCudaJitInfoLogBufferSizeBytes = 4;
-constexpr unsigned int kCudaJitErrorLogBuffer = 5;
-constexpr unsigned int kCudaJitErrorLogBufferSizeBytes = 6;
-constexpr unsigned int kCudaJitLogVerbose = 12;
+constexpr CUjitOption kCudaJitInfoLogBuffer = 3;
+constexpr CUjitOption kCudaJitInfoLogBufferSizeBytes = 4;
+constexpr CUjitOption kCudaJitErrorLogBuffer = 5;
+constexpr CUjitOption kCudaJitErrorLogBufferSizeBytes = 6;
+constexpr CUjitOption kCudaJitLogVerbose = 12;
 
 struct CudaExternalMemoryHandleDesc {
     unsigned int type = 0;
@@ -84,7 +86,7 @@ using CuExternalMemoryGetMappedBufferFn =
 using CuDestroyExternalMemoryFn = CUresult(VKKK_CUDAAPI*)(CUexternalMemory);
 using CuMemcpyDtoDFn = CUresult(VKKK_CUDAAPI*)(CUdeviceptr, CUdeviceptr, size_t);
 using CuModuleLoadDataExFn =
-    CUresult(VKKK_CUDAAPI*)(CUmodule*, const void*, unsigned int, unsigned int*, void**);
+    CUresult(VKKK_CUDAAPI*)(CUmodule*, const void*, unsigned int, CUjitOption*, void**);
 using CuModuleGetFunctionFn =
     CUresult(VKKK_CUDAAPI*)(CUfunction*, CUmodule, const char*);
 using CuModuleUnloadFn = CUresult(VKKK_CUDAAPI*)(CUmodule);
@@ -452,6 +454,12 @@ bool ensure_position_kernel(CudaInteropState& state) {
         std::cerr << "vkkk CUDA interop: failed to activate CUDA context for position kernel\n";
         return false;
     }
+    if (state.cuModuleLoadDataEx == nullptr
+        || state.cuModuleGetFunction == nullptr)
+    {
+        std::cerr << "vkkk CUDA interop: CUDA module loader symbols are unavailable\n";
+        return false;
+    }
     if (state.position_module != nullptr && state.position_kernel != nullptr) {
         return true;
     }
@@ -462,7 +470,7 @@ bool ensure_position_kernel(CudaInteropState& state) {
     unsigned int info_log_size = sizeof(info_log);
     unsigned int error_log_size = sizeof(error_log);
     unsigned int verbose = 1;
-    unsigned int jit_options[] = {
+    CUjitOption jit_options[] = {
         kCudaJitInfoLogBuffer,
         kCudaJitInfoLogBufferSizeBytes,
         kCudaJitErrorLogBuffer,
@@ -471,10 +479,10 @@ bool ensure_position_kernel(CudaInteropState& state) {
     };
     void* jit_option_values[] = {
         info_log,
-        &info_log_size,
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(info_log_size)),
         error_log,
-        &error_log_size,
-        &verbose,
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(error_log_size)),
+        reinterpret_cast<void*>(static_cast<std::uintptr_t>(verbose)),
     };
     const CUresult load_rc = state.cuModuleLoadDataEx(
         &module, kPositionScatterPtx,

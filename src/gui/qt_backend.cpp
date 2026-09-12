@@ -262,8 +262,12 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     container = QWidget::createWindowContainer(surface_window, main);
     container->setFocusPolicy(Qt::StrongFocus);
     container->installEventFilter(surface_window);
-    main->setCentralWidget(container);
     container->setFocus();
+
+    tabs = new QTabWidget(main);
+    tabs->setDocumentMode(true);
+    tabs->addTab(container, "Viewport");
+    main->setCentralWidget(tabs);
 
     hud_dock = new QDockWidget("HUD", main);
     hud_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
@@ -282,6 +286,7 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 QtBackend::~QtBackend() {
     surface_window = nullptr;
     container = nullptr;
+    tabs = nullptr;
     hud_dock = nullptr;
     status_label = nullptr;
     delete main;
@@ -300,6 +305,13 @@ QWindow* QtBackend::vulkan_window() const {
 
 QWidget* QtBackend::hud_panel() const {
     return hud_dock != nullptr ? hud_dock->widget() : nullptr;
+}
+
+int QtBackend::add_tab(QWidget* widget, const char* title) {
+    if (tabs == nullptr || widget == nullptr) {
+        return -1;
+    }
+    return tabs->addTab(widget, QString::fromUtf8(title != nullptr ? title : ""));
 }
 
 void QtBackend::set_status(const std::string& text) {

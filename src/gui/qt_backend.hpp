@@ -7,6 +7,7 @@
 #include <QDockWidget>
 #include <QLabel>
 #include <QMainWindow>
+#include <QTabWidget>
 #include <QWidget>
 #include <QWindow>
 
@@ -30,6 +31,7 @@ public:
     QMainWindow* main_window() const;
     QWindow* vulkan_window() const;
     QWidget* hud_panel() const;
+    int add_tab(QWidget* widget, const char* title);
     void set_status(const std::string& text);
 
     std::vector<const char*> instance_extensions(bool enable_validation) const override;
@@ -53,6 +55,7 @@ private:
     QtMainWindow* main = nullptr;
     QtVulkanWindow* surface_window = nullptr;
     QWidget* container = nullptr;
+    QTabWidget* tabs = nullptr;
     QDockWidget* hud_dock = nullptr;
     QLabel* status_label = nullptr;
 };

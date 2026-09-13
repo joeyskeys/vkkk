@@ -623,6 +623,8 @@ void Context::init(WindowBackend& backend,
     sample_rate_shading_enabled = supported_features.sampleRateShading == vk::True;
     wide_lines_enabled = supported_features.wideLines == vk::True;
     large_points_enabled = supported_features.largePoints == vk::True;
+    const bool shader_float64_supported = supported_features.shaderFloat64 == vk::True;
+    const bool shader_int64_supported = supported_features.shaderInt64 == vk::True;
     point_size_range = physical_device.getProperties().limits.pointSizeRange;
     line_width_range = physical_device.getProperties().limits.lineWidthRange;
     const auto supported_feature_chain = physical_device.getFeatures2<
@@ -658,6 +660,14 @@ void Context::init(WindowBackend& backend,
     // Needed for draw_indirect with draw_count > 1.
     device_features.get<vk::PhysicalDeviceFeatures2>().features.multiDrawIndirect =
         supported_features.multiDrawIndirect;
+    // The built-in joint/point/line shaders use double and int64_t values in
+    // their storage-buffer layouts.  These core features must be explicitly
+    // enabled before Vulkan shader modules declaring Float64/Int64 are created.
+    // Enable them only when the selected physical device advertises support.
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.shaderFloat64 =
+        shader_float64_supported ? VK_TRUE : VK_FALSE;
+    device_features.get<vk::PhysicalDeviceFeatures2>().features.shaderInt64 =
+        shader_int64_supported ? VK_TRUE : VK_FALSE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().synchronization2 = VK_TRUE;
     device_features.get<vk::PhysicalDeviceVulkan13Features>().dynamicRendering = VK_TRUE;
     // shaderc's Vulkan 1.3 target emits SPIR-V 1.6 LocalSizeId for mesh/task

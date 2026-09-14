@@ -260,6 +260,7 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     surface_window->create();
 
     tabs = new QTabWidget(main);
+    tabs->setDocumentMode(true);
     viewport_root = new QWidget(tabs);
     auto* viewport_layout = new QVBoxLayout(viewport_root);
     viewport_layout->setContentsMargins(0, 0, 0, 0);

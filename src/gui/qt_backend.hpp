@@ -7,6 +7,7 @@
 #include <QDockWidget>
 #include <QLabel>
 #include <QMainWindow>
+#include <QTabWidget>
 #include <QWidget>
 #include <QWindow>
 
@@ -29,6 +30,9 @@ public:
 
     QMainWindow* main_window() const;
     QWindow* vulkan_window() const;
+    QWidget* viewport_panel() const;
+    QTabWidget* tab_widget() const;
+    int add_tab(QWidget* panel, const char* title);
     QWidget* hud_panel() const;
     void set_status(const std::string& text);
 
@@ -53,6 +57,8 @@ private:
     QtMainWindow* main = nullptr;
     QtVulkanWindow* surface_window = nullptr;
     QWidget* container = nullptr;
+    QWidget* viewport_root = nullptr;
+    QTabWidget* tabs = nullptr;
     QDockWidget* hud_dock = nullptr;
     QLabel* status_label = nullptr;
 };

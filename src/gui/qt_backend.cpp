@@ -259,10 +259,17 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     surface_window->resize(width, height);
     surface_window->create();
 
-    container = QWidget::createWindowContainer(surface_window, main);
+    tabs = new QTabWidget(main);
+    viewport_root = new QWidget(tabs);
+    auto* viewport_layout = new QVBoxLayout(viewport_root);
+    viewport_layout->setContentsMargins(0, 0, 0, 0);
+
+    container = QWidget::createWindowContainer(surface_window, viewport_root);
     container->setFocusPolicy(Qt::StrongFocus);
     container->installEventFilter(surface_window);
-    main->setCentralWidget(container);
+    viewport_layout->addWidget(container);
+    tabs->addTab(viewport_root, QStringLiteral("Viewport"));
+    main->setCentralWidget(tabs);
     container->setFocus();
 
     hud_dock = new QDockWidget("HUD", main);
@@ -282,6 +289,8 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 QtBackend::~QtBackend() {
     surface_window = nullptr;
     container = nullptr;
+    viewport_root = nullptr;
+    tabs = nullptr;
     hud_dock = nullptr;
     status_label = nullptr;
     delete main;
@@ -296,6 +305,21 @@ QMainWindow* QtBackend::main_window() const {
 
 QWindow* QtBackend::vulkan_window() const {
     return surface_window;
+}
+
+QWidget* QtBackend::viewport_panel() const {
+    return viewport_root;
+}
+
+QTabWidget* QtBackend::tab_widget() const {
+    return tabs;
+}
+
+int QtBackend::add_tab(QWidget* panel, const char* title) {
+    if (tabs == nullptr || panel == nullptr) {
+        return -1;
+    }
+    return tabs->addTab(panel, title != nullptr ? QString::fromUtf8(title) : QString{});
 }
 
 QWidget* QtBackend::hud_panel() const {

@@ -18,6 +18,7 @@
 #include <QResizeEvent>
 #include <QSet>
 #include <QString>
+#include <QTabWidget>
 #include <QWheelEvent>
 #include <QWidget>
 #include <QVBoxLayout>
@@ -254,14 +255,20 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     main = new QtMainWindow();
     main->setWindowTitle(title != nullptr ? title : "vkkk");
     main->resize(width, height);
+    main->setDockNestingEnabled(true);
+    main->setDockOptions(
+        QMainWindow::AnimatedDocks
+        | QMainWindow::AllowNestedDocks
+        | QMainWindow::AllowTabbedDocks
+        | QMainWindow::GroupedDragging);
+    main->setTabPosition(
+        Qt::AllDockWidgetAreas, QTabWidget::North);
 
     surface_window = new QtVulkanWindow();
     surface_window->resize(width, height);
     surface_window->create();
 
-    tabs = new QTabWidget(main);
-    tabs->setDocumentMode(true);
-    viewport_root = new QWidget(tabs);
+    viewport_root = new QWidget(main);
     auto* viewport_layout = new QVBoxLayout(viewport_root);
     viewport_layout->setContentsMargins(0, 0, 0, 0);
 
@@ -269,12 +276,16 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     container->setFocusPolicy(Qt::StrongFocus);
     container->installEventFilter(surface_window);
     viewport_layout->addWidget(container);
-    tabs->addTab(viewport_root, QStringLiteral("Viewport"));
-    main->setCentralWidget(tabs);
+    main->setCentralWidget(viewport_root);
     container->setFocus();
 
     hud_dock = new QDockWidget("HUD", main);
-    hud_dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+    hud_dock->setObjectName(QStringLiteral("vkkk.hud"));
+    hud_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    hud_dock->setFeatures(
+        QDockWidget::DockWidgetMovable
+        | QDockWidget::DockWidgetFloatable
+        | QDockWidget::DockWidgetClosable);
     auto* hud_root = new QWidget(hud_dock);
     auto* layout = new QVBoxLayout(hud_root);
     status_label = new QLabel("Vulkan", hud_root);
@@ -291,7 +302,6 @@ QtBackend::~QtBackend() {
     surface_window = nullptr;
     container = nullptr;
     viewport_root = nullptr;
-    tabs = nullptr;
     hud_dock = nullptr;
     status_label = nullptr;
     delete main;
@@ -312,15 +322,26 @@ QWidget* QtBackend::viewport_panel() const {
     return viewport_root;
 }
 
-QTabWidget* QtBackend::tab_widget() const {
-    return tabs;
-}
-
-int QtBackend::add_tab(QWidget* panel, const char* title) {
-    if (tabs == nullptr || panel == nullptr) {
+int QtBackend::add_dock_panel(
+    QWidget* panel, const char* title, Qt::DockWidgetArea area)
+{
+    if (main == nullptr || panel == nullptr) {
         return -1;
     }
-    return tabs->addTab(panel, title != nullptr ? QString::fromUtf8(title) : QString{});
+    const QString dock_title = title != nullptr
+        ? QString::fromUtf8(title) : QStringLiteral("Panel");
+    auto* dock = new QDockWidget(dock_title, main);
+    dock->setObjectName(
+        QStringLiteral("vkkk.dock.") + dock_title);
+    dock->setAllowedAreas(Qt::AllDockWidgetAreas);
+    dock->setFeatures(
+        QDockWidget::DockWidgetMovable
+        | QDockWidget::DockWidgetFloatable
+        | QDockWidget::DockWidgetClosable);
+    dock->setWidget(panel);
+    main->addDockWidget(area, dock);
+    dock->show();
+    return 0;
 }
 
 QWidget* QtBackend::hud_panel() const {

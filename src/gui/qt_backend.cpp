@@ -18,6 +18,7 @@
 #include <QResizeEvent>
 #include <QSet>
 #include <QString>
+#include <QStatusBar>
 #include <QTabWidget>
 #include <QWheelEvent>
 #include <QWidget>
@@ -344,6 +345,26 @@ int QtBackend::add_dock_panel(
     return 0;
 }
 
+int QtBackend::set_hud_panel(QWidget* panel, const char* title) {
+    if (hud_dock == nullptr || panel == nullptr) {
+        return -1;
+    }
+    if (hud_dock->widget() != panel) {
+        QWidget* previous = hud_dock->widget();
+        if (previous != nullptr) {
+            previous->setParent(nullptr);
+        }
+        hud_dock->setWidget(panel);
+        delete previous;
+    }
+    hud_dock->setWindowTitle(
+        title != nullptr ? QString::fromUtf8(title)
+                         : QStringLiteral("Properties"));
+    status_label = nullptr;
+    hud_dock->show();
+    return 0;
+}
+
 QWidget* QtBackend::hud_panel() const {
     return hud_dock != nullptr ? hud_dock->widget() : nullptr;
 }
@@ -351,6 +372,8 @@ QWidget* QtBackend::hud_panel() const {
 void QtBackend::set_status(const std::string& text) {
     if (status_label != nullptr) {
         status_label->setText(QString::fromStdString(text));
+    } else if (main != nullptr) {
+        main->statusBar()->showMessage(QString::fromStdString(text));
     }
 }
 

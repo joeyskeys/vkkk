@@ -32,6 +32,7 @@ public:
     QWidget* viewport_panel() const;
     int add_dock_panel(QWidget* panel, const char* title,
         Qt::DockWidgetArea area = Qt::RightDockWidgetArea);
+    int set_hud_panel(QWidget* panel, const char* title);
     QWidget* hud_panel() const;
     void set_status(const std::string& text);
 

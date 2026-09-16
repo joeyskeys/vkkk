@@ -223,7 +223,9 @@ private:
     }
 
     void set_key(int key, bool pressed, Qt::KeyboardModifiers modifiers) {
-        const bool keypad = modifiers.testFlag(Qt::KeypadModifier);
+        // Some platforms report keypad Enter without KeypadModifier.
+        const bool keypad = modifiers.testFlag(Qt::KeypadModifier)
+            || key == Qt::Key_Enter;
         const int identity = keypad ? qt_keypad_identity(key) : key;
         if (pressed) {
             (keypad ? keypad_keys : keys).insert(identity);

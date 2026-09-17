@@ -588,6 +588,11 @@ public:
     // CUDA-Vulkan interop: map mesh vertex memory into the current CUDA context.
     bool mesh_cuda_vertex_ptr(const std::string& name, CudaDeviceBuffer& view);
     bool mesh_cuda_rest_ptr(const std::string& name, CudaDeviceBuffer& view);
+    // Copy a CUDA allocation into one frame's graphics SSBO through the
+    // existing Vulkan external-memory interop path.
+    bool write_pipeline_ssbo_from_cuda(const std::string& pipeline_name,
+        const std::string& block_name, uint32_t frame_idx,
+        uint64_t src_device_ptr, vk::DeviceSize bytes);
     // Convert ORL point output (four doubles per vertex) into the mesh's
     // interleaved float position component without a CPU readback.
     bool write_mesh_positions_from_cuda(const std::string& name, uint64_t src_device_ptr,
@@ -832,7 +837,11 @@ private:
     };
     std::unordered_map<std::string, BillboardText> billboard_texts;
 
-    bool map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key, CudaDeviceBuffer& view);
+    bool map_buffer_to_cuda(const vk::raii::Buffer& buffer,
+        const vk::raii::DeviceMemory& memory, vk::DeviceSize bytes,
+        const std::string& map_key, CudaDeviceBuffer& view);
+    bool map_mesh_vertices_to_cuda(const MeshGPU& mesh,
+        const std::string& map_key, CudaDeviceBuffer& view);
     void unmap_mesh_cuda(const std::string& name);
     MeshGPU* find_draw_mesh(const std::string& name);
     const MeshGPU* find_draw_mesh(const std::string& name) const;

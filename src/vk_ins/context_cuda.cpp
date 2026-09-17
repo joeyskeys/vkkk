@@ -570,18 +570,19 @@ void Context::unmap_mesh_cuda(const std::string& name) {
     unmap(name + ".rest");
 }
 
-bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& map_key,
-    CudaDeviceBuffer& view)
+bool Context::map_buffer_to_cuda(const vk::raii::Buffer& buffer,
+    const vk::raii::DeviceMemory& memory, vk::DeviceSize bytes,
+    const std::string& map_key, CudaDeviceBuffer& view)
 {
     view = {};
-    if (!external_memory_export_available || *mesh.vbuf == VK_NULL_HANDLE
-        || *mesh.vbuf_memo == VK_NULL_HANDLE || mesh.vert_bytes == 0)
+    if (!external_memory_export_available || *buffer == VK_NULL_HANDLE
+        || *memory == VK_NULL_HANDLE || bytes == 0)
     {
-        std::cerr << "vkkk CUDA interop: mesh buffer is not exportable"
+        std::cerr << "vkkk CUDA interop: Vulkan buffer is not exportable"
             << " (export=" << external_memory_export_available
-            << ", buffer=" << static_cast<VkBuffer>(*mesh.vbuf)
-            << ", memory=" << static_cast<VkDeviceMemory>(*mesh.vbuf_memo)
-            << ", bytes=" << mesh.vert_bytes << ")\n";
+            << ", buffer=" << static_cast<VkBuffer>(*buffer)
+            << ", memory=" << static_cast<VkDeviceMemory>(*memory)
+            << ", bytes=" << bytes << ")\n";
         return false;
     }
     if (!cuda_interop) {
@@ -592,11 +593,12 @@ bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& 
         return false;
     }
 
-    const uint64_t vk_buffer = reinterpret_cast<uint64_t>(static_cast<VkBuffer>(*mesh.vbuf));
+    const uint64_t vk_buffer =
+        reinterpret_cast<uint64_t>(static_cast<VkBuffer>(*buffer));
     auto& mapped = cuda_interop->maps[map_key];
     if (mapped.vk_buffer == vk_buffer && mapped.device_ptr != 0) {
         view.device_ptr = mapped.device_ptr;
-        view.bytes = mesh.vert_bytes;
+        view.bytes = bytes;
         return true;
     }
     if (mapped.external_memory != nullptr) {
@@ -604,15 +606,16 @@ bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& 
         mapped = {};
     }
 
-    const vk::MemoryRequirements mem_reqs = mesh.vbuf.getMemoryRequirements();
+    const vk::MemoryRequirements mem_reqs = buffer.getMemoryRequirements();
     std::cerr << "vkkk CUDA interop: mapping '" << map_key
-        << "' Vulkan buffer=" << static_cast<VkBuffer>(*mesh.vbuf)
-        << " memory=" << static_cast<VkDeviceMemory>(*mesh.vbuf_memo)
-        << " vertex-bytes=" << mesh.vert_bytes
+        << "' Vulkan buffer=" << static_cast<VkBuffer>(*buffer)
+        << " memory=" << static_cast<VkDeviceMemory>(*memory)
+        << " bytes=" << bytes
         << " allocation-bytes=" << mem_reqs.size << "\n";
     CudaExternalMemoryHandleDesc handle_desc{};
     int export_result = -1;
-    if (!export_memory_handle(device, mesh.vbuf_memo, mem_reqs.size, handle_desc, &export_result)) {
+    if (!export_memory_handle(
+            device, memory, mem_reqs.size, handle_desc, &export_result)) {
         std::cerr << "vkkk CUDA interop: Vulkan memory handle export failed for '"
             << map_key << "' (VkResult=" << export_result << ")\n";
         return false;
@@ -648,10 +651,23 @@ bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh, const std::string& 
     mapped.vk_buffer = vk_buffer;
     mapped.external_memory = ext_mem;
     mapped.device_ptr = device_ptr;
-    mapped.bytes = mesh.vert_bytes;
+    mapped.bytes = bytes;
     view.device_ptr = device_ptr;
-    view.bytes = mesh.vert_bytes;
+    view.bytes = bytes;
     return true;
+}
+
+bool Context::map_mesh_vertices_to_cuda(const MeshGPU& mesh,
+    const std::string& map_key, CudaDeviceBuffer& view)
+{
+    if (*mesh.vbuf == VK_NULL_HANDLE || *mesh.vbuf_memo == VK_NULL_HANDLE
+        || mesh.vert_bytes == 0)
+    {
+        view = {};
+        return false;
+    }
+    return map_buffer_to_cuda(
+        mesh.vbuf, mesh.vbuf_memo, mesh.vert_bytes, map_key, view);
 }
 
 bool Context::mesh_cuda_vertex_ptr(const std::string& name, CudaDeviceBuffer& view) {
@@ -668,6 +684,53 @@ bool Context::mesh_cuda_rest_ptr(const std::string& name, CudaDeviceBuffer& view
         return false;
     }
     return map_mesh_vertices_to_cuda(mesh->rest_mesh, name + ".rest", view);
+}
+
+bool Context::write_pipeline_ssbo_from_cuda(
+    const std::string& pipeline_name, const std::string& block_name,
+    uint32_t frame_idx, uint64_t src_device_ptr, vk::DeviceSize bytes)
+{
+    if (src_device_ptr == 0 || bytes == 0) {
+        return false;
+    }
+    const auto pipeline = pipelines.find(pipeline_name);
+    if (pipeline == pipelines.end()) {
+        return false;
+    }
+    const auto ssbo = pipeline->second.ssbos.find(block_name);
+    if (ssbo == pipeline->second.ssbos.end()
+        || ssbo->second.uses_borrowed_descriptors
+        || frame_idx >= ssbo->second.gpu_bufs.size()
+        || frame_idx >= ssbo->second.memos.size())
+    {
+        return false;
+    }
+
+    const auto& destination = ssbo->second;
+    const vk::DeviceSize destination_bytes =
+        static_cast<vk::DeviceSize>(destination.size)
+        * destination.vecsize;
+    if (bytes > destination_bytes) {
+        return false;
+    }
+
+    // The selected per-frame allocation was fenced by begin_frame. CUDA is
+    // synchronized below before the graphics command buffer is submitted, so
+    // no device-wide wait or host readback is needed here.
+    CudaDeviceBuffer mapped{};
+    const std::string map_key = pipeline_name + ":" + block_name + ":"
+        + std::to_string(frame_idx);
+    if (!map_buffer_to_cuda(
+            destination.gpu_bufs[frame_idx], destination.memos[frame_idx],
+            destination_bytes, map_key, mapped)
+        || !cuda_interop
+        || cuda_interop->cuMemcpyDtoD(
+               mapped.device_ptr, src_device_ptr,
+               static_cast<size_t>(bytes)) != kCudaSuccess)
+    {
+        return false;
+    }
+    return cuda_interop->cuCtxSynchronize() == kCudaSuccess;
 }
 
 bool Context::write_mesh_vertices(const std::string& name, vk::raii::Buffer& src, vk::DeviceSize bytes) {

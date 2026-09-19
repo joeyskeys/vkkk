@@ -169,7 +169,7 @@ public:
             set_key(key_event->key(), event->type() == QEvent::KeyPress,
                 key_event->modifiers());
         }
-        else if (event->type() == QEvent::Wheel) {
+        else if (event->type() == QEvent::Wheel && watched != this) {
             const auto* wheel = static_cast<QWheelEvent*>(event);
             scroll_delta += static_cast<float>(wheel->angleDelta().y()) / 120.0f;
         }
@@ -270,6 +270,12 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     surface_window = new QtVulkanWindow();
     surface_window->resize(width, height);
     surface_window->create();
+    if (auto* application = QCoreApplication::instance()) {
+        // ControlMap polls edge transitions after processEvents(). Install
+        // the filter on the application so key presses from dock widgets are
+        // visible to the window-level input state as well as the viewport.
+        application->installEventFilter(surface_window);
+    }
 
     viewport_root = new QWidget(main);
     auto* viewport_layout = new QVBoxLayout(viewport_root);
@@ -277,7 +283,6 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 
     container = QWidget::createWindowContainer(surface_window, viewport_root);
     container->setFocusPolicy(Qt::StrongFocus);
-    container->installEventFilter(surface_window);
     viewport_layout->addWidget(container);
     main->setCentralWidget(viewport_root);
     container->setFocus();
@@ -302,6 +307,9 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 }
 
 QtBackend::~QtBackend() {
+    if (auto* application = QCoreApplication::instance()) {
+        application->removeEventFilter(surface_window);
+    }
     surface_window = nullptr;
     container = nullptr;
     viewport_root = nullptr;

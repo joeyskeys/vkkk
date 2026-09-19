@@ -3,10 +3,12 @@
 #include <cassert>
 #include <chrono>
 #include <cstring>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <ranges>
 #include <stdexcept>
+#include <system_error>
 #include <vector>
 
 #include <OpenImageIO/imagebuf.h>
@@ -157,6 +159,120 @@ static VKAPI_ATTR vk::Bool32 VKAPI_CALL debug_callback(
 Context::Context(bool enable_debug_m)
     : enable_debug_messenger(enable_debug_m)
 {}
+
+void Context::set_shader_cache(fs::path directory, bool force_recompile) {
+    shader_cache_options_.directory = std::move(directory);
+    shader_cache_options_.force_recompile = force_recompile;
+}
+
+bool Context::load_shader(ShaderModule& module, const fs::path& path,
+    vk::ShaderStageFlagBits stage) const
+{
+    return module.load(path, stage, shader_cache_options_);
+}
+
+bool Context::load_shader(ShaderModule& module, const char* source,
+    vk::ShaderStageFlagBits stage, const std::string& source_name) const
+{
+    return module.load(source, stage, source_name, shader_cache_options_);
+}
+
+void Context::set_pipeline_cache_path(fs::path path, bool force_recompile) {
+    pipeline_cache_path_ = std::move(path);
+    pipeline_cache_force_recompile_ = force_recompile;
+}
+
+bool Context::load_pipeline_cache(const fs::path& path) {
+    if (device == nullptr) {
+        return false;
+    }
+
+    std::vector<char> initial_data;
+    if (!path.empty()) {
+        std::ifstream file(path, std::ios::binary | std::ios::ate);
+        if (file) {
+            const auto end = file.tellg();
+            if (end > 0) {
+                initial_data.resize(static_cast<std::size_t>(end));
+                file.seekg(0);
+                file.read(initial_data.data(),
+                    static_cast<std::streamsize>(initial_data.size()));
+                if (!file) {
+                    initial_data.clear();
+                }
+            }
+        }
+    }
+
+    vk::PipelineCacheCreateInfo create_info{};
+    create_info.initialDataSize = initial_data.size();
+    create_info.pInitialData = initial_data.empty()
+        ? nullptr : initial_data.data();
+    try {
+        pipeline_cache = vk::raii::PipelineCache(device, create_info);
+        return true;
+    }
+    catch (const std::exception& error) {
+        if (!initial_data.empty()) {
+            std::cerr << "vkkk: ignoring invalid pipeline cache '"
+                      << path << "': " << error.what() << '\n';
+            create_info.initialDataSize = 0;
+            create_info.pInitialData = nullptr;
+            try {
+                pipeline_cache = vk::raii::PipelineCache(device, create_info);
+                return true;
+            }
+            catch (const std::exception&) {
+                // Fall through and report a hard cache creation failure.
+            }
+        }
+        std::cerr << "vkkk: failed to create pipeline cache: "
+                  << error.what() << '\n';
+        return false;
+    }
+}
+
+bool Context::save_pipeline_cache(const fs::path& path) const {
+    if (path.empty() || pipeline_cache == nullptr) {
+        return false;
+    }
+
+    const auto data = pipeline_cache.getData();
+    if (data.empty()) {
+        return false;
+    }
+
+    std::error_code error;
+    if (!path.parent_path().empty()) {
+        fs::create_directories(path.parent_path(), error);
+        if (error) {
+            return false;
+        }
+    }
+    const fs::path temporary = path.string() + ".tmp";
+    {
+        std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            return false;
+        }
+        file.write(reinterpret_cast<const char*>(data.data()),
+            static_cast<std::streamsize>(data.size()));
+        file.flush();
+        if (!file) {
+            file.close();
+            fs::remove(temporary, error);
+            return false;
+        }
+    }
+    fs::remove(path, error);
+    error.clear();
+    fs::rename(temporary, path, error);
+    if (error) {
+        fs::remove(temporary, error);
+        return false;
+    }
+    return true;
+}
 
 uint32_t Context::find_graphics_queue_family_index() const {
     const auto queue_family_properties = physical_device.getQueueFamilyProperties();
@@ -705,6 +821,15 @@ void Context::init(WindowBackend& backend,
     device = vk::raii::Device(physical_device, device_create_info);
     queue = vk::raii::Queue(device, queue_idx, 0);
     compute_queue = vk::raii::Queue(device, compute_queue_idx, 0);
+
+    if (pipeline_cache_path_.empty() || pipeline_cache_force_recompile_) {
+        if (!load_pipeline_cache({})) {
+            throw std::runtime_error("failed to create Vulkan pipeline cache");
+        }
+    }
+    else if (!load_pipeline_cache(pipeline_cache_path_)) {
+        throw std::runtime_error("failed to create Vulkan pipeline cache");
+    }
 
     create_swapchain();
     create_imageviews();

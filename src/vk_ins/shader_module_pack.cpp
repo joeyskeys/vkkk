@@ -4,12 +4,125 @@
 #include <spirv_cross/spirv_glsl.hpp>
 #include <algorithm>
 #include <cstring>
+#include <fstream>
+#include <iomanip>
+#include <sstream>
+#include <system_error>
 
 #include "utils/io.h"
 #include "vk_ins/shader_module_pack.hpp"
 
 namespace vkkk
 {
+
+namespace
+{
+
+constexpr std::uint32_t kSpirvMagic = 0x07230203u;
+constexpr std::string_view kSpirvCacheSignature = "vkkk-spirv-cache-v1";
+
+bool valid_spirv(const std::vector<std::uint32_t>& spirv) {
+    return !spirv.empty() && spirv.front() == kSpirvMagic;
+}
+
+std::uint64_t fnv1a_append(std::uint64_t hash, std::string_view value) {
+    for (const unsigned char byte : value) {
+        hash ^= byte;
+        hash *= 1099511628211ull;
+    }
+    return hash;
+}
+
+} // namespace
+
+fs::path spirv_cache_path(std::string_view source,
+    vk::ShaderStageFlagBits stage, const ShaderCacheOptions& options)
+{
+    if (!options.enabled()) {
+        return {};
+    }
+
+    auto hash = fnv1a_append(1469598103934665603ull,
+        kSpirvCacheSignature);
+    hash = fnv1a_append(hash, source);
+    const auto stage_value = static_cast<std::uint32_t>(stage);
+    for (std::size_t i = 0; i < sizeof(stage_value); ++i) {
+        hash ^= static_cast<unsigned char>(stage_value >> (i * 8));
+        hash *= 1099511628211ull;
+    }
+
+    std::ostringstream name;
+    name << "shader_" << std::hex << std::setw(16)
+         << std::setfill('0') << hash << ".spv";
+    return options.directory / name.str();
+}
+
+bool load_spirv_cache(const fs::path& path, std::vector<uint32_t>& spirv) {
+    spirv.clear();
+    std::ifstream file(path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        return false;
+    }
+
+    const auto end = file.tellg();
+    if (end <= 0
+        || static_cast<std::uintmax_t>(end) % sizeof(std::uint32_t) != 0)
+    {
+        return false;
+    }
+    spirv.resize(static_cast<std::size_t>(end) / sizeof(std::uint32_t));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(spirv.data()),
+        static_cast<std::streamsize>(
+            spirv.size() * sizeof(std::uint32_t)));
+    if (!file || !valid_spirv(spirv)) {
+        spirv.clear();
+        return false;
+    }
+    return true;
+}
+
+bool save_spirv_cache(const fs::path& path,
+    const std::vector<uint32_t>& spirv)
+{
+    if (path.empty() || !valid_spirv(spirv)) {
+        return false;
+    }
+
+    std::error_code error;
+    if (!path.parent_path().empty()) {
+        fs::create_directories(path.parent_path(), error);
+        if (error) {
+            return false;
+        }
+    }
+
+    const fs::path temporary = path.string() + ".tmp";
+    {
+        std::ofstream file(temporary, std::ios::binary | std::ios::trunc);
+        if (!file) {
+            return false;
+        }
+        file.write(reinterpret_cast<const char*>(spirv.data()),
+            static_cast<std::streamsize>(
+                spirv.size() * sizeof(std::uint32_t)));
+        file.flush();
+        if (!file) {
+            file.close();
+            fs::remove(temporary, error);
+            return false;
+        }
+    }
+
+    fs::remove(path, error);
+    error.clear();
+    fs::rename(temporary, path, error);
+    if (error) {
+        fs::remove(temporary, error);
+        return false;
+    }
+    return true;
+}
 
 static GLSLTYPE find_vec_type(spirv_cross::SPIRType t) {
     enum GLSLTYPE vt = GLSLTYPE::UNKNOWN;
@@ -184,7 +297,7 @@ static bool shader_kind_from_stage(const vk::ShaderStageFlagBits t, shaderc_shad
 }
 
 bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
-    const std::string& source_name)
+    const std::string& source_name, const ShaderCacheOptions& cache)
 {
     type = t;
     spirv_code.clear();
@@ -200,6 +313,23 @@ bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
         return false;
     }
 
+    const std::string source_text(source_code.begin(), source_code.end());
+    if (cache.enabled() && !cache.force_recompile) {
+        const auto cache_file = spirv_cache_path(source_text, t, cache);
+        if (load_spirv_cache(cache_file, spirv_code)) {
+            try {
+                if (reflect_shader_module(*this, t)) {
+                    return true;
+                }
+            }
+            catch (const std::exception&) {
+                // Recompile if this cache was produced by an incompatible
+                // reflection toolchain.
+            }
+            spirv_code.clear();
+        }
+    }
+
     shaderc_shader_kind tt;
     if (!shader_kind_from_stage(t, tt)) {
         std::cout << "Shader type " << static_cast<uint32_t>(t) << " not supported yet.." << std::endl;
@@ -212,7 +342,6 @@ bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
     options.SetForcedVersionProfile(450, shaderc_profile_none);
 
-    const std::string source_text(source_code.begin(), source_code.end());
     shaderc::SpvCompilationResult ret =
         compiler.CompileGlslToSpv(source_text, tt, source_name.c_str(), "main", options);
 
@@ -222,10 +351,15 @@ bool ShaderModule::load(const char* source, const vk::ShaderStageFlagBits t,
     }
 
     spirv_code.insert(spirv_code.begin(), ret.cbegin(), ret.cend());
+    if (cache.enabled()) {
+        save_spirv_cache(spirv_cache_path(source_text, t, cache), spirv_code);
+    }
     return reflect_shader_module(*this, t);
 }
 
-bool ShaderModule::load(const fs::path& path, const vk::ShaderStageFlagBits t) {
+bool ShaderModule::load(const fs::path& path,
+    const vk::ShaderStageFlagBits t, const ShaderCacheOptions& cache)
+{
     type = t;
 
     auto abs_path = ensure_abs_path(path);
@@ -236,13 +370,7 @@ bool ShaderModule::load(const fs::path& path, const vk::ShaderStageFlagBits t) {
     auto extension = abs_path.extension();
 
     if (extension.string().ends_with(".spv")) {
-        // Compiled SPRIV
-        spirv_code = load_spirv_file(abs_path);
-        if (spirv_code.empty()) {
-            std::cout << "Failed to load SPIR-V file: " << abs_path << std::endl;
-            return false;
-        }
-        return reflect_shader_module(*this, t);
+        return load_spirv(abs_path, t);
     }
 
     source_code = load_file(abs_path);
@@ -252,7 +380,23 @@ bool ShaderModule::load(const fs::path& path, const vk::ShaderStageFlagBits t) {
     }
 
     const std::string source_text(source_code.begin(), source_code.end());
-    return load(source_text.c_str(), t, abs_path.filename().string());
+    return load(source_text.c_str(), t, abs_path.filename().string(), cache);
+}
+
+bool ShaderModule::load_spirv(const fs::path& path,
+    const vk::ShaderStageFlagBits t)
+{
+    type = t;
+    source_code.clear();
+    if (!load_spirv_cache(path, spirv_code)) {
+        std::cout << "Failed to load SPIR-V file: " << path << std::endl;
+        return false;
+    }
+    return reflect_shader_module(*this, t);
+}
+
+bool ShaderModule::save_spirv(const fs::path& path) const {
+    return save_spirv_cache(path, spirv_code);
 }
 
 bool ShaderModulePack::add_shader_module(const ShaderModule& module, bool replace) {

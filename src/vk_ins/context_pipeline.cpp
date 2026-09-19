@@ -330,7 +330,8 @@ bool Context::create_pipeline(const std::string& name,
     graphics_pipeline_create_info.layout = *pipeline_layout;
     graphics_pipeline_create_info.renderPass = nullptr;
     graphics_pipeline_create_info.subpass = 0;
-    vk::raii::Pipelines vk_pipelines(device, nullptr, {graphics_pipeline_create_info});
+    vk::raii::Pipelines vk_pipelines(
+        device, pipeline_cache, {graphics_pipeline_create_info});
     if (vk_pipelines.empty()) {
         std::cout << "Pipeline " << name << " creation failed" << std::endl;
         return false;
@@ -486,7 +487,7 @@ bool Context::create_pipeline(const std::string& name,
 
 bool Context::load_compute_pipeline(const std::string& name, const fs::path& path) {
     ComputeShader shader;
-    if (!shader.load(path)) {
+    if (!shader.load(path, shader_cache_options_)) {
         return false;
     }
     return create_compute_pipeline(name, shader);
@@ -602,7 +603,8 @@ bool Context::create_compute_pipeline(const std::string& name, const ComputeShad
     vk::ComputePipelineCreateInfo compute_pipeline_create_info{};
     compute_pipeline_create_info.stage = shader_stage_info;
     compute_pipeline_create_info.layout = *pipeline_layout;
-    vk::raii::Pipeline compute_pipeline(device, nullptr, compute_pipeline_create_info);
+    vk::raii::Pipeline compute_pipeline(
+        device, pipeline_cache, compute_pipeline_create_info);
 
     ComputePipeline pipeline{};
     pipeline.vk_pipeline = std::move(compute_pipeline);

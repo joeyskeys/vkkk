@@ -133,7 +133,9 @@ bool reflect_compute_shader(ComputeShader& shader) {
 
 } // namespace
 
-bool ComputeShader::load(const char* source, const std::string& source_name) {
+bool ComputeShader::load(const char* source, const std::string& source_name,
+    const ShaderCacheOptions& cache)
+{
     spirv_code.clear();
     bindings.clear();
     push_constants.clear();
@@ -149,13 +151,30 @@ bool ComputeShader::load(const char* source, const std::string& source_name) {
         return false;
     }
 
+    const std::string source_text(source_code.begin(), source_code.end());
+    if (cache.enabled() && !cache.force_recompile) {
+        const auto cache_file = spirv_cache_path(
+            source_text, vk::ShaderStageFlagBits::eCompute, cache);
+        if (load_spirv_cache(cache_file, spirv_code)) {
+            try {
+                if (reflect_compute_shader(*this)) {
+                    return true;
+                }
+            }
+            catch (const std::exception&) {
+                // Recompile if this cache was produced by an incompatible
+                // reflection toolchain.
+            }
+            spirv_code.clear();
+        }
+    }
+
     shaderc::Compiler compiler;
     shaderc::CompileOptions options;
     options.SetSourceLanguage(shaderc_source_language_glsl);
     options.SetTargetEnvironment(shaderc_target_env_vulkan, shaderc_env_version_vulkan_1_3);
     options.SetForcedVersionProfile(450, shaderc_profile_none);
 
-    const std::string source_text(source_code.begin(), source_code.end());
     shaderc::SpvCompilationResult ret =
         compiler.CompileGlslToSpv(source_text, shaderc_glsl_compute_shader, source_name.c_str(), "main", options);
     if (ret.GetCompilationStatus() != shaderc_compilation_status_success) {
@@ -164,10 +183,16 @@ bool ComputeShader::load(const char* source, const std::string& source_name) {
     }
 
     spirv_code.insert(spirv_code.begin(), ret.cbegin(), ret.cend());
+    if (cache.enabled()) {
+        save_spirv_cache(spirv_cache_path(
+            source_text, vk::ShaderStageFlagBits::eCompute, cache), spirv_code);
+    }
     return reflect_compute_shader(*this);
 }
 
-bool ComputeShader::load(const fs::path& path) {
+bool ComputeShader::load(const fs::path& path,
+    const ShaderCacheOptions& cache)
+{
     auto abs_path = ensure_abs_path(path);
     if (!fs::exists(abs_path)) {
         std::cout << "Compute shader file " << abs_path << " does not exist" << std::endl;
@@ -175,12 +200,7 @@ bool ComputeShader::load(const fs::path& path) {
     }
 
     if (abs_path.extension().string().ends_with(".spv")) {
-        spirv_code = load_spirv_file(abs_path);
-        if (spirv_code.empty()) {
-            std::cout << "Failed to load SPIR-V compute shader file: " << abs_path << std::endl;
-            return false;
-        }
-        return reflect_compute_shader(*this);
+        return load_spirv(abs_path);
     }
 
     source_code = load_file(abs_path);
@@ -189,7 +209,21 @@ bool ComputeShader::load(const fs::path& path) {
         return false;
     }
     const std::string source_text(source_code.begin(), source_code.end());
-    return load(source_text.c_str(), abs_path.filename().string());
+    return load(source_text.c_str(), abs_path.filename().string(), cache);
+}
+
+bool ComputeShader::load_spirv(const fs::path& path) {
+    source_code.clear();
+    if (!load_spirv_cache(path, spirv_code)) {
+        std::cout << "Failed to load SPIR-V compute shader file: "
+                  << path << std::endl;
+        return false;
+    }
+    return reflect_compute_shader(*this);
+}
+
+bool ComputeShader::save_spirv(const fs::path& path) const {
+    return save_spirv_cache(path, spirv_code);
 }
 
 } // namespace vkkk

@@ -407,6 +407,22 @@ public:
     void recreate_swapchain();
     void wait_idle() const { device.waitIdle(); }
 
+    // Shader source/SPIR-V cache configuration. The cache is optional; an
+    // empty directory preserves the original compile-on-load behavior.
+    void set_shader_cache(fs::path directory, bool force_recompile = false);
+    bool load_shader(ShaderModule& module, const fs::path& path,
+        vk::ShaderStageFlagBits stage) const;
+    bool load_shader(ShaderModule& module, const char* source,
+        vk::ShaderStageFlagBits stage,
+        const std::string& source_name = "inline_shader") const;
+
+    // Driver-specific Vulkan pipeline cache. Cache data is opaque and should
+    // only be reused for a compatible physical device and driver.
+    void set_pipeline_cache_path(fs::path path,
+        bool force_recompile = false);
+    bool load_pipeline_cache(const fs::path& path);
+    bool save_pipeline_cache(const fs::path& path) const;
+
     // Pipeline creation
     bool create_pipeline(const std::string& name,
         const ShaderModulePack& shader_module_pack,
@@ -781,6 +797,7 @@ private:
     vk::raii::SurfaceKHR surface = nullptr;
     vk::raii::PhysicalDevice physical_device = nullptr;
     vk::raii::Device device = nullptr;
+    vk::raii::PipelineCache pipeline_cache = nullptr;
     vk::raii::Queue queue = nullptr;
     vk::raii::Queue compute_queue = nullptr;
     uint32_t queue_idx = ~0;
@@ -818,6 +835,9 @@ private:
     bool enable_debug_messenger = true;
     bool mesh_shader_available = false;
     bool task_shader_available = false;
+    ShaderCacheOptions shader_cache_options_;
+    fs::path pipeline_cache_path_;
+    bool pipeline_cache_force_recompile_ = false;
     bool depth_image_initialized = false;
     int32_t active_render_target_index_ = -1;
     int32_t active_depth_attachment_index_ = -1;

@@ -1,8 +1,10 @@
 #pragma once
 
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <string>
+#include <string_view>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -24,6 +26,23 @@ using TexImgPairs = std::unordered_map<std::string, std::pair<std::string, bool>
 // Keyed by GLSL block/type name → (byte size, byte offset in the push-constant space).
 using PushConstantInfoMap = std::unordered_map<std::string, std::tuple<uint32_t, uint32_t>>;
 
+struct ShaderCacheOptions {
+    fs::path directory;
+    bool force_recompile = false;
+
+    bool enabled() const {
+        return !directory.empty();
+    }
+};
+
+// The cache filename is content-addressed, so source changes naturally
+// invalidate old entries without requiring a separate manifest.
+fs::path spirv_cache_path(std::string_view source,
+    vk::ShaderStageFlagBits stage, const ShaderCacheOptions& options);
+bool load_spirv_cache(const fs::path& path, std::vector<uint32_t>& spirv);
+bool save_spirv_cache(const fs::path& path,
+    const std::vector<uint32_t>& spirv);
+
 class ShaderModule {
 public:
     vk::ShaderStageFlagBits                         type{};
@@ -37,8 +56,12 @@ public:
     PushConstantInfoMap                             push_constant_infos;
 
     bool load(const char* source, vk::ShaderStageFlagBits t,
-        const std::string& source_name = "inline_shader");
-    bool load(const fs::path& path, vk::ShaderStageFlagBits t);
+        const std::string& source_name = "inline_shader",
+        const ShaderCacheOptions& cache = {});
+    bool load(const fs::path& path, vk::ShaderStageFlagBits t,
+        const ShaderCacheOptions& cache = {});
+    bool load_spirv(const fs::path& path, vk::ShaderStageFlagBits t);
+    bool save_spirv(const fs::path& path) const;
 
     std::tuple<std::string, uint32_t, uint32_t, uint32_t>
     get_uniform_info(const std::string& name) const

@@ -42,8 +42,13 @@ public:
     std::vector<ComputePushConstant> push_constants;
     std::array<uint32_t, 3> local_size{1, 1, 1};
 
-    bool load(const char* source, const std::string& source_name = "inline_compute_shader");
-    bool load(const fs::path& path);
+    bool load(const char* source,
+        const std::string& source_name = "inline_compute_shader",
+        const ShaderCacheOptions& cache = {});
+    bool load(const fs::path& path,
+        const ShaderCacheOptions& cache = {});
+    bool load_spirv(const fs::path& path);
+    bool save_spirv(const fs::path& path) const;
 };
 
 } // namespace vkkk

@@ -148,6 +148,7 @@ uint32_t mods_from_qt(Qt::KeyboardModifiers qt_mods) {
 class QtVulkanWindow final : public QWindow {
 public:
     bool* resize_flag = nullptr;
+    QWidget* viewport_container = nullptr;
     bool buttons[3] = {};
     QSet<int> keys;
     QSet<int> keypad_keys;
@@ -169,7 +170,12 @@ public:
             set_key(key_event->key(), event->type() == QEvent::KeyPress,
                 key_event->modifiers());
         }
-        else if (event->type() == QEvent::Wheel && watched != this) {
+        else if (event->type() == QEvent::Wheel && watched != this
+            && is_viewport_wheel_target(watched))
+        {
+            // Wheel events on the embedded window container do not always
+            // reach QWindow::wheelEvent. Capture only those viewport-owned
+            // events so dock panels keep independent zoom.
             const auto* wheel = static_cast<QWheelEvent*>(event);
             scroll_delta += static_cast<float>(wheel->angleDelta().y()) / 120.0f;
         }
@@ -210,6 +216,15 @@ protected:
     }
 
 private:
+    bool is_viewport_wheel_target(const QObject* watched) const {
+        if (viewport_container == nullptr || watched == nullptr) {
+            return false;
+        }
+        const auto* widget = qobject_cast<const QWidget*>(watched);
+        return widget != nullptr
+            && (widget == viewport_container
+                || viewport_container->isAncestorOf(widget));
+    }
     void set_button(Qt::MouseButton button, bool pressed) {
         if (button == Qt::LeftButton) {
             buttons[0] = pressed;
@@ -283,6 +298,7 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 
     container = QWidget::createWindowContainer(surface_window, viewport_root);
     container->setFocusPolicy(Qt::StrongFocus);
+    surface_window->viewport_container = viewport_root;
     viewport_layout->addWidget(container);
     main->setCentralWidget(viewport_root);
     container->setFocus();
@@ -309,6 +325,9 @@ QtBackend::QtBackend(int width, int height, const char* title) {
 QtBackend::~QtBackend() {
     if (auto* application = QCoreApplication::instance()) {
         application->removeEventFilter(surface_window);
+    }
+    if (surface_window != nullptr) {
+        surface_window->viewport_container = nullptr;
     }
     surface_window = nullptr;
     container = nullptr;

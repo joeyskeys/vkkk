@@ -34,6 +34,7 @@ public:
         Qt::DockWidgetArea area = Qt::RightDockWidgetArea);
     int set_hud_panel(QWidget* panel, const char* title);
     QWidget* hud_panel() const;
+    void set_right_dock_ratio(double ratio);
     void set_status(const std::string& text);
 
     std::vector<const char*> instance_extensions(bool enable_validation) const override;

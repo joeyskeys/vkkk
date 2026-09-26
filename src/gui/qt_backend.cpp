@@ -14,6 +14,7 @@
 #include <QGuiApplication>
 #include <QKeyEvent>
 #include <QLabel>
+#include <QList>
 #include <QMouseEvent>
 #include <QResizeEvent>
 #include <QSet>
@@ -255,11 +256,79 @@ class QtMainWindow final : public QMainWindow {
 public:
     bool closing = false;
 
+    void add_right_dock(QDockWidget* dock) {
+        if (dock == nullptr
+            || std::find(right_docks.begin(), right_docks.end(), dock)
+                != right_docks.end())
+        {
+            return;
+        }
+        right_docks.push_back(dock);
+        dock->installEventFilter(this);
+        resize_right_docks();
+    }
+
+    void set_right_dock_ratio(double ratio) {
+        right_dock_ratio = std::clamp(ratio, 0.10, 0.80);
+        resize_right_docks();
+    }
+
 protected:
     void closeEvent(QCloseEvent* event) override {
         closing = true;
         QMainWindow::closeEvent(event);
     }
+
+    void resizeEvent(QResizeEvent* event) override {
+        const bool was_resizing = resizing_docks;
+        resizing_docks = true;
+        QMainWindow::resizeEvent(event);
+        resize_right_docks();
+        resizing_docks = was_resizing;
+    }
+
+    bool eventFilter(QObject* watched, QEvent* event) override {
+        if (!resizing_docks && event->type() == QEvent::Resize) {
+            auto* dock = qobject_cast<QDockWidget*>(watched);
+            if (dock != nullptr
+                && dockWidgetArea(dock) == Qt::RightDockWidgetArea
+                && width() > 0 && dock->width() > 0)
+            {
+                right_dock_ratio = std::clamp(
+                    static_cast<double>(dock->width())
+                        / static_cast<double>(width()),
+                    0.10, 0.80);
+            }
+        }
+        return QMainWindow::eventFilter(watched, event);
+    }
+
+private:
+    void resize_right_docks() {
+        QList<QDockWidget*> visible_docks;
+        for (auto* dock : right_docks) {
+            if (dock != nullptr && dock->isVisible()
+                && dockWidgetArea(dock) == Qt::RightDockWidgetArea)
+            {
+                visible_docks.push_back(dock);
+            }
+        }
+        if (visible_docks.empty() || width() <= 0) {
+            return;
+        }
+
+        const bool was_resizing = resizing_docks;
+        resizing_docks = true;
+        resizeDocks(
+            {visible_docks.front()},
+            {std::max(1, static_cast<int>(width() * right_dock_ratio))},
+            Qt::Horizontal);
+        resizing_docks = was_resizing;
+    }
+
+    std::vector<QDockWidget*> right_docks;
+    double right_dock_ratio = 0.30;
+    bool resizing_docks = false;
 };
 
 QtBackend::QtBackend(int width, int height, const char* title) {
@@ -318,6 +387,7 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     layout->addStretch(1);
     hud_dock->setWidget(hud_root);
     main->addDockWidget(Qt::RightDockWidgetArea, hud_dock);
+    main->add_right_dock(hud_dock);
 
     main->show();
 }
@@ -370,6 +440,9 @@ int QtBackend::add_dock_panel(
         | QDockWidget::DockWidgetClosable);
     dock->setWidget(panel);
     main->addDockWidget(area, dock);
+    if (area == Qt::RightDockWidgetArea) {
+        main->add_right_dock(dock);
+    }
     dock->show();
     return 0;
 }
@@ -396,6 +469,12 @@ int QtBackend::set_hud_panel(QWidget* panel, const char* title) {
 
 QWidget* QtBackend::hud_panel() const {
     return hud_dock != nullptr ? hud_dock->widget() : nullptr;
+}
+
+void QtBackend::set_right_dock_ratio(double ratio) {
+    if (main != nullptr) {
+        main->set_right_dock_ratio(ratio);
+    }
 }
 
 void QtBackend::set_status(const std::string& text) {

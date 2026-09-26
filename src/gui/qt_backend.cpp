@@ -9,18 +9,17 @@
 #include <QCloseEvent>
 #include <QCoreApplication>
 #include <QCursor>
-#include <QDockWidget>
 #include <QEvent>
+#include <QFrame>
 #include <QGuiApplication>
+#include <QHBoxLayout>
 #include <QKeyEvent>
 #include <QLabel>
-#include <QList>
 #include <QMouseEvent>
-#include <QResizeEvent>
 #include <QSet>
 #include <QString>
-#include <QStatusBar>
-#include <QTabWidget>
+#include <QSplitter>
+#include <QResizeEvent>
 #include <QWheelEvent>
 #include <QWidget>
 #include <QVBoxLayout>
@@ -252,83 +251,204 @@ private:
     }
 };
 
-class QtMainWindow final : public QMainWindow {
+class QtPanelFrame final : public QFrame {
+public:
+    explicit QtPanelFrame(const QString& title, QWidget* parent = nullptr)
+        : QFrame(parent)
+    {
+        setFrameShape(QFrame::StyledPanel);
+        auto* outer = new QVBoxLayout(this);
+        outer->setContentsMargins(0, 0, 0, 0);
+        outer->setSpacing(0);
+
+        auto* title_bar = new QFrame(this);
+        title_bar->setObjectName(QStringLiteral("vkkk.panel.title"));
+        auto* title_layout = new QHBoxLayout(title_bar);
+        title_layout->setContentsMargins(10, 5, 10, 5);
+        title_label = new QLabel(title, title_bar);
+        title_layout->addWidget(title_label);
+        outer->addWidget(title_bar, 0);
+
+        content_layout = new QVBoxLayout();
+        content_layout->setContentsMargins(0, 0, 0, 0);
+        outer->addLayout(content_layout, 1);
+    }
+
+    void set_title(const QString& title) {
+        title_label->setText(title);
+    }
+
+    void set_content(QWidget* content) {
+        if (content == content_widget) {
+            return;
+        }
+        if (content_widget != nullptr) {
+            content_widget->setParent(nullptr);
+            delete content_widget;
+        }
+        content_widget = content;
+        if (content_widget != nullptr) {
+            content_widget->setParent(this);
+            content_layout->addWidget(content_widget);
+            content_widget->show();
+        }
+    }
+
+    QWidget* content() const {
+        return content_widget;
+    }
+
+private:
+    QLabel* title_label = nullptr;
+    QVBoxLayout* content_layout = nullptr;
+    QWidget* content_widget = nullptr;
+};
+
+class QtMainWindow final : public QWidget {
 public:
     bool closing = false;
 
-    void add_right_dock(QDockWidget* dock) {
-        if (dock == nullptr
-            || std::find(right_docks.begin(), right_docks.end(), dock)
-                != right_docks.end())
-        {
+    QtMainWindow(int width, int height, const char* title) {
+        setWindowTitle(title != nullptr ? title : "vkkk");
+        resize(width, height);
+
+        auto* layout = new QVBoxLayout(this);
+        layout->setContentsMargins(0, 0, 0, 0);
+        layout->setSpacing(0);
+
+        main_splitter = new QSplitter(Qt::Horizontal, this);
+        main_splitter->setChildrenCollapsible(false);
+        right_splitter = new QSplitter(Qt::Vertical, main_splitter);
+        right_splitter->setChildrenCollapsible(false);
+
+        auto* viewport_placeholder = new QWidget(main_splitter);
+        main_splitter->addWidget(viewport_placeholder);
+        main_splitter->addWidget(right_splitter);
+        main_splitter->setStretchFactor(0, 7);
+        main_splitter->setStretchFactor(1, 3);
+
+        hud_panel = new QtPanelFrame(QStringLiteral("HUD"), right_splitter);
+        right_splitter->addWidget(hud_panel);
+
+        status_label = new QLabel(QStringLiteral("Vulkan"), this);
+        status_label->setContentsMargins(8, 3, 8, 3);
+        layout->addWidget(main_splitter, 1);
+        layout->addWidget(status_label, 0);
+
+        QObject::connect(main_splitter, &QSplitter::splitterMoved,
+            this, [this](int, int) {
+                if (!redrawing) {
+                    update_ratio_from_splitter();
+                }
+            });
+        redraw_layout();
+    }
+
+    void set_viewport(QWidget* viewport) {
+        if (viewport == nullptr || viewport == viewport_widget) {
             return;
         }
-        right_docks.push_back(dock);
-        dock->installEventFilter(this);
-        resize_right_docks();
+        QWidget* previous = main_splitter->replaceWidget(0, viewport);
+        if (previous != nullptr && previous != viewport) {
+            previous->deleteLater();
+        }
+        viewport_widget = viewport;
+        redraw_layout();
+    }
+
+    int add_dock_panel(QWidget* panel, const char* title,
+        Qt::DockWidgetArea area)
+    {
+        if (panel == nullptr || area != Qt::RightDockWidgetArea) {
+            return -1;
+        }
+        auto* frame = new QtPanelFrame(
+            title != nullptr ? QString::fromUtf8(title)
+                             : QStringLiteral("Panel"),
+            right_splitter);
+        frame->set_content(panel);
+        right_splitter->addWidget(frame);
+        panel_frames.push_back(frame);
+        frame->show();
+        return 0;
+    }
+
+    int set_hud_panel(QWidget* panel, const char* title) {
+        if (panel == nullptr || hud_panel == nullptr) {
+            return -1;
+        }
+        hud_panel->set_title(
+            title != nullptr ? QString::fromUtf8(title)
+                             : QStringLiteral("Properties"));
+        hud_panel->set_content(panel);
+        hud_panel->show();
+        return 0;
+    }
+
+    QWidget* hud_panel_widget() const {
+        return hud_panel != nullptr ? hud_panel->content() : nullptr;
+    }
+
+    void set_status(const QString& text) {
+        if (status_label != nullptr) {
+            status_label->setText(text);
+        }
     }
 
     void set_right_dock_ratio(double ratio) {
-        right_dock_ratio = std::clamp(ratio, 0.10, 0.80);
-        resize_right_docks();
+        right_ratio = std::clamp(ratio, 0.10, 0.80);
+        redraw_layout();
     }
 
 protected:
     void closeEvent(QCloseEvent* event) override {
         closing = true;
-        QMainWindow::closeEvent(event);
+        QWidget::closeEvent(event);
     }
 
     void resizeEvent(QResizeEvent* event) override {
-        const bool was_resizing = resizing_docks;
-        resizing_docks = true;
-        QMainWindow::resizeEvent(event);
-        resize_right_docks();
-        resizing_docks = was_resizing;
-    }
-
-    bool eventFilter(QObject* watched, QEvent* event) override {
-        if (!resizing_docks && event->type() == QEvent::Resize) {
-            auto* dock = qobject_cast<QDockWidget*>(watched);
-            if (dock != nullptr
-                && dockWidgetArea(dock) == Qt::RightDockWidgetArea
-                && width() > 0 && dock->width() > 0)
-            {
-                right_dock_ratio = std::clamp(
-                    static_cast<double>(dock->width())
-                        / static_cast<double>(width()),
-                    0.10, 0.80);
-            }
-        }
-        return QMainWindow::eventFilter(watched, event);
+        QWidget::resizeEvent(event);
+        redraw_layout();
     }
 
 private:
-    void resize_right_docks() {
-        QList<QDockWidget*> visible_docks;
-        for (auto* dock : right_docks) {
-            if (dock != nullptr && dock->isVisible()
-                && dockWidgetArea(dock) == Qt::RightDockWidgetArea)
-            {
-                visible_docks.push_back(dock);
-            }
-        }
-        if (visible_docks.empty() || width() <= 0) {
+    void update_ratio_from_splitter() {
+        const auto sizes = main_splitter->sizes();
+        if (sizes.size() < 2 || sizes[0] + sizes[1] <= 0) {
             return;
         }
-
-        const bool was_resizing = resizing_docks;
-        resizing_docks = true;
-        resizeDocks(
-            {visible_docks.front()},
-            {std::max(1, static_cast<int>(width() * right_dock_ratio))},
-            Qt::Horizontal);
-        resizing_docks = was_resizing;
+        right_ratio = std::clamp(
+            static_cast<double>(sizes[1])
+                / static_cast<double>(sizes[0] + sizes[1]),
+            0.10, 0.80);
     }
 
-    std::vector<QDockWidget*> right_docks;
-    double right_dock_ratio = 0.30;
-    bool resizing_docks = false;
+    void redraw_layout() {
+        if (redrawing || main_splitter == nullptr
+            || main_splitter->width() <= 0)
+        {
+            return;
+        }
+        redrawing = true;
+        const bool was_enabled = updatesEnabled();
+        setUpdatesEnabled(false);
+        const int total = main_splitter->width();
+        const int right = std::max(
+            1, static_cast<int>(total * right_ratio));
+        main_splitter->setSizes({std::max(1, total - right), right});
+        setUpdatesEnabled(was_enabled);
+        redrawing = false;
+        update();
+    }
+
+    QSplitter* main_splitter = nullptr;
+    QSplitter* right_splitter = nullptr;
+    QWidget* viewport_widget = nullptr;
+    QtPanelFrame* hud_panel = nullptr;
+    QLabel* status_label = nullptr;
+    std::vector<QtPanelFrame*> panel_frames;
+    double right_ratio = 0.30;
+    bool redrawing = false;
 };
 
 QtBackend::QtBackend(int width, int height, const char* title) {
@@ -339,17 +459,7 @@ QtBackend::QtBackend(int width, int height, const char* title) {
         owned_app = new QApplication(argc, argv);
     }
 
-    main = new QtMainWindow();
-    main->setWindowTitle(title != nullptr ? title : "vkkk");
-    main->resize(width, height);
-    main->setDockNestingEnabled(true);
-    main->setDockOptions(
-        QMainWindow::AnimatedDocks
-        | QMainWindow::AllowNestedDocks
-        | QMainWindow::AllowTabbedDocks
-        | QMainWindow::GroupedDragging);
-    main->setTabPosition(
-        Qt::AllDockWidgetAreas, QTabWidget::North);
+    main = new QtMainWindow(width, height, title);
 
     surface_window = new QtVulkanWindow();
     surface_window->resize(width, height);
@@ -369,25 +479,8 @@ QtBackend::QtBackend(int width, int height, const char* title) {
     container->setFocusPolicy(Qt::StrongFocus);
     surface_window->viewport_container = viewport_root;
     viewport_layout->addWidget(container);
-    main->setCentralWidget(viewport_root);
+    main->set_viewport(viewport_root);
     container->setFocus();
-
-    hud_dock = new QDockWidget("HUD", main);
-    hud_dock->setObjectName(QStringLiteral("vkkk.hud"));
-    hud_dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    hud_dock->setFeatures(
-        QDockWidget::DockWidgetMovable
-        | QDockWidget::DockWidgetFloatable
-        | QDockWidget::DockWidgetClosable);
-    auto* hud_root = new QWidget(hud_dock);
-    auto* layout = new QVBoxLayout(hud_root);
-    status_label = new QLabel("Vulkan", hud_root);
-    status_label->setWordWrap(true);
-    layout->addWidget(status_label);
-    layout->addStretch(1);
-    hud_dock->setWidget(hud_root);
-    main->addDockWidget(Qt::RightDockWidgetArea, hud_dock);
-    main->add_right_dock(hud_dock);
 
     main->show();
 }
@@ -402,15 +495,13 @@ QtBackend::~QtBackend() {
     surface_window = nullptr;
     container = nullptr;
     viewport_root = nullptr;
-    hud_dock = nullptr;
-    status_label = nullptr;
     delete main;
     main = nullptr;
     delete owned_app;
     owned_app = nullptr;
 }
 
-QMainWindow* QtBackend::main_window() const {
+QWidget* QtBackend::main_window() const {
     return main;
 }
 
@@ -428,47 +519,18 @@ int QtBackend::add_dock_panel(
     if (main == nullptr || panel == nullptr) {
         return -1;
     }
-    const QString dock_title = title != nullptr
-        ? QString::fromUtf8(title) : QStringLiteral("Panel");
-    auto* dock = new QDockWidget(dock_title, main);
-    dock->setObjectName(
-        QStringLiteral("vkkk.dock.") + dock_title);
-    dock->setAllowedAreas(Qt::AllDockWidgetAreas);
-    dock->setFeatures(
-        QDockWidget::DockWidgetMovable
-        | QDockWidget::DockWidgetFloatable
-        | QDockWidget::DockWidgetClosable);
-    dock->setWidget(panel);
-    main->addDockWidget(area, dock);
-    if (area == Qt::RightDockWidgetArea) {
-        main->add_right_dock(dock);
-    }
-    dock->show();
-    return 0;
+    return main->add_dock_panel(panel, title, area);
 }
 
 int QtBackend::set_hud_panel(QWidget* panel, const char* title) {
-    if (hud_dock == nullptr || panel == nullptr) {
+    if (main == nullptr || panel == nullptr) {
         return -1;
     }
-    if (hud_dock->widget() != panel) {
-        QWidget* previous = hud_dock->widget();
-        if (previous != nullptr) {
-            previous->setParent(nullptr);
-        }
-        hud_dock->setWidget(panel);
-        delete previous;
-    }
-    hud_dock->setWindowTitle(
-        title != nullptr ? QString::fromUtf8(title)
-                         : QStringLiteral("Properties"));
-    status_label = nullptr;
-    hud_dock->show();
-    return 0;
+    return main->set_hud_panel(panel, title);
 }
 
 QWidget* QtBackend::hud_panel() const {
-    return hud_dock != nullptr ? hud_dock->widget() : nullptr;
+    return main != nullptr ? main->hud_panel_widget() : nullptr;
 }
 
 void QtBackend::set_right_dock_ratio(double ratio) {
@@ -478,10 +540,8 @@ void QtBackend::set_right_dock_ratio(double ratio) {
 }
 
 void QtBackend::set_status(const std::string& text) {
-    if (status_label != nullptr) {
-        status_label->setText(QString::fromStdString(text));
-    } else if (main != nullptr) {
-        main->statusBar()->showMessage(QString::fromStdString(text));
+    if (main != nullptr) {
+        main->set_status(QString::fromStdString(text));
     }
 }
 

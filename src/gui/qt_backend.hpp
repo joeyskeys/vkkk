@@ -4,8 +4,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <QDockWidget>
-#include <QLabel>
 #include <QMainWindow>
 #include <QWidget>
 #include <QWindow>
@@ -27,13 +25,14 @@ public:
     QtBackend(const QtBackend&) = delete;
     QtBackend& operator=(const QtBackend&) = delete;
 
-    QMainWindow* main_window() const;
+    QWidget* main_window() const;
     QWindow* vulkan_window() const;
     QWidget* viewport_panel() const;
     int add_dock_panel(QWidget* panel, const char* title,
         Qt::DockWidgetArea area = Qt::RightDockWidgetArea);
     int set_hud_panel(QWidget* panel, const char* title);
     QWidget* hud_panel() const;
+    void set_right_dock_ratio(double ratio);
     void set_status(const std::string& text);
 
     std::vector<const char*> instance_extensions(bool enable_validation) const override;
@@ -58,8 +57,6 @@ private:
     QtVulkanWindow* surface_window = nullptr;
     QWidget* container = nullptr;
     QWidget* viewport_root = nullptr;
-    QDockWidget* hud_dock = nullptr;
-    QLabel* status_label = nullptr;
 };
 
 static_assert(WindowBackendType<QtBackend>);

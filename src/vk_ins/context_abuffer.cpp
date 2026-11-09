@@ -166,10 +166,11 @@ void Context::barrier_abuffer_for_host(vk::CommandBuffer cmd) const {
     cmd.pipelineBarrier2(dependency);
 }
 
-bool Context::read_abuffer_pixel(const std::string& name, uint32_t frame_idx, uint32_t x, uint32_t y,
-    std::vector<uint32_t>& vertex_ids, bool& overflow) const
+bool Context::read_abuffer_pixel(const std::string& name, uint32_t frame_idx,
+    uint32_t x, uint32_t y, std::vector<ABufferHit>& hits,
+    bool& overflow) const
 {
-    vertex_ids.clear();
+    hits.clear();
     overflow = false;
     const auto found = abuffers.find(name);
     if (found == abuffers.end() || frame_idx >= found->second.head_memos.size()
@@ -197,10 +198,30 @@ bool Context::read_abuffer_pixel(const std::string& name, uint32_t frame_idx, ui
             buffer.node_memos[frame_idx].unmapMemory();
             return false;
         }
-        vertex_ids.push_back(nodes[node_index].vertex_id);
+        hits.push_back(ABufferHit{
+            .vertex_id = nodes[node_index].vertex_id,
+            .depth = nodes[node_index].depth,
+        });
         node_index = nodes[node_index].next;
     }
     buffer.node_memos[frame_idx].unmapMemory();
+    return true;
+}
+
+bool Context::read_abuffer_pixel(const std::string& name, uint32_t frame_idx,
+    uint32_t x, uint32_t y, std::vector<uint32_t>& vertex_ids,
+    bool& overflow) const
+{
+    std::vector<ABufferHit> hits;
+    if (!read_abuffer_pixel(name, frame_idx, x, y, hits, overflow)) {
+        vertex_ids.clear();
+        return false;
+    }
+    vertex_ids.clear();
+    vertex_ids.reserve(hits.size());
+    for (const auto& hit : hits) {
+        vertex_ids.push_back(hit.vertex_id);
+    }
     return true;
 }
 

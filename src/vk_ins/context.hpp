@@ -334,6 +334,13 @@ struct IndirectBuffer {
 struct ABufferNode {
     uint32_t vertex_id = 0;
     uint32_t next = ~0u;
+    float depth = 0.0f;
+    uint32_t reserved = 0;
+};
+
+struct ABufferHit {
+    uint32_t vertex_id = 0;
+    float depth = 0.0f;
 };
 
 struct ABuffer {
@@ -538,6 +545,8 @@ public:
     void barrier_abuffer_for_host(vk::CommandBuffer cmd) const;
     bool read_abuffer_pixel(const std::string& name, uint32_t frame_idx, uint32_t x, uint32_t y,
         std::vector<uint32_t>& vertex_ids, bool& overflow) const;
+    bool read_abuffer_pixel(const std::string& name, uint32_t frame_idx, uint32_t x, uint32_t y,
+        std::vector<ABufferHit>& hits, bool& overflow) const;
     bool bind_pipeline_ssbo_from_compute(const std::string& graphics_pipeline_name,
         const std::string& graphics_block_name, const std::string& compute_pipeline_name,
         const std::string& compute_block_name);

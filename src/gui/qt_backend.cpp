@@ -318,14 +318,18 @@ public:
 
         main_splitter = new QSplitter(Qt::Horizontal, this);
         main_splitter->setChildrenCollapsible(false);
+        left_splitter = new QSplitter(Qt::Vertical, main_splitter);
+        left_splitter->setChildrenCollapsible(false);
         right_splitter = new QSplitter(Qt::Vertical, main_splitter);
         right_splitter->setChildrenCollapsible(false);
 
         auto* viewport_placeholder = new QWidget(main_splitter);
+        main_splitter->addWidget(left_splitter);
         main_splitter->addWidget(viewport_placeholder);
         main_splitter->addWidget(right_splitter);
-        main_splitter->setStretchFactor(0, 7);
-        main_splitter->setStretchFactor(1, 3);
+        main_splitter->setStretchFactor(0, 2);
+        main_splitter->setStretchFactor(1, 7);
+        main_splitter->setStretchFactor(2, 3);
 
         hud_panel = new QtPanelFrame(QStringLiteral("HUD"), right_splitter);
         right_splitter->addWidget(hud_panel);
@@ -348,7 +352,7 @@ public:
         if (viewport == nullptr || viewport == viewport_widget) {
             return;
         }
-        QWidget* previous = main_splitter->replaceWidget(0, viewport);
+        QWidget* previous = main_splitter->replaceWidget(1, viewport);
         if (previous != nullptr && previous != viewport) {
             previous->deleteLater();
         }
@@ -359,15 +363,20 @@ public:
     int add_dock_panel(QWidget* panel, const char* title,
         Qt::DockWidgetArea area)
     {
-        if (panel == nullptr || area != Qt::RightDockWidgetArea) {
+        if (panel == nullptr
+            || (area != Qt::LeftDockWidgetArea
+                && area != Qt::RightDockWidgetArea))
+        {
             return -1;
         }
+        auto* splitter = area == Qt::LeftDockWidgetArea
+            ? left_splitter : right_splitter;
         auto* frame = new QtPanelFrame(
             title != nullptr ? QString::fromUtf8(title)
                              : QStringLiteral("Panel"),
-            right_splitter);
+            splitter);
         frame->set_content(panel);
-        right_splitter->addWidget(frame);
+        splitter->addWidget(frame);
         panel_frames.push_back(frame);
         frame->show();
         return 0;
@@ -414,12 +423,20 @@ protected:
 private:
     void update_ratio_from_splitter() {
         const auto sizes = main_splitter->sizes();
-        if (sizes.size() < 2 || sizes[0] + sizes[1] <= 0) {
+        if (sizes.size() < 3) {
             return;
         }
+        const int total = sizes[0] + sizes[1] + sizes[2];
+        if (total <= 0) {
+            return;
+        }
+        left_ratio = std::clamp(
+            static_cast<double>(sizes[0])
+                / static_cast<double>(total),
+            0.10, 0.50);
         right_ratio = std::clamp(
-            static_cast<double>(sizes[1])
-                / static_cast<double>(sizes[0] + sizes[1]),
+            static_cast<double>(sizes[2])
+                / static_cast<double>(total),
             0.10, 0.80);
     }
 
@@ -433,20 +450,25 @@ private:
         const bool was_enabled = updatesEnabled();
         setUpdatesEnabled(false);
         const int total = main_splitter->width();
+        const int left = std::max(
+            1, static_cast<int>(total * left_ratio));
         const int right = std::max(
             1, static_cast<int>(total * right_ratio));
-        main_splitter->setSizes({std::max(1, total - right), right});
+        const int center = std::max(1, total - left - right);
+        main_splitter->setSizes({left, center, right});
         setUpdatesEnabled(was_enabled);
         redrawing = false;
         update();
     }
 
     QSplitter* main_splitter = nullptr;
+    QSplitter* left_splitter = nullptr;
     QSplitter* right_splitter = nullptr;
     QWidget* viewport_widget = nullptr;
     QtPanelFrame* hud_panel = nullptr;
     QLabel* status_label = nullptr;
     std::vector<QtPanelFrame*> panel_frames;
+    double left_ratio = 0.22;
     double right_ratio = 0.30;
     bool redrawing = false;
 };
